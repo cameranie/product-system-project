@@ -23,7 +23,6 @@ import {
 import { 
   ArrowLeft, 
   Plus,
-  Save,
   Users,
   Calendar,
   Clock,
@@ -46,18 +45,22 @@ const taskTypeConfig = {
 };
 
 const priorityConfig = {
-  LOW: { label: '低', color: '#6B7280' },
-  MEDIUM: { label: '中', color: '#F59E0B' },
-  HIGH: { label: '高', color: '#EF4444' },
-  URGENT: { label: '紧急', color: '#DC2626' },
+  LOW: { label: '低', color: '#6B7280', bgColor: 'bg-gray-100', textColor: 'text-gray-800' },
+  MEDIUM: { label: '中', color: '#F59E0B', bgColor: 'bg-orange-100', textColor: 'text-orange-800' },
+  HIGH: { label: '高', color: '#EF4444', bgColor: 'bg-red-100', textColor: 'text-red-800' },
+  URGENT: { label: '紧急', color: '#DC2626', bgColor: 'bg-red-100', textColor: 'text-red-800' },
 };
 
-// 状态配置 - Issue和Task使用相同状态
+// 状态配置 - 映射后端状态到统一状态
 const statusConfig = {
-  TODO: { label: '待办', color: '#6B7280' },
-  IN_PROGRESS: { label: '进行中', color: '#F59E0B' },
-  DONE: { label: '已完成', color: '#10B981' },
-  CANCELLED: { label: '已取消', color: '#EF4444' },
+  OPEN: { label: '待开始', color: '#6B7280', bgColor: 'bg-gray-100', textColor: 'text-gray-800' },
+  IN_DISCUSSION: { label: '进行中', color: '#F59E0B', bgColor: 'bg-orange-100', textColor: 'text-orange-800' },
+  TODO: { label: '待开始', color: '#6B7280', bgColor: 'bg-gray-100', textColor: 'text-gray-800' },
+  IN_PROGRESS: { label: '进行中', color: '#F59E0B', bgColor: 'bg-orange-100', textColor: 'text-orange-800' },
+  IN_REVIEW: { label: '审核中', color: '#8B5CF6', bgColor: 'bg-purple-100', textColor: 'text-purple-800' },
+  DONE: { label: '已完成', color: '#10B981', bgColor: 'bg-green-100', textColor: 'text-green-800' },
+  CANCELLED: { label: '已完成', color: '#10B981', bgColor: 'bg-green-100', textColor: 'text-green-800' },
+  IN_DEVELOPMENT: { label: '进行中', color: '#F59E0B', bgColor: 'bg-orange-100', textColor: 'text-orange-800' },
 };
 
 
@@ -244,7 +247,7 @@ export default function IssueDetailPage() {
               size="sm"
             >
               <Plus className="h-4 w-4 mr-2" />
-              添加
+              添加任务
             </Button>
           </div>
         </div>
@@ -380,8 +383,7 @@ export default function IssueDetailPage() {
 
                         <div className="flex items-center gap-3 pt-4">
                           <Button onClick={handleAddTask}>
-                            <Save className="h-4 w-4 mr-2" />
-                            添加任务
+                            添加
                           </Button>
                           <Button 
                             variant="outline" 
@@ -531,18 +533,24 @@ export default function IssueDetailPage() {
                     
                     <div>
                       <div className="text-sm font-medium text-muted-foreground mb-2">Issue ID</div>
-                      <Badge variant="outline">{issue.id}</Badge>
+                      <div className="text-sm">{issue.id}</div>
                     </div>
                     
                     <div>
                       <div className="text-sm font-medium text-muted-foreground mb-2">状态</div>
-                      <Badge variant="outline">{issue.status}</Badge>
+                      <Badge 
+                        className={`text-xs ${statusConfig[issue.status as keyof typeof statusConfig]?.bgColor || 'bg-gray-100'} ${statusConfig[issue.status as keyof typeof statusConfig]?.textColor || 'text-gray-800'}`}
+                      >
+                        {statusConfig[issue.status as keyof typeof statusConfig]?.label || issue.status}
+                      </Badge>
                     </div>
                     
                     <div>
                       <div className="text-sm font-medium text-muted-foreground mb-2">优先级</div>
-                      <Badge variant="outline" className="text-xs">
-                        {issue.priority}
+                      <Badge 
+                        className={`text-xs ${priorityConfig[issue.priority as keyof typeof priorityConfig]?.bgColor || 'bg-gray-100'} ${priorityConfig[issue.priority as keyof typeof priorityConfig]?.textColor || 'text-gray-800'}`}
+                      >
+                        {priorityConfig[issue.priority as keyof typeof priorityConfig]?.label || issue.priority}
                       </Badge>
                     </div>
 
@@ -555,16 +563,12 @@ export default function IssueDetailPage() {
 
                     <div>
                       <div className="text-sm font-medium text-muted-foreground mb-2">Issue类型</div>
-                      <Badge variant="outline" className="text-xs">
-                        {issue.issueType}
-                      </Badge>
+                      <div className="text-sm">{issue.issueType}</div>
                     </div>
 
                     <div>
                       <div className="text-sm font-medium text-muted-foreground mb-2">输入源</div>
-                      <Badge variant="outline" className="text-xs">
-                        {issue.inputSource}
-                      </Badge>
+                      <div className="text-sm">{issue.inputSource}</div>
                     </div>
 
                     {issue.assignee && (
@@ -576,33 +580,6 @@ export default function IssueDetailPage() {
                             <AvatarFallback>{issue.assignee.name[0]}</AvatarFallback>
                           </Avatar>
                           <span className="text-sm">{issue.assignee.name}</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {issue.businessValue && (
-                      <div>
-                        <div className="text-sm font-medium text-muted-foreground mb-2">商业价值</div>
-                        <div className="text-sm text-muted-foreground">
-                          {issue.businessValue}
-                        </div>
-                      </div>
-                    )}
-
-                    {issue.userImpact && (
-                      <div>
-                        <div className="text-sm font-medium text-muted-foreground mb-2">用户影响</div>
-                        <div className="text-sm text-muted-foreground">
-                          {issue.userImpact}
-                        </div>
-                      </div>
-                    )}
-
-                    {issue.technicalRisk && (
-                      <div>
-                        <div className="text-sm font-medium text-muted-foreground mb-2">技术风险</div>
-                        <div className="text-sm text-muted-foreground">
-                          {issue.technicalRisk}
                         </div>
                       </div>
                     )}
@@ -623,14 +600,30 @@ export default function IssueDetailPage() {
                       </div>
                     </div>
 
-                    {issue.description && (
-                      <div>
-                        <div className="text-sm font-medium text-muted-foreground mb-2">描述</div>
-                        <div className="text-sm whitespace-pre-wrap text-muted-foreground">
-                          {issue.description}
-                        </div>
+                    <div>
+                      <div className="text-sm font-medium text-muted-foreground mb-2">描述</div>
+                      <div className="text-sm whitespace-pre-wrap text-muted-foreground">
+                        {issue.description}
+                        {issue.businessValue && (
+                          <div className="mt-3">
+                            <div className="font-medium text-foreground">商业价值：</div>
+                            <div>{issue.businessValue}</div>
+                          </div>
+                        )}
+                        {issue.userImpact && (
+                          <div className="mt-3">
+                            <div className="font-medium text-foreground">用户影响：</div>
+                            <div>{issue.userImpact}</div>
+                          </div>
+                        )}
+                        {issue.technicalRisk && (
+                          <div className="mt-3">
+                            <div className="font-medium text-foreground">技术风险：</div>
+                            <div>{issue.technicalRisk}</div>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
 
                     {/* 统计信息 */}
                     {tasks.length > 0 && (
