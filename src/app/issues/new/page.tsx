@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { TagSelector } from '@/components/ui/tag-selector';
+
 import { DatePicker } from '@/components/ui/date-picker';
 import { FormField, FormFieldGroup } from '@/components/ui/form-field';
 import { WysiwygEditor } from '@/components/ui/wysiwyg-editor';
@@ -23,7 +23,7 @@ import {
   Save,
   Send
 } from 'lucide-react';
-import Image from 'next/image';
+
 
 // 输入源配置
 const inputSourceConfig = {
@@ -49,20 +49,16 @@ const priorityConfig = {
   URGENT: { label: '紧急', color: '#DC2626' },
 };
 
-interface Department {
-  id: string;
-  name: string;
-  color: string;
-}
+
 
 interface IssueFormData {
   title: string;
   projectId: string;
+  versionId: string;
   description: string;
   assigneeId: string;
-  businessValue: string;
-  userImpact: string;
-  technicalRisk: string;
+  reviewerId: string;
+  startDate?: Date;
   dueDate?: Date;
   priority: Priority;
   issueType: IssueType;
@@ -73,19 +69,23 @@ export default function CreateIssuePage() {
   const [formData, setFormData] = useState<IssueFormData>({
     title: '',
     projectId: '',
+    versionId: '',
     description: '',
     assigneeId: '',
-    businessValue: '',
-    userImpact: '',
-    technicalRisk: '',
-    priority: 'MEDIUM',
-    issueType: 'FEATURE',
-    inputSource: 'USER_FEEDBACK',
+    reviewerId: '',
+    priority: 'MEDIUM' as Priority,
+    issueType: 'FEATURE' as IssueType,
+    inputSource: 'USER_FEEDBACK' as InputSource,
   });
 
   const [saving, setSaving] = useState(false);
-  const [projects, setProjects] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
+  const [projects, setProjects] = useState<Array<{id: string; name: string; key: string}>>([]);
+  const [users, setUsers] = useState<Array<{id: string; name: string; email: string; username: string}>>([]);
+  const [versions] = useState<Array<{id: string; name: string; description: string}>>([
+    { id: 'v1.0.0', name: 'v1.0.0', description: '第一个正式版本' },
+    { id: 'v1.1.0', name: 'v1.1.0', description: '功能增强版本' },
+    { id: 'v2.0.0', name: 'v2.0.0', description: '重大更新版本' },
+  ]);
   const [loading, setLoading] = useState(true);
 
   // 加载项目和用户数据
@@ -115,7 +115,7 @@ export default function CreateIssuePage() {
     window.history.back();
   };
 
-  const handleSave = async (isDraft: boolean = false) => {
+  const handleSave = async () => {
     if (!formData.title || !formData.projectId) {
       alert('请填写标题和选择项目');
       return;
@@ -131,9 +131,6 @@ export default function CreateIssuePage() {
         issueType: formData.issueType,
         projectId: formData.projectId,
         assigneeId: formData.assigneeId || undefined,
-        businessValue: formData.businessValue || undefined,
-        userImpact: formData.userImpact || undefined,
-        technicalRisk: formData.technicalRisk || undefined,
         dueDate: formData.dueDate?.toISOString() || undefined,
       });
       
@@ -184,7 +181,7 @@ export default function CreateIssuePage() {
           {/* 操作按钮 */}
           <div className="flex items-center gap-3">
             <Button 
-              onClick={() => handleSave(true)}
+              onClick={handleSave}
               disabled={saving}
               variant="outline"
               size="sm"
@@ -194,7 +191,7 @@ export default function CreateIssuePage() {
             </Button>
             
             <Button 
-              onClick={() => handleSave(false)}
+              onClick={handleSave}
               disabled={saving || !formData.title}
               size="sm"
             >
@@ -219,8 +216,8 @@ export default function CreateIssuePage() {
                     />
                   </FormField>
 
-                  {/* 项目信息行：所属项目、Issue类型、输入源 */}
-                  <div className="grid grid-cols-3 gap-4">
+                  {/* 第一行：所属项目、所属版本 */}
+                  <div className="grid grid-cols-2 gap-4">
                     <FormField label="所属项目" required>
                       <Select 
                         value={formData.projectId} 
@@ -239,6 +236,30 @@ export default function CreateIssuePage() {
                       </Select>
                     </FormField>
 
+                    <FormField label="所属版本">
+                      <Select 
+                        value={formData.versionId} 
+                        onValueChange={(value) => setFormData({...formData, versionId: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="选择版本" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {versions.map(version => (
+                            <SelectItem key={version.id} value={version.id}>
+                              <div className="flex flex-col">
+                                <span>{version.name}</span>
+                                <span className="text-xs text-muted-foreground">{version.description}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormField>
+                  </div>
+
+                  {/* 第二行：Issue类型、输入源 */}
+                  <div className="grid grid-cols-2 gap-4">
                     <FormField label="Issue类型">
                       <Select 
                         value={formData.issueType} 
@@ -276,39 +297,20 @@ export default function CreateIssuePage() {
                     </FormField>
                   </div>
 
-                  {/* 商业价值 */}
-                  <FormField label="商业价值">
-                    <Input
-                      placeholder="描述这个需求的商业价值和预期收益"
-                      value={formData.businessValue}
-                      onChange={(e) => setFormData({...formData, businessValue: e.target.value})}
-                    />
-                  </FormField>
 
-                  {/* 用户影响 */}
-                  <FormField label="用户影响">
-                    <Input
-                      placeholder="描述对用户的影响范围和程度"
-                      value={formData.userImpact}
-                      onChange={(e) => setFormData({...formData, userImpact: e.target.value})}
-                    />
-                  </FormField>
-
-                  {/* 技术风险 */}
-                  <FormField label="技术风险">
-                    <Input
-                      placeholder="评估技术实现的风险和复杂度"
-                      value={formData.technicalRisk}
-                      onChange={(e) => setFormData({...formData, technicalRisk: e.target.value})}
-                    />
-                  </FormField>
 
                   {/* 描述 - 使用所见即所得编辑器 */}
                   <FormField label="描述">
                     <WysiwygEditor
                       value={formData.description}
                       onChange={(value) => setFormData({...formData, description: value})}
-                      placeholder="详细描述需求背景、商业价值、功能规格、用户场景等..."
+                      placeholder="详细描述需求背景、功能规格、用户场景等...
+
+可以包含以下内容：
+• 商业价值：描述这个需求的商业价值和预期收益
+• 用户影响：描述对用户的影响范围和程度  
+• 技术风险：评估技术实现的风险和复杂度
+• 功能详情：具体的功能需求和实现方案"
                       minHeight="300px"
                       showHelpText={false}
                     />
@@ -329,6 +331,31 @@ export default function CreateIssuePage() {
                         >
                           <SelectTrigger className="h-9">
                             <SelectValue placeholder="选择负责人" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {users.map(user => (
+                              <SelectItem key={user.id} value={user.id}>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-xs">
+                                    {user.name[0]}
+                                  </div>
+                                  <span>{user.name}</span>
+                                  <span className="text-xs text-muted-foreground">({user.email})</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormField>
+
+                      {/* 审核人 */}
+                      <FormField label="审核人 (Reviewer)">
+                        <Select 
+                          value={formData.reviewerId} 
+                          onValueChange={(value) => setFormData({...formData, reviewerId: value})}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="选择审核人" />
                           </SelectTrigger>
                           <SelectContent>
                             {users.map(user => (
@@ -369,6 +396,16 @@ export default function CreateIssuePage() {
                             ))}
                           </SelectContent>
                         </Select>
+                      </FormField>
+
+                      {/* 预计开始日期 */}
+                      <FormField label="预计开始日期">
+                        <DatePicker
+                          date={formData.startDate}
+                          onDateChange={(date) => setFormData({...formData, startDate: date})}
+                          placeholder="选择开始日期"
+                          className="h-9 text-sm"
+                        />
                       </FormField>
 
                       {/* 预期完成日期 */}
