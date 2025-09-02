@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,8 @@ import { TagSelector } from '@/components/ui/tag-selector';
 import { DatePicker } from '@/components/ui/date-picker';
 import { FormField, FormFieldGroup } from '@/components/ui/form-field';
 import { WysiwygEditor } from '@/components/ui/wysiwyg-editor';
+import { issueApi, projectApi, userApi } from '@/lib/api';
+import type { Priority, InputSource, IssueType } from '@/types/issue';
 import { 
   Select,
   SelectContent,
@@ -23,37 +25,13 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 
-// 模拟数据
-const mockProjects = [
-  { id: '1', name: '项目管理系统', key: 'PMS' },
-  { id: '2', name: '用户中心', key: 'UC' },
-  { id: '3', name: '数据分析平台', key: 'DAP' },
-];
-
-const mockVersions = [
-  { id: '1', name: 'v1.0.0', description: '初始版本' },
-  { id: '2', name: 'v1.1.0', description: '功能增强' },
-  { id: '3', name: 'v2.0.0', description: '重大更新' },
-];
-
-const mockRelatedIssues = [
-  { id: 'ISS-001', title: '用户登录优化' },
-  { id: 'ISS-002', title: '数据导出功能' },
-  { id: 'ISS-003', title: '权限管理重构' },
-];
-
-const mockUsers = [
-  { id: '1', name: '张三', avatar: 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=zhang', role: '前端开发' },
-  { id: '2', name: '李四', avatar: 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=li', role: '后端开发' },
-  { id: '3', name: '王五', avatar: 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=wang', role: '产品经理' },
-];
-
-const mockDepartments = [
-  { id: '1', name: '产品部', color: '#3B82F6' },
-  { id: '2', name: '技术部', color: '#10B981' },
-  { id: '3', name: '设计部', color: '#F59E0B' },
-  { id: '4', name: '运营部', color: '#EF4444' },
-];
+// 输入源配置
+const inputSourceConfig = {
+  USER_FEEDBACK: { label: '用户反馈', value: 'USER_FEEDBACK' as InputSource },
+  INTERNAL: { label: '内部反馈', value: 'INTERNAL' as InputSource },
+  DATA_ANALYSIS: { label: '数据分析', value: 'DATA_ANALYSIS' as InputSource },
+  STRATEGY: { label: '战略需求', value: 'STRATEGY' as InputSource },
+};
 
 // 配置对象
 const issueTypeConfig = {
@@ -80,46 +58,88 @@ interface Department {
 interface IssueFormData {
   title: string;
   projectId: string;
-  versionId: string;
-  relatedIssueIds: string[];
   description: string;
   assigneeId: string;
-  reviewerId: string;
-  startDate?: Date;
-  endDate?: Date;
-  departments: Department[];
-  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-  issueType: 'FEATURE' | 'ENHANCEMENT' | 'BUG_FIX' | 'TECHNICAL_DEBT' | 'RESEARCH';
+  businessValue: string;
+  userImpact: string;
+  technicalRisk: string;
+  dueDate?: Date;
+  priority: Priority;
+  issueType: IssueType;
+  inputSource: InputSource;
 }
 
 export default function CreateIssuePage() {
   const [formData, setFormData] = useState<IssueFormData>({
     title: '',
     projectId: '',
-    versionId: '',
-    relatedIssueIds: [],
     description: '',
     assigneeId: '',
-    reviewerId: '',
-    departments: [],
+    businessValue: '',
+    userImpact: '',
+    technicalRisk: '',
     priority: 'MEDIUM',
     issueType: 'FEATURE',
+    inputSource: 'USER_FEEDBACK',
   });
 
   const [saving, setSaving] = useState(false);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // 加载项目和用户数据
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const [projectsResponse, usersResponse] = await Promise.all([
+          projectApi.getProjects(),
+          userApi.getUsers()
+        ]);
+        
+        setProjects(projectsResponse.projects.projects);
+        setUsers(usersResponse.users.users);
+      } catch (error) {
+        console.error('Failed to load data:', error);
+        alert('加载数据失败，请刷新重试');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   const handleBack = () => {
     window.history.back();
   };
 
   const handleSave = async (isDraft: boolean = false) => {
+    if (!formData.title || !formData.projectId) {
+      alert('请填写标题和选择项目');
+      return;
+    }
+
     setSaving(true);
     try {
-      // 模拟保存逻辑
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log('保存Issue:', { ...formData, isDraft });
-      // 这里应该调用API保存数据
-      alert(isDraft ? '草稿保存成功！' : 'Issue创建成功！');
+      await issueApi.createIssue({
+        title: formData.title,
+        description: formData.description,
+        priority: formData.priority,
+        inputSource: formData.inputSource,
+        issueType: formData.issueType,
+        projectId: formData.projectId,
+        assigneeId: formData.assigneeId || undefined,
+        businessValue: formData.businessValue || undefined,
+        userImpact: formData.userImpact || undefined,
+        technicalRisk: formData.technicalRisk || undefined,
+        dueDate: formData.dueDate?.toISOString() || undefined,
+      });
+      
+      alert('Issue创建成功！');
+      // 跳转到Issues列表页
+      window.location.href = '/issues';
     } catch (error) {
       console.error('保存失败:', error);
       alert('保存失败，请重试');
@@ -128,17 +148,18 @@ export default function CreateIssuePage() {
     }
   };
 
-  const handleDepartmentsChange = (departments: Department[]) => {
-    setFormData({...formData, departments});
-  };
-
-  const getDepartmentValue = (dept: Department) => dept.id;
-  const getDepartmentLabel = (dept: Department) => dept.name;
-  const createDepartment = (name: string): Department => ({
-    id: `dept_${Date.now()}`,
-    name,
-    color: '#6B7280'
-  });
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="text-lg">加载中...</div>
+            <div className="text-sm text-muted-foreground mt-2">正在加载项目和用户数据</div>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -198,9 +219,9 @@ export default function CreateIssuePage() {
                     />
                   </FormField>
 
-                  {/* 项目信息行：所属项目、所属版本、Issue类型 */}
+                  {/* 项目信息行：所属项目、Issue类型、输入源 */}
                   <div className="grid grid-cols-3 gap-4">
-                    <FormField label="所属项目">
+                    <FormField label="所属项目" required>
                       <Select 
                         value={formData.projectId} 
                         onValueChange={(value) => setFormData({...formData, projectId: value})}
@@ -209,27 +230,9 @@ export default function CreateIssuePage() {
                           <SelectValue placeholder="选择项目" />
                         </SelectTrigger>
                         <SelectContent>
-                          {mockProjects.map(project => (
+                          {projects.map(project => (
                             <SelectItem key={project.id} value={project.id}>
                               {project.name} ({project.key})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormField>
-
-                    <FormField label="所属版本">
-                      <Select 
-                        value={formData.versionId} 
-                        onValueChange={(value) => setFormData({...formData, versionId: value})}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="选择版本" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {mockVersions.map(version => (
-                            <SelectItem key={version.id} value={version.id}>
-                              {version.name} - {version.description}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -239,7 +242,7 @@ export default function CreateIssuePage() {
                     <FormField label="Issue类型">
                       <Select 
                         value={formData.issueType} 
-                        onValueChange={(value) => setFormData({...formData, issueType: value as IssueFormData['issueType']})}
+                        onValueChange={(value) => setFormData({...formData, issueType: value as IssueType})}
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -253,21 +256,50 @@ export default function CreateIssuePage() {
                         </SelectContent>
                       </Select>
                     </FormField>
+
+                    <FormField label="输入源">
+                      <Select 
+                        value={formData.inputSource} 
+                        onValueChange={(value) => setFormData({...formData, inputSource: value as InputSource})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(inputSourceConfig).map(([key, config]) => (
+                            <SelectItem key={key} value={config.value}>
+                              {config.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormField>
                   </div>
 
-                  {/* 相关Issue - 使用TagSelector */}
-                  <FormField label="相关 Issue">
-                    <TagSelector
-                      availableTags={mockRelatedIssues}
-                      selectedTags={formData.relatedIssueIds.map(id => mockRelatedIssues.find(issue => issue.id === id)!).filter(Boolean)}
-                      onChange={(selected) => setFormData({
-                        ...formData, 
-                        relatedIssueIds: selected.map(issue => issue.id)
-                      })}
-                      getValue={(issue) => issue.id}
-                      getLabel={(issue) => issue.title}
-                      createTag={(inputValue: string) => ({ id: `ISS-${Date.now()}`, title: inputValue })}
-                      className="w-full"
+                  {/* 商业价值 */}
+                  <FormField label="商业价值">
+                    <Input
+                      placeholder="描述这个需求的商业价值和预期收益"
+                      value={formData.businessValue}
+                      onChange={(e) => setFormData({...formData, businessValue: e.target.value})}
+                    />
+                  </FormField>
+
+                  {/* 用户影响 */}
+                  <FormField label="用户影响">
+                    <Input
+                      placeholder="描述对用户的影响范围和程度"
+                      value={formData.userImpact}
+                      onChange={(e) => setFormData({...formData, userImpact: e.target.value})}
+                    />
+                  </FormField>
+
+                  {/* 技术风险 */}
+                  <FormField label="技术风险">
+                    <Input
+                      placeholder="评估技术实现的风险和复杂度"
+                      value={formData.technicalRisk}
+                      onChange={(e) => setFormData({...formData, technicalRisk: e.target.value})}
                     />
                   </FormField>
 
@@ -289,58 +321,24 @@ export default function CreateIssuePage() {
                 <Card className="border border-border shadow-none py-0">
                   <CardContent className="p-6" style={{ padding: '24px' }}>
                     <FormFieldGroup>
-                      {/* 涉及部门 */}
-                      <FormField label="涉及部门">
-                        <TagSelector
-                          availableTags={mockDepartments}
-                          selectedTags={formData.departments}
-                          onChange={handleDepartmentsChange}
-                          getValue={getDepartmentValue}
-                          getLabel={getDepartmentLabel}
-                          createTag={createDepartment}
-                          className="w-full"
-                        />
-                      </FormField>
-
-                      {/* 执行人 */}
-                      <FormField label="执行人 (Assignee)">
+                      {/* 负责人 */}
+                      <FormField label="负责人 (Assignee)">
                         <Select 
                           value={formData.assigneeId} 
                           onValueChange={(value) => setFormData({...formData, assigneeId: value})}
                         >
                           <SelectTrigger className="h-9">
-                            <SelectValue placeholder="选择执行人" />
+                            <SelectValue placeholder="选择负责人" />
                           </SelectTrigger>
                           <SelectContent>
-                            {mockUsers.map(user => (
+                            {users.map(user => (
                               <SelectItem key={user.id} value={user.id}>
                                 <div className="flex items-center gap-2">
-                                  <Image src={user.avatar} alt={user.name} width={20} height={20} className="w-5 h-5 rounded-full" />
+                                  <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-xs">
+                                    {user.name[0]}
+                                  </div>
                                   <span>{user.name}</span>
-                                  <span className="text-xs text-muted-foreground">({user.role})</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormField>
-
-                      {/* 审核人 */}
-                      <FormField label="审核人 (Reviewer)">
-                        <Select 
-                          value={formData.reviewerId} 
-                          onValueChange={(value) => setFormData({...formData, reviewerId: value})}
-                        >
-                          <SelectTrigger className="h-9">
-                            <SelectValue placeholder="选择审核人" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {mockUsers.map(user => (
-                              <SelectItem key={user.id} value={user.id}>
-                                <div className="flex items-center gap-2">
-                                  <Image src={user.avatar} alt={user.name} width={20} height={20} className="w-5 h-5 rounded-full" />
-                                  <span>{user.name}</span>
-                                  <span className="text-xs text-muted-foreground">({user.role})</span>
+                                  <span className="text-xs text-muted-foreground">({user.email})</span>
                                 </div>
                               </SelectItem>
                             ))}
@@ -352,7 +350,7 @@ export default function CreateIssuePage() {
                       <FormField label="优先级">
                         <Select 
                           value={formData.priority} 
-                          onValueChange={(value) => setFormData({...formData, priority: value as IssueFormData['priority']})}
+                          onValueChange={(value) => setFormData({...formData, priority: value as Priority})}
                         >
                           <SelectTrigger className="h-9">
                             <SelectValue />
@@ -373,22 +371,12 @@ export default function CreateIssuePage() {
                         </Select>
                       </FormField>
 
-                      {/* 预计开始日期 */}
-                      <FormField label="预计开始日期">
+                      {/* 预期完成日期 */}
+                      <FormField label="预期完成日期">
                         <DatePicker
-                          date={formData.startDate}
-                          onDateChange={(date) => setFormData({...formData, startDate: date})}
-                          placeholder="选择开始日期"
-                          className="h-9 text-sm"
-                        />
-                      </FormField>
-
-                      {/* 预计结束日期 */}
-                      <FormField label="预计结束日期">
-                        <DatePicker
-                          date={formData.endDate}
-                          onDateChange={(date) => setFormData({...formData, endDate: date})}
-                          placeholder="选择结束日期"
+                          date={formData.dueDate}
+                          onDateChange={(date) => setFormData({...formData, dueDate: date})}
+                          placeholder="选择完成日期"
                           className="h-9 text-sm"
                         />
                       </FormField>

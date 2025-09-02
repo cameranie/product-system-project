@@ -1,10 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { issueApi } from '@/lib/api';
+import type { Issue, IssueStatus } from '@/types/issue';
 
 import {
   Table,
@@ -18,130 +21,79 @@ import {
 
 import { Search, Plus, Eye } from 'lucide-react';
 
-// 任务类型
-const taskTypeConfig = {
-  issue: { icon: '🐛', label: '产品建议', color: 'bg-orange-100 text-orange-800' },
-  feature: { icon: '💻', label: '功能开发', color: 'bg-blue-100 text-blue-800' },
-  bug: { icon: '🐞', label: '缺陷修复', color: 'bg-red-100 text-red-800' },
-  improvement: { icon: '💡', label: '改进优化', color: 'bg-green-100 text-green-800' },
+// Issue类型配置
+const issueTypeConfig = {
+  FEATURE: { label: '新功能' },
+  ENHANCEMENT: { label: '功能增强' },
+  BUG_FIX: { label: 'Bug修复' },
+  TECHNICAL_DEBT: { label: '技术债务' },
+  RESEARCH: { label: '技术调研' },
 };
 
 // 优先级标签
-const priorityLabels = {
-  low: '低',
-  medium: '中', 
-  high: '高',
-  urgent: '紧急'
+const priorityConfig = {
+  LOW: { label: '低', color: 'bg-gray-100 text-gray-800' },
+  MEDIUM: { label: '中', color: 'bg-yellow-100 text-yellow-800' },
+  HIGH: { label: '高', color: 'bg-orange-100 text-orange-800' },
+  URGENT: { label: '紧急', color: 'bg-red-100 text-red-800' },
 };
 
-// 反馈来源标签
-const inputSourceLabels = {
-  kol: 'KOL反馈',
-  user_feedback: '用户反馈',
-  internal: '内部需求',
-  data_analysis: '数据分析',
-  strategy: '战略需求'
+// 输入源标签
+const inputSourceConfig = {
+  USER_FEEDBACK: { label: '用户反馈' },
+  INTERNAL: { label: '内部反馈' },
+  DATA_ANALYSIS: { label: '数据分析' },
+  STRATEGY: { label: '战略需求' },
 };
 
-// Issue数据类型
-interface Issue {
-  id: string;
-  title: string;
-  description?: string;
-  type: 'issue' | 'feature' | 'bug' | 'improvement';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: string;
-  assignee: string;
-  inputSource?: 'kol' | 'user_feedback' | 'internal' | 'data_analysis' | 'strategy';
-  createdAt: string;
-}
+// 状态配置 - 简化为四类
+const getSimplifiedStatus = (status: IssueStatus) => {
+  switch (status) {
+    case 'OPEN':
+    case 'IN_DISCUSSION':
+      return { label: '待开始', color: 'bg-gray-100 text-gray-800' };
+    case 'APPROVED':
+    case 'IN_PRD':
+    case 'IN_DEVELOPMENT':
+      return { label: '进行中', color: 'bg-blue-100 text-blue-800' };
+    case 'IN_TESTING':
+    case 'IN_ACCEPTANCE':
+      return { label: '审核中', color: 'bg-yellow-100 text-yellow-800' };
+    case 'COMPLETED':
+      return { label: '已完成', color: 'bg-green-100 text-green-800' };
+    case 'REJECTED':
+    case 'CANCELLED':
+      return { label: '已完成', color: 'bg-gray-100 text-gray-800' };
+    default:
+      return { label: '待开始', color: 'bg-gray-100 text-gray-800' };
+  }
+};
 
-// 模拟Issues数据
-const mockIssues: Issue[] = [
-  {
-    id: 'ISS-001',
-    title: '用户反馈：需要添加深色主题',
-    description: '多个用户在社区反馈希望能支持暗色主题，提升夜间使用体验。',
-    type: 'issue',
-    priority: 'medium',
-    status: '待处理',
-    assignee: '张小明',
-    inputSource: 'user_feedback',
-    createdAt: '2024-01-15',
-  },
-  {
-    id: 'ISS-002',
-    title: 'KOL建议：优化移动端性能',
-    description: '某知名KOL反馈移动端加载较慢，影响用户体验。',
-    type: 'issue',
-    priority: 'high',
-    status: '进行中',
-    assignee: '李小红',
-    inputSource: 'kol',
-    createdAt: '2024-01-14',
-  },
-  {
-    id: 'BUG-001',
-    title: '登录页面在Safari浏览器显示异常',
-    description: '用户反馈在Safari浏览器中登录页面布局错乱。',
-    type: 'bug',
-    priority: 'high',
-    status: '待处理',
-    assignee: '王小强',
-    inputSource: 'user_feedback',
-    createdAt: '2024-01-13',
-  },
-  {
-    id: 'FEA-001',
-    title: '新增数据导出功能',
-    description: '用户希望能够将项目数据导出为Excel格式。',
-    type: 'feature',
-    priority: 'medium',
-    status: '已完成',
-    assignee: '赵小亮',
-    inputSource: 'user_feedback',
-    createdAt: '2024-01-12',
-  },
-];
+// 使用真实的Issue类型定义已在types/issue.ts中
 
 export default function IssuesPage() {
-  const [issues, setIssues] = useState<Issue[]>(mockIssues);
+  const [issues, setIssues] = useState<Issue[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const [newIssue, setNewIssue] = useState({
-    title: '',
-    description: '',
-    type: 'issue' as Issue['type'],
-    priority: 'medium' as Issue['priority'],
-    inputSource: 'user_feedback' as Issue['inputSource'],
-  });
-
-
-
-  // 创建Issue
-  const handleCreateIssue = () => {
-    const issue: Issue = {
-      id: `${newIssue.type.toUpperCase()}-${String(Date.now()).slice(-3)}`,
-      title: newIssue.title,
-      description: newIssue.description,
-      type: newIssue.type,
-      priority: newIssue.priority,
-      status: '待处理',
-      assignee: '未分配',
-      inputSource: newIssue.inputSource,
-      createdAt: new Date().toISOString().split('T')[0],
+  // 加载Issues数据
+  useEffect(() => {
+    const loadIssues = async () => {
+      try {
+        setLoading(true);
+        const response = await issueApi.getIssues();
+        setIssues(response.issues.issues);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '加载失败');
+        console.error('Failed to load issues:', err);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    setIssues(prev => [issue, ...prev]);
-    setNewIssue({
-      title: '',
-      description: '',
-      type: 'issue',
-      priority: 'medium',
-      inputSource: 'user_feedback',
-    });
-
-  };
+    loadIssues();
+  }, []);
 
   // 过滤Issues
   const filteredIssues = issues.filter(issue =>
@@ -170,7 +122,7 @@ export default function IssuesPage() {
           </div>
 
           {/* 创建Issue按钮 */}
-          <Button className="h-10" asChild>
+          <Button asChild>
             <a href="/issues/new">
               <Plus className="h-4 w-4 mr-2" />
               创建Issue
@@ -180,58 +132,81 @@ export default function IssuesPage() {
 
 
         {/* Issues表格 */}
-        <div className="rounded-md border">
-          <Table>
+        <div className="rounded-md border overflow-x-auto">
+          <Table className="min-w-full">
             <TableHeaderRaw>
               <TableRowRaw>
                 <TableHeadRaw>ID</TableHeadRaw>
-                <TableHeadRaw>类型</TableHeadRaw>
                 <TableHeadRaw>标题</TableHeadRaw>
+                <TableHeadRaw>类型</TableHeadRaw>
                 <TableHeadRaw>优先级</TableHeadRaw>
                 <TableHeadRaw>状态</TableHeadRaw>
                 <TableHeadRaw>负责人</TableHeadRaw>
+                <TableHeadRaw>输入源</TableHeadRaw>
                 <TableHeadRaw>创建时间</TableHeadRaw>
                 <TableHeadRaw>操作</TableHeadRaw>
               </TableRowRaw>
             </TableHeaderRaw>
             <TableBodyRaw>
-              {filteredIssues.length > 0 ? (
+              {loading ? (
+                <TableRowRaw>
+                  <TableCellRaw colSpan={9} className="h-24 text-center">
+                    加载中...
+                  </TableCellRaw>
+                </TableRowRaw>
+              ) : error ? (
+                <TableRowRaw>
+                  <TableCellRaw colSpan={9} className="h-24 text-center text-red-600">
+                    {error}
+                  </TableCellRaw>
+                </TableRowRaw>
+              ) : filteredIssues.length > 0 ? (
                 filteredIssues.map((issue) => (
                   <TableRowRaw key={issue.id}>
                     <TableCellRaw className="font-mono text-sm">{issue.id}</TableCellRaw>
                     <TableCellRaw>
-                      <Badge className={taskTypeConfig[issue.type]?.color}>
-                        {taskTypeConfig[issue.type]?.label}
+                      <div className="max-w-md">
+                        <div className="font-medium">{issue.title}</div>
+                      </div>
+                    </TableCellRaw>
+                    <TableCellRaw>
+                      <Badge variant="outline">
+                        {issueTypeConfig[issue.issueType]?.label}
                       </Badge>
                     </TableCellRaw>
                     <TableCellRaw>
-                      <div className="max-w-md">
-                        <div className="font-medium">{issue.title}</div>
-                        {issue.description && (
-                          <div className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                            {issue.description}
-                          </div>
+                      <Badge variant="outline" className={priorityConfig[issue.priority]?.color}>
+                        {priorityConfig[issue.priority]?.label}
+                      </Badge>
+                    </TableCellRaw>
+                    <TableCellRaw>
+                      <Badge variant="outline" className={getSimplifiedStatus(issue.status).color}>
+                        {getSimplifiedStatus(issue.status).label}
+                      </Badge>
+                    </TableCellRaw>
+                    <TableCellRaw>
+                      <div className="flex items-center gap-2">
+                        {issue.assignee ? (
+                          <>
+                            <Avatar className="h-6 w-6">
+                              <AvatarImage src={`https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${issue.assignee.username}`} />
+                              <AvatarFallback>{issue.assignee.name[0]}</AvatarFallback>
+                            </Avatar>
+                            <span className="text-sm">{issue.assignee.name}</span>
+                          </>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">未分配</span>
                         )}
                       </div>
                     </TableCellRaw>
                     <TableCellRaw>
-                      <Badge 
-                        variant="outline" 
-                        className={
-                          issue.priority === 'urgent' ? 'bg-red-100 text-red-800' :
-                          issue.priority === 'high' ? 'bg-orange-100 text-orange-800' :
-                          issue.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'
-                        }
-                      >
-                        {priorityLabels[issue.priority]}
+                      <Badge variant="outline">
+                        {inputSourceConfig[issue.inputSource]?.label}
                       </Badge>
                     </TableCellRaw>
-                    <TableCellRaw>
-                      <Badge variant="outline">{issue.status}</Badge>
+                    <TableCellRaw className="text-sm">
+                      {new Date(issue.createdAt).toLocaleDateString('zh-CN')}
                     </TableCellRaw>
-                    <TableCellRaw>{issue.assignee}</TableCellRaw>
-                    <TableCellRaw className="text-sm">{issue.createdAt}</TableCellRaw>
                     <TableCellRaw>
                       <Button 
                         variant="ghost" 
@@ -248,7 +223,7 @@ export default function IssuesPage() {
                 ))
               ) : (
                 <TableRowRaw>
-                  <TableCellRaw colSpan={8} className="h-24 text-center">
+                  <TableCellRaw colSpan={9} className="h-24 text-center">
                     暂无Issues数据
                   </TableCellRaw>
                 </TableRowRaw>

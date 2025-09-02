@@ -4,6 +4,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  username: string;
 }
 
 export interface Project {
@@ -24,8 +25,16 @@ export interface IssueComment {
 export interface Task {
   id: string;
   title: string;
-  status: string;
-  assignee?: User;
+  description?: string;
+  status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  startDate?: string;
+  dueDate?: string;
+  estimatedHours: number;
+  actualHours?: number;
+  createdAt: string;
+  updatedAt: string;
+  assigneeId?: string;
 }
 
 export interface PRD {

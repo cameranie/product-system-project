@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-// import { useParams } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import { AppLayout } from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,8 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { FormField, FormFieldGroup } from '@/components/ui/form-field';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { KanbanCard } from '@/components/ui/kanban';
+import { issueApi, userApi } from '@/lib/api';
+import type { Issue, User } from '@/types/issue';
 import { 
   Select,
   SelectContent,
@@ -29,16 +31,9 @@ import {
   ChevronUp,
   Trash2
 } from 'lucide-react';
-import Image from 'next/image';
 
-// 模拟数据
-const mockUsers = [
-  { id: '1', name: '张三', avatar: 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=zhang', role: '前端开发' },
-  { id: '2', name: '李四', avatar: 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=li', role: '后端开发' },
-  { id: '3', name: '王五', avatar: 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=wang', role: '产品经理' },
-  { id: '4', name: '赵六', avatar: 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=zhao', role: '测试工程师' },
-  { id: '5', name: '钱七', avatar: 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=qian', role: 'UI设计师' },
-];
+
+
 
 // 任务类型配置
 const taskTypeConfig = {
@@ -65,52 +60,7 @@ const statusConfig = {
   CANCELLED: { label: '已取消', color: '#EF4444' },
 };
 
-const mockProjects = [
-  { id: '1', name: '项目管理系统', key: 'PMS' },
-  { id: '2', name: '用户中心', key: 'UC' },
-  { id: '3', name: '数据分析平台', key: 'DAP' },
-];
 
-const mockVersions = [
-  { id: '1', name: 'v1.0.0', description: '初始版本' },
-  { id: '2', name: 'v1.1.0', description: '功能增强' },
-  { id: '3', name: 'v2.0.0', description: '重大更新' },
-];
-
-const mockRelatedIssues = [
-  { id: 'ISS-001', title: '用户登录优化' },
-  { id: 'ISS-002', title: '数据导出功能' },
-  { id: 'ISS-003', title: '权限管理重构' },
-];
-
-// Issue类型配置
-const issueTypeConfig = {
-  FEATURE: { label: '新功能', color: '#10B981' },
-  ENHANCEMENT: { label: '功能增强', color: '#3B82F6' },
-  BUG_FIX: { label: 'Bug修复', color: '#EF4444' },
-  TECHNICAL_DEBT: { label: '技术债务', color: '#F59E0B' },
-  RESEARCH: { label: '技术调研', color: '#8B5CF6' },
-};
-
-// 模拟Issue详情数据
-const mockIssueDetail = {
-  id: 'ISS-001',
-  title: '用户反馈：需要添加深色主题',
-  description: '多个用户在社区反馈希望能支持暗色主题，提升夜间使用体验。需要考虑整体UI的适配，包括但不限于：\n\n1. 主要界面的深色适配\n2. 图标和按钮的颜色调整\n3. 文字对比度优化\n4. 用户设置保存功能\n\n预期能够提升用户体验，特别是夜间使用场景。',
-  type: 'FEATURE',
-  priority: 'MEDIUM',
-  status: 'IN_PROGRESS',
-  projectId: '1',
-  versionId: '2',
-  assigneeId: '3',
-  reviewerId: '1',
-  relatedIssueIds: ['ISS-002', 'ISS-003'],
-  createdAt: '2024-01-15',
-  departments: [
-    { id: '2', name: '技术部', color: '#10B981' },
-    { id: '3', name: '设计部', color: '#F59E0B' }
-  ]
-};
 
 interface Task {
   id: string;
@@ -127,23 +77,52 @@ interface Task {
 }
 
 export default function IssueDetailPage() {
-  // const params = useParams();
-  // const issueId = params.id as string;
+  const params = useParams();
+  const issueId = params.id as string;
   
-  const [issue] = useState(mockIssueDetail);
+  const [issue, setIssue] = useState<Issue | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Record<string, boolean>>({});
   const [newTask, setNewTask] = useState<Partial<Task>>({
     title: '',
     description: '',
-    type: 'frontend',
     priority: 'MEDIUM',
     status: 'TODO',
     assigneeId: '',
     estimatedHours: 8,
-    dependencies: []
   });
+
+  // 加载数据
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const [issueResponse, usersResponse] = await Promise.all([
+          issueApi.getIssue(issueId),
+          userApi.getUsers()
+        ]);
+        
+        setIssue(issueResponse.issue);
+        // 暂时使用空数组，等后端支持issueId筛选后再启用
+        setTasks([]);
+        setUsers(usersResponse.users.users);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '加载失败');
+        console.error('Failed to load data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (issueId) {
+      loadData();
+    }
+  }, [issueId]);
 
   const handleBack = () => {
     window.history.back();
@@ -203,7 +182,7 @@ export default function IssueDetailPage() {
 
   const getAssigneeDistribution = () => {
     const distribution = tasks.reduce((acc, task) => {
-      const user = mockUsers.find(u => u.id === task.assigneeId);
+      const user = users.find(u => u.id === task.assigneeId);
       const key = user?.name || '未分配';
       acc[key] = (acc[key] || 0) + task.estimatedHours;
       return acc;
@@ -211,6 +190,32 @@ export default function IssueDetailPage() {
     
     return Object.entries(distribution);
   };
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="text-lg">加载中...</div>
+            <div className="text-sm text-muted-foreground mt-2">正在加载Issue详情</div>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (error || !issue) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="text-lg text-red-600">加载失败</div>
+            <div className="text-sm text-muted-foreground mt-2">{error || 'Issue不存在'}</div>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -304,12 +309,15 @@ export default function IssueDetailPage() {
                                 <SelectValue placeholder="选择人员" />
                               </SelectTrigger>
                               <SelectContent>
-                                {mockUsers.map(user => (
+                                {users.map(user => (
                                   <SelectItem key={user.id} value={user.id}>
                                     <div className="flex items-center gap-2">
-                                      <Image src={user.avatar} alt={user.name} width={20} height={20} className="w-5 h-5 rounded-full" />
+                                      <Avatar className="h-5 w-5">
+                                        <AvatarImage src={`https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username}`} />
+                                        <AvatarFallback>{user.name[0]}</AvatarFallback>
+                                      </Avatar>
                                       <span>{user.name}</span>
-                                      <span className="text-xs text-muted-foreground">({user.role})</span>
+                                      <span className="text-xs text-muted-foreground">({user.email})</span>
                                     </div>
                                   </SelectItem>
                                 ))}
@@ -434,12 +442,12 @@ export default function IssueDetailPage() {
                             <div className="flex items-center gap-4 text-xs text-muted-foreground">
                               <div className="flex items-center gap-1">
                                 <Avatar className="h-4 w-4">
-                                  <AvatarImage src={mockUsers.find(u => u.id === task.assigneeId)?.avatar} />
+                                  <AvatarImage src={`https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${users.find(u => u.id === task.assigneeId)?.username}`} />
                                   <AvatarFallback className="text-xs">
-                                    {mockUsers.find(u => u.id === task.assigneeId)?.name?.[0] || '?'}
+                                    {users.find(u => u.id === task.assigneeId)?.name?.[0] || '?'}
                                   </AvatarFallback>
                                 </Avatar>
-                                <span>{mockUsers.find(u => u.id === task.assigneeId)?.name || '未分配'}</span>
+                                <span>{users.find(u => u.id === task.assigneeId)?.name || '未分配'}</span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
@@ -528,111 +536,101 @@ export default function IssueDetailPage() {
                     
                     <div>
                       <div className="text-sm font-medium text-muted-foreground mb-2">状态</div>
-                      <Badge variant="outline">{statusConfig[issue.status as keyof typeof statusConfig].label}</Badge>
+                      <Badge variant="outline">{issue.status}</Badge>
                     </div>
                     
                     <div>
                       <div className="text-sm font-medium text-muted-foreground mb-2">优先级</div>
-                      <Badge 
-                        className="text-xs"
-                        style={{ backgroundColor: priorityConfig[issue.priority as keyof typeof priorityConfig].color, color: 'white' }}
-                      >
-                        {priorityConfig[issue.priority as keyof typeof priorityConfig].label}
+                      <Badge variant="outline" className="text-xs">
+                        {issue.priority}
                       </Badge>
                     </div>
 
                     <div>
                       <div className="text-sm font-medium text-muted-foreground mb-2">所属项目</div>
                       <div className="text-sm">
-                        {mockProjects.find(p => p.id === issue.projectId)?.name} ({mockProjects.find(p => p.id === issue.projectId)?.key})
+                        {issue.project?.name} ({issue.project?.key})
                       </div>
-                    </div>
-
-                    <div>
-                      <div className="text-sm font-medium text-muted-foreground mb-2">所属版本</div>
-                      <Badge variant="outline" className="text-xs">
-                        {mockVersions.find(v => v.id === issue.versionId)?.name}
-                      </Badge>
                     </div>
 
                     <div>
                       <div className="text-sm font-medium text-muted-foreground mb-2">Issue类型</div>
                       <Badge variant="outline" className="text-xs">
-                        {issueTypeConfig[issue.type as keyof typeof issueTypeConfig].label}
+                        {issue.issueType}
                       </Badge>
                     </div>
 
-                    {issue.relatedIssueIds && issue.relatedIssueIds.length > 0 && (
-                      <div>
-                        <div className="text-sm font-medium text-muted-foreground mb-2">相关Issue</div>
-                        <div className="flex flex-wrap gap-1">
-                          {issue.relatedIssueIds.map(relatedId => {
-                            const relatedIssue = mockRelatedIssues.find(ri => ri.id === relatedId);
-                            return relatedIssue ? (
-                              <Badge key={relatedId} variant="outline" className="text-xs">
-                                {relatedIssue.id}
-                              </Badge>
-                            ) : null;
-                          })}
-                        </div>
-                      </div>
-                    )}
-
                     <div>
-                      <div className="text-sm font-medium text-muted-foreground mb-2">执行人</div>
-                      <div className="flex items-center gap-2">
-                        {mockUsers.find(u => u.id === issue.assigneeId) && (
-                          <>
-                            <Image 
-                              src={mockUsers.find(u => u.id === issue.assigneeId)!.avatar} 
-                              alt="" 
-                              width={20} 
-                              height={20} 
-                              className="w-5 h-5 rounded-full" 
-                            />
-                            <span className="text-sm">{mockUsers.find(u => u.id === issue.assigneeId)!.name}</span>
-                          </>
-                        )}
-                      </div>
+                      <div className="text-sm font-medium text-muted-foreground mb-2">输入源</div>
+                      <Badge variant="outline" className="text-xs">
+                        {issue.inputSource}
+                      </Badge>
                     </div>
 
-                    {issue.reviewerId && (
+                    {issue.assignee && (
                       <div>
-                        <div className="text-sm font-medium text-muted-foreground mb-2">审核人</div>
+                        <div className="text-sm font-medium text-muted-foreground mb-2">负责人</div>
                         <div className="flex items-center gap-2">
-                          {mockUsers.find(u => u.id === issue.reviewerId) && (
-                            <>
-                              <Image 
-                                src={mockUsers.find(u => u.id === issue.reviewerId)!.avatar} 
-                                alt="" 
-                                width={20} 
-                                height={20} 
-                                className="w-5 h-5 rounded-full" 
-                              />
-                              <span className="text-sm">{mockUsers.find(u => u.id === issue.reviewerId)!.name}</span>
-                            </>
-                          )}
+                          <Avatar className="h-5 w-5">
+                            <AvatarImage src={`https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${issue.assignee.username}`} />
+                            <AvatarFallback>{issue.assignee.name[0]}</AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm">{issue.assignee.name}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {issue.businessValue && (
+                      <div>
+                        <div className="text-sm font-medium text-muted-foreground mb-2">商业价值</div>
+                        <div className="text-sm text-muted-foreground">
+                          {issue.businessValue}
+                        </div>
+                      </div>
+                    )}
+
+                    {issue.userImpact && (
+                      <div>
+                        <div className="text-sm font-medium text-muted-foreground mb-2">用户影响</div>
+                        <div className="text-sm text-muted-foreground">
+                          {issue.userImpact}
+                        </div>
+                      </div>
+                    )}
+
+                    {issue.technicalRisk && (
+                      <div>
+                        <div className="text-sm font-medium text-muted-foreground mb-2">技术风险</div>
+                        <div className="text-sm text-muted-foreground">
+                          {issue.technicalRisk}
+                        </div>
+                      </div>
+                    )}
+
+                    {issue.dueDate && (
+                      <div>
+                        <div className="text-sm font-medium text-muted-foreground mb-2">预期完成时间</div>
+                        <div className="text-sm">
+                          {new Date(issue.dueDate).toLocaleDateString('zh-CN')}
                         </div>
                       </div>
                     )}
 
                     <div>
-                      <div className="text-sm font-medium text-muted-foreground mb-2">涉及部门</div>
-                      <div className="flex flex-wrap gap-1">
-                        {issue.departments.map(dept => (
-                          <Badge key={dept.id} variant="outline" className="text-xs">
-                            {dept.name}
-                          </Badge>
-                        ))}
+                      <div className="text-sm font-medium text-muted-foreground mb-2">创建时间</div>
+                      <div className="text-sm">
+                        {new Date(issue.createdAt).toLocaleDateString('zh-CN')}
                       </div>
                     </div>
 
-                    <div>
-                      <div className="text-sm font-medium text-muted-foreground mb-2">描述</div>
-                      <div className="text-sm whitespace-pre-wrap text-muted-foreground">
-                        {issue.description}
+                    {issue.description && (
+                      <div>
+                        <div className="text-sm font-medium text-muted-foreground mb-2">描述</div>
+                        <div className="text-sm whitespace-pre-wrap text-muted-foreground">
+                          {issue.description}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* 统计信息 */}
                     {tasks.length > 0 && (
