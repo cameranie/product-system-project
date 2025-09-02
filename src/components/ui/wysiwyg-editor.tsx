@@ -26,6 +26,7 @@ interface WysiwygEditorProps {
   placeholder?: string
   className?: string
   minHeight?: string
+  showHelpText?: boolean
 }
 
 export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
@@ -34,6 +35,7 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
   placeholder = "开始编写...",
   className,
   minHeight = "200px",
+  showHelpText = true,
 }) => {
   const editorRef = React.useRef<HTMLDivElement>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -179,9 +181,11 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
       />
       
       {/* 提示文本 */}
-      <div className="px-3 py-2 text-xs text-muted-foreground border-t border-border bg-muted/30">
-        支持富文本格式 • 可直接上传图片 • 支持复制粘贴链接
-      </div>
+      {showHelpText && (
+        <div className="px-3 py-2 text-xs text-muted-foreground border-t border-border bg-muted/30">
+          支持富文本格式 • 可直接上传图片 • 支持复制粘贴链接
+        </div>
+      )}
       
       <style jsx>{`
         [contenteditable]:empty:before {

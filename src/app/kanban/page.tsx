@@ -33,7 +33,8 @@ import type { DragEndEvent } from '@dnd-kit/core';
 import { addMonths, startOfMonth, endOfMonth, subDays, subMonths } from 'date-fns';
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Search, ChevronDown, ChevronUp, Bug, Code, Lightbulb } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Bug, Code, Lightbulb, Filter } from 'lucide-react';
+import { TagSelector } from '@/components/ui/tag-selector';
 
 const today = new Date();
 
@@ -64,6 +65,7 @@ interface ExtendedFeature {
   };
   initiative: { id: string; name: string };
   release: { id: string; name: string };
+  version: { id: string; name: string };
   priority?: 'low' | 'medium' | 'high' | 'urgent';
   inputSource?: 'kol' | 'user_feedback' | 'internal' | 'data_analysis' | 'strategy';
 }
@@ -85,6 +87,7 @@ const exampleFeatures: ExtendedFeature[] = [
     },
     initiative: { id: "1", name: "用户体系" },
     release: { id: "1", name: "v1.0" },
+    version: { id: "1", name: "v1.0.0" },
     priority: "high",
   },
   {
@@ -103,6 +106,7 @@ const exampleFeatures: ExtendedFeature[] = [
     },
     initiative: { id: "2", name: "核心看板" },
     release: { id: "1", name: "v1.0" },
+    version: { id: "2", name: "v1.1.0" },
     priority: "medium",
   },
   {
@@ -122,6 +126,7 @@ const exampleFeatures: ExtendedFeature[] = [
     },
     initiative: { id: "ui", name: "界面优化" },
     release: { id: "2", name: "v1.1" },
+    version: { id: "2", name: "v1.1.0" },
     priority: "medium",
     inputSource: "user_feedback",
   },
@@ -142,6 +147,7 @@ const exampleFeatures: ExtendedFeature[] = [
     },
     initiative: { id: "perf", name: "性能提升" },
     release: { id: "2", name: "v1.1" },
+    version: { id: "3", name: "v2.0.0" },
     priority: "high",
     inputSource: "kol",
   },
@@ -161,6 +167,7 @@ const exampleFeatures: ExtendedFeature[] = [
     },
     initiative: { id: "2", name: "核心看板" },
     release: { id: "1", name: "v1.0" },
+    version: { id: "1", name: "v1.0.0" },
     priority: "medium",
   },
   {
@@ -179,6 +186,7 @@ const exampleFeatures: ExtendedFeature[] = [
     },
     initiative: { id: "3", name: "团队协作" },
     release: { id: "2", name: "v1.1" },
+    version: { id: "4", name: "v2.1.0" },
     priority: "medium",
   },
   {
@@ -197,6 +205,7 @@ const exampleFeatures: ExtendedFeature[] = [
     },
     initiative: { id: "3", name: "团队协作" },
     release: { id: "2", name: "v1.1" },
+    version: { id: "2", name: "v1.1.0" },
     priority: "high",
   },
   {
@@ -215,6 +224,7 @@ const exampleFeatures: ExtendedFeature[] = [
     },
     initiative: { id: "4", name: "文件管理" },
     release: { id: "2", name: "v1.1" },
+    version: { id: "3", name: "v2.0.0" },
     priority: "medium",
   },
   {
@@ -233,6 +243,7 @@ const exampleFeatures: ExtendedFeature[] = [
     },
     initiative: { id: "2", name: "核心看板" },
     release: { id: "2", name: "v1.1" },
+    version: { id: "3", name: "v2.0.0" },
     priority: "medium",
   },
   {
@@ -251,6 +262,7 @@ const exampleFeatures: ExtendedFeature[] = [
     },
     initiative: { id: "5", name: "数据洞察" },
     release: { id: "3", name: "v1.2" },
+    version: { id: "4", name: "v2.1.0" },
     priority: "low",
   },
   {
@@ -269,6 +281,7 @@ const exampleFeatures: ExtendedFeature[] = [
     },
     initiative: { id: "6", name: "多端支持" },
     release: { id: "3", name: "v1.2" },
+    version: { id: "3", name: "v2.0.0" },
     priority: "medium",
   },
   {
@@ -287,6 +300,7 @@ const exampleFeatures: ExtendedFeature[] = [
     },
     initiative: { id: "1", name: "用户体系" },
     release: { id: "3", name: "v1.2" },
+    version: { id: "4", name: "v2.1.0" },
     priority: "high",
   },
   {
@@ -305,6 +319,7 @@ const exampleFeatures: ExtendedFeature[] = [
     },
     initiative: { id: "7", name: "开发支持" },
     release: { id: "4", name: "v1.3" },
+    version: { id: "2", name: "v1.1.0" },
     priority: "low",
   },
   {
@@ -323,6 +338,7 @@ const exampleFeatures: ExtendedFeature[] = [
     },
     initiative: { id: "7", name: "开发支持" },
     release: { id: "4", name: "v1.3" },
+    version: { id: "1", name: "v1.0.0" },
     priority: "medium",
   },
 ];
@@ -345,6 +361,14 @@ const priorityLabels = {
   high: '高',
   urgent: '紧急'
 };
+
+// 版本数据
+const versions = [
+  { id: '1', name: 'v1.0.0', description: '初始版本' },
+  { id: '2', name: 'v1.1.0', description: '功能增强' },
+  { id: '3', name: 'v2.0.0', description: '重大更新' },
+  { id: '4', name: 'v2.1.0', description: '性能优化' },
+];
 
 // 团队成员数据
 const teamMembers = [
@@ -385,6 +409,7 @@ const KanbanPage: FC = () => {
     4: true,
   });
   const [viewMode, setViewMode] = useState<'team' | 'personal'>('team');
+  const [selectedVersions, setSelectedVersions] = useState<typeof versions>([]);
   
   // 新任务表单状态
   const [newTask, setNewTask] = useState({
@@ -430,7 +455,30 @@ const KanbanPage: FC = () => {
     const member = teamMembers.find(m => m.id === memberId);
     if (!member) return [];
     
-    return features.filter(feature => feature.owner.name === member.name);
+    return getFilteredFeatures().filter(feature => feature.owner.name === member.name);
+  };
+
+  // 筛选功能
+  const getFilteredFeatures = () => {
+    let filtered = features;
+
+    // 搜索筛选
+    if (searchTerm) {
+      filtered = filtered.filter(feature =>
+        feature.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        feature.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // 版本筛选
+    if (selectedVersions.length > 0) {
+      const selectedVersionIds = selectedVersions.map(v => v.id);
+      filtered = filtered.filter(feature =>
+        selectedVersionIds.includes(feature.version.id)
+      );
+    }
+
+    return filtered;
   };
 
 
@@ -454,6 +502,7 @@ const KanbanPage: FC = () => {
       },
       initiative: { id: "user-initiative", name: "用户需求" },
       release: { id: "2", name: "v1.1" },
+      version: { id: "2", name: "v1.1.0" },
       priority: newTask.priority,
       inputSource: newTask.inputSource,
     };
@@ -504,6 +553,20 @@ const KanbanPage: FC = () => {
 
           {/* 右侧空间填充 */}
           <div className="flex-1"></div>
+
+          {/* 版本筛选 */}
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <TagSelector
+              availableTags={versions}
+              selectedTags={selectedVersions}
+              onChange={setSelectedVersions}
+              getValue={(version) => version.id}
+              getLabel={(version) => version.name}
+              createTag={(inputValue: string) => ({ id: `v_${Date.now()}`, name: inputValue, description: '' })}
+              className="w-48"
+            />
+          </div>
 
           {/* 视图切换开关 - 移到最右侧 */}
           <div className="flex bg-background border border-border rounded-md p-1">
@@ -716,7 +779,7 @@ const KanbanPage: FC = () => {
               <KanbanBoard key={status.name} id={status.name}>
                 <KanbanHeader name={status.name} color={status.color} />
                 <KanbanCards>
-                  {features
+                  {getFilteredFeatures()
                     .filter((feature) => feature.status.name === status.name)
                     .map((feature, index) => (
                       <KanbanCard

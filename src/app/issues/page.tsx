@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/table';
 
 
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, Eye } from 'lucide-react';
 
 // 任务类型
 const taskTypeConfig = {
@@ -108,6 +108,41 @@ export default function IssuesPage() {
   const [issues, setIssues] = useState<Issue[]>(mockIssues);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const [newIssue, setNewIssue] = useState({
+    title: '',
+    description: '',
+    type: 'issue' as Issue['type'],
+    priority: 'medium' as Issue['priority'],
+    inputSource: 'user_feedback' as Issue['inputSource'],
+  });
+
+
+
+  // 创建Issue
+  const handleCreateIssue = () => {
+    const issue: Issue = {
+      id: `${newIssue.type.toUpperCase()}-${String(Date.now()).slice(-3)}`,
+      title: newIssue.title,
+      description: newIssue.description,
+      type: newIssue.type,
+      priority: newIssue.priority,
+      status: '待处理',
+      assignee: '未分配',
+      inputSource: newIssue.inputSource,
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+
+    setIssues(prev => [issue, ...prev]);
+    setNewIssue({
+      title: '',
+      description: '',
+      type: 'issue',
+      priority: 'medium',
+      inputSource: 'user_feedback',
+    });
+
+  };
+
   // 过滤Issues
   const filteredIssues = issues.filter(issue =>
     issue.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -117,13 +152,7 @@ export default function IssuesPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        {/* 页面标题 */}
-        <div>
-          <h1 className="text-xl font-semibold">Issues</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            管理产品建议、功能需求和问题反馈
-          </p>
-        </div>
+        {/* 页面标题已移至顶部导航栏 */}
 
         {/* 顶部操作栏 */}
         <div className="flex items-center gap-4">
@@ -141,14 +170,14 @@ export default function IssuesPage() {
           </div>
 
           {/* 创建Issue按钮 */}
-          <Button 
-            className="h-10"
-            onClick={() => window.location.href = '/issues/new'}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            创建Issue
+          <Button className="h-10" asChild>
+            <a href="/issues/new">
+              <Plus className="h-4 w-4 mr-2" />
+              创建Issue
+            </a>
           </Button>
         </div>
+
 
         {/* Issues表格 */}
         <div className="rounded-md border">
@@ -161,8 +190,8 @@ export default function IssuesPage() {
                 <TableHeadRaw>优先级</TableHeadRaw>
                 <TableHeadRaw>状态</TableHeadRaw>
                 <TableHeadRaw>负责人</TableHeadRaw>
-                <TableHeadRaw>来源</TableHeadRaw>
                 <TableHeadRaw>创建时间</TableHeadRaw>
+                <TableHeadRaw>操作</TableHeadRaw>
               </TableRowRaw>
             </TableHeaderRaw>
             <TableBodyRaw>
@@ -202,14 +231,19 @@ export default function IssuesPage() {
                       <Badge variant="outline">{issue.status}</Badge>
                     </TableCellRaw>
                     <TableCellRaw>{issue.assignee}</TableCellRaw>
-                    <TableCellRaw>
-                      {issue.inputSource && (
-                        <Badge variant="secondary" className="text-xs">
-                          {inputSourceLabels[issue.inputSource]}
-                        </Badge>
-                      )}
-                    </TableCellRaw>
                     <TableCellRaw className="text-sm">{issue.createdAt}</TableCellRaw>
+                    <TableCellRaw>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        asChild
+                      >
+                        <a href={`/issues/${issue.id}`}>
+                          <Eye className="h-4 w-4 mr-1" />
+                          详情
+                        </a>
+                      </Button>
+                    </TableCellRaw>
                   </TableRowRaw>
                 ))
               ) : (

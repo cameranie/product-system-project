@@ -57,13 +57,7 @@ const priorityConfig = {
   [Priority.URGENT]: { label: '紧急', color: 'bg-red-100 text-red-800' },
 };
 
-// 输入源标签配置
-const inputSourceConfig = {
-  [InputSource.USER_FEEDBACK]: { label: '用户反馈', color: 'bg-blue-100 text-blue-800' },
-  [InputSource.INTERNAL]: { label: '内部需求', color: 'bg-green-100 text-green-800' },
-  [InputSource.DATA_ANALYSIS]: { label: '数据分析', color: 'bg-purple-100 text-purple-800' },
-  [InputSource.STRATEGY]: { label: '战略需求', color: 'bg-indigo-100 text-indigo-800' },
-};
+
 
 // Issue类型配置
 const issueTypeConfig = {
@@ -312,45 +306,24 @@ export default function IssuesPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">输入源</label>
-                    <Select 
-                      value={newIssue.inputSource} 
-                      onValueChange={(value) => setNewIssue({...newIssue, inputSource: value as InputSource})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(inputSourceConfig).map(([key, config]) => (
-                          <SelectItem key={key} value={key}>
-                            {config.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">负责人</label>
-                    <Select 
-                      value={newIssue.assigneeId} 
-                      onValueChange={(value) => setNewIssue({...newIssue, assigneeId: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="选择负责人" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">未分配</SelectItem>
-                        {users.map(user => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">负责人</label>
+                  <Select 
+                    value={newIssue.assigneeId} 
+                    onValueChange={(value) => setNewIssue({...newIssue, assigneeId: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="选择负责人" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">未分配</SelectItem>
+                      {users.map(user => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <DialogFooter>
@@ -377,7 +350,6 @@ export default function IssuesPage() {
                 <TableHeadRaw>状态</TableHeadRaw>
                 <TableHeadRaw>优先级</TableHeadRaw>
                 <TableHeadRaw>负责人</TableHeadRaw>
-                <TableHeadRaw>输入源</TableHeadRaw>
                 <TableHeadRaw>创建时间</TableHeadRaw>
               </TableRowRaw>
             </TableHeaderRaw>
@@ -414,11 +386,6 @@ export default function IssuesPage() {
                     <TableCellRaw>
                       {issue.assignee?.name || '未分配'}
                     </TableCellRaw>
-                    <TableCellRaw>
-                      <Badge variant="secondary" className={inputSourceConfig[issue.inputSource]?.color}>
-                        {inputSourceConfig[issue.inputSource]?.label}
-                      </Badge>
-                    </TableCellRaw>
                     <TableCellRaw className="text-sm">
                       {new Date(issue.createdAt).toLocaleDateString('zh-CN')}
                     </TableCellRaw>
@@ -426,7 +393,7 @@ export default function IssuesPage() {
                 ))
               ) : (
                 <TableRowRaw>
-                  <TableCellRaw colSpan={8} className="h-24 text-center">
+                  <TableCellRaw colSpan={7} className="h-24 text-center">
                     {searchTerm ? '没有找到匹配的Issues' : '暂无Issues数据'}
                   </TableCellRaw>
                 </TableRowRaw>

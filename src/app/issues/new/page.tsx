@@ -21,6 +21,7 @@ import {
   Save,
   Send
 } from 'lucide-react';
+import Image from 'next/image';
 
 // 模拟数据
 const mockProjects = [
@@ -197,27 +198,26 @@ export default function CreateIssuePage() {
                     />
                   </FormField>
 
-                  {/* 第一行：项目 */}
-                  <FormField label="所属项目">
-                    <Select 
-                      value={formData.projectId} 
-                      onValueChange={(value) => setFormData({...formData, projectId: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="选择项目" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {mockProjects.map(project => (
-                          <SelectItem key={project.id} value={project.id}>
-                            {project.name} ({project.key})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormField>
-
-                  {/* 第二行：版本、Issue类型、优先级 */}
+                  {/* 项目信息行：所属项目、所属版本、Issue类型 */}
                   <div className="grid grid-cols-3 gap-4">
+                    <FormField label="所属项目">
+                      <Select 
+                        value={formData.projectId} 
+                        onValueChange={(value) => setFormData({...formData, projectId: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="选择项目" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {mockProjects.map(project => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.name} ({project.key})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormField>
+
                     <FormField label="所属版本">
                       <Select 
                         value={formData.versionId} 
@@ -253,30 +253,6 @@ export default function CreateIssuePage() {
                         </SelectContent>
                       </Select>
                     </FormField>
-
-                    <FormField label="优先级">
-                      <Select 
-                        value={formData.priority} 
-                        onValueChange={(value) => setFormData({...formData, priority: value as IssueFormData['priority']})}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.entries(priorityConfig).map(([key, config]) => (
-                            <SelectItem key={key} value={key}>
-                              <div className="flex items-center gap-2">
-                                <div 
-                                  className="w-3 h-3 rounded-full" 
-                                  style={{ backgroundColor: config.color }}
-                                />
-                                {config.label}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormField>
                   </div>
 
                   {/* 相关Issue - 使用TagSelector */}
@@ -301,7 +277,8 @@ export default function CreateIssuePage() {
                       value={formData.description}
                       onChange={(value) => setFormData({...formData, description: value})}
                       placeholder="详细描述需求背景、商业价值、功能规格、用户场景等..."
-                      minHeight="200px"
+                      minHeight="300px"
+                      showHelpText={false}
                     />
                   </FormField>
                 </FormFieldGroup>
@@ -309,8 +286,8 @@ export default function CreateIssuePage() {
 
               {/* 右侧其他信息卡片 - 占1列 */}
               <div className="lg:col-span-1">
-                <Card className="border border-border shadow-none">
-                  <CardContent className="p-6">
+                <Card className="border border-border shadow-none py-0">
+                  <CardContent className="p-6" style={{ padding: '24px' }}>
                     <FormFieldGroup>
                       {/* 涉及部门 */}
                       <FormField label="涉及部门">
@@ -325,28 +302,6 @@ export default function CreateIssuePage() {
                         />
                       </FormField>
 
-                      {/* 预计开始日期 */}
-                      <FormField label="预计开始日期">
-                        <DatePicker
-                          date={formData.startDate}
-                          onDateChange={(date) => setFormData({...formData, startDate: date})}
-                          placeholder="选择开始日期"
-                          className="h-9 text-sm"
-                        />
-                      </FormField>
-
-                      {/* 预计结束日期 */}
-                      <FormField label="预计结束日期">
-                        <DatePicker
-                          date={formData.endDate}
-                          onDateChange={(date) => setFormData({...formData, endDate: date})}
-                          placeholder="选择结束日期"
-                          className="h-9 text-sm"
-                        />
-                      </FormField>
-
-
-
                       {/* 执行人 */}
                       <FormField label="执行人 (Assignee)">
                         <Select 
@@ -360,7 +315,7 @@ export default function CreateIssuePage() {
                             {mockUsers.map(user => (
                               <SelectItem key={user.id} value={user.id}>
                                 <div className="flex items-center gap-2">
-                                  <img src={user.avatar} alt={user.name} className="w-5 h-5 rounded-full" />
+                                  <Image src={user.avatar} alt={user.name} width={20} height={20} className="w-5 h-5 rounded-full" />
                                   <span>{user.name}</span>
                                   <span className="text-xs text-muted-foreground">({user.role})</span>
                                 </div>
@@ -383,7 +338,7 @@ export default function CreateIssuePage() {
                             {mockUsers.map(user => (
                               <SelectItem key={user.id} value={user.id}>
                                 <div className="flex items-center gap-2">
-                                  <img src={user.avatar} alt={user.name} className="w-5 h-5 rounded-full" />
+                                  <Image src={user.avatar} alt={user.name} width={20} height={20} className="w-5 h-5 rounded-full" />
                                   <span>{user.name}</span>
                                   <span className="text-xs text-muted-foreground">({user.role})</span>
                                 </div>
@@ -391,6 +346,51 @@ export default function CreateIssuePage() {
                             ))}
                           </SelectContent>
                         </Select>
+                      </FormField>
+
+                      {/* 优先级 */}
+                      <FormField label="优先级">
+                        <Select 
+                          value={formData.priority} 
+                          onValueChange={(value) => setFormData({...formData, priority: value as IssueFormData['priority']})}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(priorityConfig).map(([key, config]) => (
+                              <SelectItem key={key} value={key}>
+                                <div className="flex items-center gap-2">
+                                  <div 
+                                    className="w-3 h-3 rounded-full" 
+                                    style={{ backgroundColor: config.color }}
+                                  />
+                                  {config.label}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormField>
+
+                      {/* 预计开始日期 */}
+                      <FormField label="预计开始日期">
+                        <DatePicker
+                          date={formData.startDate}
+                          onDateChange={(date) => setFormData({...formData, startDate: date})}
+                          placeholder="选择开始日期"
+                          className="h-9 text-sm"
+                        />
+                      </FormField>
+
+                      {/* 预计结束日期 */}
+                      <FormField label="预计结束日期">
+                        <DatePicker
+                          date={formData.endDate}
+                          onDateChange={(date) => setFormData({...formData, endDate: date})}
+                          placeholder="选择结束日期"
+                          className="h-9 text-sm"
+                        />
                       </FormField>
                     </FormFieldGroup>
                   </CardContent>

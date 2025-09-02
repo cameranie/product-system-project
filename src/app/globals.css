@@ -198,7 +198,7 @@
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
   --hu-background: hsl(0, 0%, 7%);
   --hu-foreground: hsl(0, 0%, 100%);
   --hu-card: hsl(0, 0%, 9%);
@@ -237,9 +237,9 @@
     @apply bg-background text-foreground;
     /* Sidebar CSS Variables */
     --sidebar-width: 16rem;
-    --sidebar-width-icon: 3.5rem;
+    --sidebar-width-icon: 3rem;
   }
-  
+
   /* 统一所有placeholder的颜色 */
   input::placeholder,
   textarea::placeholder,
@@ -249,7 +249,7 @@
     color: hsl(var(--muted-foreground)) !important;
     opacity: 0.5 !important;
   }
-  
+
   /* 确保Tailwind的placeholder样式也使用统一颜色 */
   .placeholder\:text-muted-foreground::placeholder {
     opacity: 0.5 !important;
