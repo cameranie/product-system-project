@@ -5,6 +5,7 @@ import {
   Home,
   Kanban,
   MessageSquare,
+  Users,
   Settings,
   HelpCircle,
   Search,
@@ -46,6 +47,11 @@ const data = {
       title: "Issues",
       url: "/issues",
       icon: MessageSquare,
+    },
+    {
+      title: "人员管理",
+      url: "/personnel",
+      icon: Users,
     },
   ],
   navSecondary: [
