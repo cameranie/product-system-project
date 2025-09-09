@@ -154,3 +154,103 @@ export interface Pagination {
   take?: number;
 }
 
+// 需求池相关类型定义
+export enum RequirementStatus {
+  PENDING = 'PENDING',           // 待审核
+  APPROVED = 'APPROVED',         // 审核通过
+  REJECTED = 'REJECTED',         // 审核不通过
+  SCHEDULED = 'SCHEDULED',       // 已排期
+  IN_DEVELOPMENT = 'IN_DEVELOPMENT', // 开发中
+  COMPLETED = 'COMPLETED'        // 已完成
+}
+
+export enum RequirementType {
+  NEW_FEATURE = 'NEW_FEATURE',   // 新功能
+  BUG = 'BUG',                   // Bug修复
+  ENHANCEMENT = 'ENHANCEMENT',    // 功能增强
+  OPTIMIZATION = 'OPTIMIZATION'   // 优化改进
+}
+
+export enum ApplicationPlatform {
+  WEB = 'WEB',                   // Web端
+  MOBILE = 'MOBILE',             // 移动端
+  DESKTOP = 'DESKTOP',           // 桌面端
+  API = 'API',                   // API接口
+  ALL = 'ALL'                    // 全端
+}
+
+export interface Requirement {
+  id: string;
+  title: string;                 // 需求名称
+  description: string;           // 需求描述
+  type: RequirementType;         // 需求类型
+  platform: ApplicationPlatform; // 应用端
+  priority: Priority;            // 优先级
+  status: RequirementStatus;     // 状态
+  submitter: User;               // 需求提出者
+  reviewer?: User;               // 审核人
+  assignee?: User;               // 负责人
+  expectedVersion?: string;      // 预期版本号
+  businessValue?: string;        // 商业价值
+  userImpact?: string;          // 用户影响
+  technicalRisk?: string;       // 技术风险
+  attachments?: string[];       // 附件链接
+  relatedRequirements?: string[]; // 关联需求ID列表
+  createdAt: string;
+  updatedAt: string;
+  submittedAt?: string;         // 提交审核时间
+  reviewedAt?: string;          // 审核时间
+  scheduledAt?: string;         // 排期时间
+  dueDate?: string;             // 预期完成时间
+}
+
+export interface RequirementComment {
+  id: string;
+  content: string;
+  createdAt: string;
+  author: User;
+  requirementId: string;
+}
+
+// 需求创建输入类型
+export interface CreateRequirementInput {
+  title: string;
+  description: string;
+  type: RequirementType;
+  platform: ApplicationPlatform;
+  priority: Priority;
+  businessValue?: string;
+  userImpact?: string;
+  technicalRisk?: string;
+  attachments?: string[];
+  relatedRequirements?: string[];
+}
+
+// 需求筛选条件
+export interface RequirementFilters {
+  status?: RequirementStatus[];
+  type?: RequirementType[];
+  platform?: ApplicationPlatform[];
+  priority?: Priority[];
+  submitterId?: string;
+  reviewerId?: string;
+  assigneeId?: string;
+  keyword?: string;
+  dateRange?: {
+    start: string;
+    end: string;
+  };
+}
+
+// 需求统计
+export interface RequirementStats {
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  scheduled: number;
+  byType: Array<{ type: RequirementType; count: number }>;
+  byPlatform: Array<{ platform: ApplicationPlatform; count: number }>;
+  byPriority: Array<{ priority: Priority; count: number }>;
+}
+

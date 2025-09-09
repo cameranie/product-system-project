@@ -1,14 +1,18 @@
 'use client';
 
-import { AppLayout } from '@/components/layout/app-layout';
-import { StatsCardsWithProgress } from '@/components/ui/stats-cards-with-progress';
+import { Homepage } from '@/components/homepage';
 
-export default function HomePage() {
-  return (
-    <AppLayout>
-      <div className="mb-6">
-        <StatsCardsWithProgress />
-      </div>
-    </AppLayout>
-  );
+export default function Page() {
+  const handleLogin = (email: string, password: string) => {
+    // Handle login logic here
+    console.log('Login attempt:', { email, password });
+    
+    // For now, redirect to dashboard on successful login
+    // In a real app, you would validate credentials first
+    if (email && password) {
+      window.location.href = '/dashboard';
+    }
+  };
+
+  return <Homepage onLogin={handleLogin} />;
 }

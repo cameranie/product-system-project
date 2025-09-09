@@ -4,10 +4,21 @@ import { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { userApi } from '@/lib/api';
-import type { User } from '@/types/issue';
+import { userApi, visibilityApi } from '@/lib/api';
+type ListUser = {
+  id: string;
+  name: string;
+  email: string | null;
+  username: string;
+  phone: string | null;
+  position: string | null;
+  employeeNo: string | null;
+  employmentStatus: string | null;
+  department?: { id: string; name: string } | null;
+};
 import Link from 'next/link';
 
 import {
@@ -19,80 +30,62 @@ import {
   TableHead as TableHeadRaw,
 } from '@/components/ui/table';
 
-import { Search, Plus, Eye } from 'lucide-react';
+import { Search, Plus, Eye, ShieldCheck } from 'lucide-react';
 
-// 人员状态配置
-const userStatusConfig = {
-  ACTIVE: { label: '在职', color: 'bg-green-100 text-green-800' },
-  INACTIVE: { label: '离职', color: 'bg-gray-100 text-gray-800' },
-  ON_LEAVE: { label: '请假', color: 'bg-yellow-100 text-yellow-800' },
-  PROBATION: { label: '试用期', color: 'bg-blue-100 text-blue-800' },
-};
+// （列显隐已由 visibleFieldKeys 控制）
 
-// 人员类型配置
-const userTypeConfig = {
-  FULL_TIME: { label: '全职' },
-  PART_TIME: { label: '兼职' },
-  INTERN: { label: '实习生' },
-  CONTRACTOR: { label: '外包' },
-};
-
-// 性别配置
-const genderConfig = {
-  MALE: { label: '男' },
-  FEMALE: { label: '女' },
-  OTHER: { label: '其他' },
-};
-
-// 模拟扩展用户数据
-interface ExtendedUser extends User {
-  gender: 'MALE' | 'FEMALE' | 'OTHER';
-  phone: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'ON_LEAVE' | 'PROBATION';
-  userType: 'FULL_TIME' | 'PART_TIME' | 'INTERN' | 'CONTRACTOR';
-  department: {
-    id: string;
-    name: string;
-  };
-  manager: {
-    id: string;
-    name: string;
-  } | null;
-  position: string;
-}
+// 可见字段 keys -> 控制列显隐
+const FIELD_KEYS = {
+  name: 'name',
+  department: 'department',
+  position: 'position',
+  employeeNo: 'employee_no',
+  employmentStatus: 'employment_status',
+  contactWorkEmail: 'contact_work_email',
+  contactPhone: 'contact_phone',
+} as const;
 
 export default function PersonnelPage() {
-  const [personnel, setPersonnel] = useState<ExtendedUser[]>([]);
+  const [personnel, setPersonnel] = useState<ListUser[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [visibleKeys, setVisibleKeys] = useState<string[]>([]);
+  const [exporting, setExporting] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(20);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [total, setTotal] = useState(0);
+  const [isActive, setIsActive] = useState<'all' | 'active' | 'inactive'>('all');
+  const [departmentId, setDepartmentId] = useState<string>('all');
 
-  // 加载人员数据
+  // 搜索防抖
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  // 加载人员数据 + 可见字段
   useEffect(() => {
     const loadPersonnel = async () => {
       try {
         setLoading(true);
-        const response = await userApi.getUsers();
-        
-        // 模拟扩展数据
-        const extendedUsers: ExtendedUser[] = response.users.users.map((user, index) => ({
-          ...user,
-          gender: ['MALE', 'FEMALE', 'OTHER'][index % 3] as 'MALE' | 'FEMALE' | 'OTHER',
-          phone: `138${String(Math.floor(Math.random() * 100000000)).padStart(8, '0')}`,
-          status: ['ACTIVE', 'INACTIVE', 'ON_LEAVE', 'PROBATION'][index % 4] as 'ACTIVE' | 'INACTIVE' | 'ON_LEAVE' | 'PROBATION',
-          userType: ['FULL_TIME', 'PART_TIME', 'INTERN', 'CONTRACTOR'][index % 4] as 'FULL_TIME' | 'PART_TIME' | 'INTERN' | 'CONTRACTOR',
-          department: {
-            id: `dept_${index % 3 + 1}`,
-            name: ['技术部', '产品部', '运营部'][index % 3]
-          },
-          manager: index === 0 ? null : {
-            id: 'manager_1',
-            name: '张经理'
-          },
-          position: ['高级工程师', '产品经理', '运营专员', '设计师'][index % 4]
-        }));
-        
-        setPersonnel(extendedUsers);
+        const [usersRes, keysRes] = await Promise.all([
+          userApi.getUsers({
+            filters: {
+              ...(debouncedSearch ? { search: debouncedSearch } : {}),
+              ...(isActive === 'active' ? { isActive: true } : {}),
+              ...(isActive === 'inactive' ? { isActive: false } : {}),
+              ...(departmentId && departmentId !== 'all' ? { departmentId } : {}),
+            },
+            skip: (page - 1) * pageSize,
+            take: pageSize,
+          }),
+          visibilityApi.visibleFieldKeys({ resource: 'user' }),
+        ]);
+        setPersonnel(usersRes.users.users);
+        setTotal(usersRes.users.total ?? 0);
+        setVisibleKeys(keysRes.visibleFieldKeys);
       } catch (err) {
         setError(err instanceof Error ? err.message : '加载失败');
         console.error('Failed to load personnel:', err);
@@ -102,16 +95,54 @@ export default function PersonnelPage() {
     };
 
     loadPersonnel();
-  }, []);
+  }, [debouncedSearch, page, pageSize, isActive, departmentId]);
+
+  // 搜索变更时重置页码
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, isActive, departmentId]);
 
   // 过滤人员
-  const filteredPersonnel = personnel.filter(person =>
-    person.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    person.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    person.phone.includes(searchTerm) ||
-    person.department.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    person.position.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPersonnel = personnel; // 过滤交由后端 search
+
+  const showPhone = visibleKeys.includes(FIELD_KEYS.contactPhone);
+  const showPosition = visibleKeys.includes(FIELD_KEYS.position);
+  const showDepartment = visibleKeys.includes(FIELD_KEYS.department);
+  const showEmployeeNo = visibleKeys.includes(FIELD_KEYS.employeeNo);
+  const showEmploymentStatus = visibleKeys.includes(FIELD_KEYS.employmentStatus);
+  const columnsCount = 2 +
+    (showPhone ? 1 : 0) +
+    (showEmploymentStatus ? 1 : 0) +
+    (showEmployeeNo ? 1 : 0) +
+    (showDepartment ? 1 : 0) +
+    (showPosition ? 1 : 0);
+
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      const filters: Record<string, string | boolean> = {};
+      if (debouncedSearch) filters.search = debouncedSearch;
+      if (isActive === 'active') filters.isActive = true;
+      if (isActive === 'inactive') filters.isActive = false;
+      if (departmentId && departmentId !== 'all') filters.departmentId = departmentId;
+      const data = await visibilityApi.exportUsersCsv(Object.keys(filters).length ? filters : undefined);
+      const csv = data.exportUsersCsv as string;
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `users-${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : '导出失败（可能无导出权限）';
+      alert(message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <AppLayout>
@@ -138,6 +169,36 @@ export default function PersonnelPage() {
               添加人员
             </Link>
           </Button>
+          {/* 状态筛选 */}
+          <div className="w-40">
+            <Select value={isActive} onValueChange={(v) => setIsActive(v as 'all' | 'active' | 'inactive')}>
+              <SelectTrigger>
+                <SelectValue placeholder="状态" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部状态</SelectItem>
+                <SelectItem value="active">在职</SelectItem>
+                <SelectItem value="inactive">未激活/离职</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {/* 部门筛选（从当前结果中聚合） */}
+          <div className="w-48">
+            <Select value={departmentId} onValueChange={(v) => setDepartmentId(v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="部门" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部部门</SelectItem>
+                {[...new Map(personnel.map(u => (u.department ? [u.department.id, u.department.name] : null)).filter(Boolean) as [string, string][])].map(([id, name]) => (
+                  <SelectItem key={id} value={id}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button variant="secondary" onClick={handleExport} disabled={exporting}>
+            {exporting ? '导出中…' : '导出 CSV'}
+          </Button>
         </div>
 
         {/* 人员表格 */}
@@ -146,26 +207,24 @@ export default function PersonnelPage() {
             <TableHeaderRaw>
               <TableRowRaw>
                 <TableHeadRaw>姓名</TableHeadRaw>
-                <TableHeadRaw>性别</TableHeadRaw>
-                <TableHeadRaw>手机号码</TableHeadRaw>
-                <TableHeadRaw>人员状态</TableHeadRaw>
-                <TableHeadRaw>人员类型</TableHeadRaw>
-                <TableHeadRaw>部门</TableHeadRaw>
-                <TableHeadRaw>主管</TableHeadRaw>
-                <TableHeadRaw>职务</TableHeadRaw>
+                {showPhone && <TableHeadRaw>手机号码</TableHeadRaw>}
+                {showEmploymentStatus && <TableHeadRaw>人员状态</TableHeadRaw>}
+                {showEmployeeNo && <TableHeadRaw>工号</TableHeadRaw>}
+                {showDepartment && <TableHeadRaw>部门</TableHeadRaw>}
+                {showPosition && <TableHeadRaw>职务</TableHeadRaw>}
                 <TableHeadRaw>操作</TableHeadRaw>
               </TableRowRaw>
             </TableHeaderRaw>
             <TableBodyRaw>
               {loading ? (
                 <TableRowRaw>
-                  <TableCellRaw colSpan={9} className="h-24 text-center">
+                  <TableCellRaw colSpan={columnsCount} className="h-24 text-center">
                     加载中...
                   </TableCellRaw>
                 </TableRowRaw>
               ) : error ? (
                 <TableRowRaw>
-                  <TableCellRaw colSpan={9} className="h-24 text-center text-red-600">
+                  <TableCellRaw colSpan={columnsCount} className="h-24 text-center text-red-600">
                     {error}
                   </TableCellRaw>
                 </TableRowRaw>
@@ -180,41 +239,37 @@ export default function PersonnelPage() {
                         </Avatar>
                         <div>
                           <div className="font-medium">{person.name}</div>
-                          <div className="text-sm text-muted-foreground">{person.email}</div>
+                          {visibleKeys.includes(FIELD_KEYS.contactWorkEmail) && (
+                            <div className="text-sm text-muted-foreground">{person.email}</div>
+                          )}
                         </div>
                       </div>
                     </TableCellRaw>
-                    <TableCellRaw>
-                      <Badge variant="outline">
-                        {genderConfig[person.gender]?.label}
-                      </Badge>
-                    </TableCellRaw>
-                    <TableCellRaw className="font-mono text-sm">
-                      {person.phone}
-                    </TableCellRaw>
-                    <TableCellRaw>
-                      <Badge variant="outline" className={userStatusConfig[person.status]?.color}>
-                        {userStatusConfig[person.status]?.label}
-                      </Badge>
-                    </TableCellRaw>
-                    <TableCellRaw>
-                      <Badge variant="outline">
-                        {userTypeConfig[person.userType]?.label}
-                      </Badge>
-                    </TableCellRaw>
-                    <TableCellRaw>
-                      <div className="text-sm">{person.department.name}</div>
-                    </TableCellRaw>
-                    <TableCellRaw>
-                      {person.manager ? (
-                        <div className="text-sm">{person.manager.name}</div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">-</span>
-                      )}
-                    </TableCellRaw>
-                    <TableCellRaw>
-                      <div className="text-sm">{person.position}</div>
-                    </TableCellRaw>
+                    {showPhone && (
+                      <TableCellRaw className="font-mono text-sm">
+                        {person.phone ?? ''}
+                      </TableCellRaw>
+                    )}
+                    {showEmploymentStatus && (
+                      <TableCellRaw>
+                        <Badge variant="outline">{person.employmentStatus ?? ''}</Badge>
+                      </TableCellRaw>
+                    )}
+                    {showEmployeeNo && (
+                      <TableCellRaw>
+                        <div className="text-sm">{person.employeeNo ?? ''}</div>
+                      </TableCellRaw>
+                    )}
+                    {showDepartment && (
+                      <TableCellRaw>
+                        <div className="text-sm">{person.department?.name ?? ''}</div>
+                      </TableCellRaw>
+                    )}
+                    {showPosition && (
+                      <TableCellRaw>
+                        <div className="text-sm">{person.position ?? ''}</div>
+                      </TableCellRaw>
+                    )}
                     <TableCellRaw>
                       <Button 
                         variant="ghost" 
@@ -226,18 +281,35 @@ export default function PersonnelPage() {
                           详情
                         </Link>
                       </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        asChild
+                      >
+                        <Link href={`/admin/permissions/preview?targetUserId=${person.id}`}>
+                          <ShieldCheck className="h-4 w-4 mr-1" />
+                          权限
+                        </Link>
+                      </Button>
                     </TableCellRaw>
                   </TableRowRaw>
                 ))
               ) : (
                 <TableRowRaw>
-                  <TableCellRaw colSpan={9} className="h-24 text-center">
+                  <TableCellRaw colSpan={columnsCount} className="h-24 text-center">
                     暂无人员数据
                   </TableCellRaw>
                 </TableRowRaw>
               )}
             </TableBodyRaw>
           </Table>
+        </div>
+        {/* 分页 */}
+        <div className="flex items-center justify-end gap-2">
+          <div className="text-sm text-muted-foreground mr-2">共 {total} 条</div>
+          <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>上一页</Button>
+          <div className="text-sm text-muted-foreground">第 {page} 页</div>
+          <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page * pageSize >= total}>下一页</Button>
         </div>
       </div>
     </AppLayout>

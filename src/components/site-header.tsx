@@ -8,6 +8,8 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 // 页面标题映射
 const PAGE_TITLES: Record<string, string> = {
   "/": "项目概览",
+  "/requirements": "需求池",
+  "/requirements/new": "提交需求",
   "/kanban": "任务看板", 
   "/issues": "Issues",
   "/issues/new": "创建Issue"

@@ -313,21 +313,70 @@ export const projectApi = {
 
 // 用户API (获取用户列表用于分配)
 export const userApi = {
-  async getUsers() {
+  async getUsers(params?: {
+    filters?: { departmentId?: string; isActive?: boolean; search?: string };
+    skip?: number;
+    take?: number;
+  }) {
     const query = `
-      query GetUsers {
-        users {
+      query GetUsers($filters: UserFiltersInput, $skip: Int, $take: Int) {
+        users(filters: $filters, skip: $skip, take: $take) {
           users {
             id
             name
             email
             username
+            phone
+            department { id name }
           }
+          total
         }
       }
     `;
 
-    return graphqlRequest(query);
+    return graphqlRequest(query, {
+      filters: params?.filters,
+      skip: params?.skip,
+      take: params?.take,
+    });
+  }
+  ,
+  async getUser(id: string) {
+    const query = `
+      query GetUser($id: String!) {
+        user(id: $id) {
+          id
+          name
+          email
+          username
+          phone
+          isActive
+          createdAt
+          department { id name }
+        }
+      }
+    `;
+    return graphqlRequest(query, { id });
+  }
+  ,
+  async createUser(input: {
+    email: string; username: string; name: string; password: string; departmentId?: string; phone?: string;
+  }) {
+    const query = `
+      mutation CreateUser($input: CreateUserInputType!) {
+        createUser(input: $input) { id name email username }
+      }
+    `;
+    return graphqlRequest(query, { input });
+  }
+  ,
+  async updateUser(id: string, input: { name?: string; phone?: string; departmentId?: string; isActive?: boolean; }) {
+    const query = `
+      mutation UpdateUser($id: String!, $input: UpdateUserInputType!) {
+        updateUser(id: $id, input: $input) { id name email username phone isActive department { id name } }
+      }
+    `;
+    return graphqlRequest(query, { id, input });
   }
 };
 
@@ -453,6 +502,143 @@ export const taskApi = {
     `;
 
     return graphqlRequest(query, { id, input: { status } });
+  },
+};
+
+// 可见性与权限（用户侧）
+export const visibilityApi = {
+  async visibleFieldKeys(params: { resource: string; targetUserId?: string }) {
+    const query = `
+      query VisibleFieldKeys($resource: String!, $targetUserId: String) {
+        visibleFieldKeys(resource: $resource, targetUserId: $targetUserId)
+      }
+    `;
+    return graphqlRequest(query, params);
+  },
+
+  async accessPreview(params: { resource?: string; targetUserId?: string }) {
+    const query = `
+      query AccessPreview($resource: String, $targetUserId: String) {
+        accessPreview(resource: $resource, targetUserId: $targetUserId)
+      }
+    `;
+    return graphqlRequest(query, params);
+  },
+
+  async exportUsersCsv(filters?: Record<string, any>) {
+    const query = `
+      query ExportUsers($filters: UserFiltersInput) {
+        exportUsersCsv(filters: $filters)
+      }
+    `;
+    return graphqlRequest(query, { filters });
+  },
+};
+
+// 管理端（仅管理员）
+export const adminApi = {
+  async fieldDefinitions() {
+    const query = `
+      query FieldDefs {
+        fieldDefinitions
+      }
+    `;
+    return graphqlRequest(query);
+  },
+
+  async fieldSets() {
+    const query = `
+      query FieldSets {
+        fieldSets
+      }
+    `;
+    return graphqlRequest(query);
+  },
+
+  async upsertFieldDefinition(input: {
+    key: string; label: string; classification: string; selfEditable?: boolean;
+  }) {
+    const query = `
+      mutation UpsertFieldDefinition($key: String!, $label: String!, $cls: String!, $self: Boolean) {
+        upsertFieldDefinition(key: $key, label: $label, classification: $cls, selfEditable: $self)
+      }
+    `;
+    return graphqlRequest(query, {
+      key: input.key,
+      label: input.label,
+      cls: input.classification,
+      self: input.selfEditable,
+    });
+  },
+
+  async upsertFieldSet(input: { name: string; description?: string; isSystem?: boolean }) {
+    const query = `
+      mutation UpsertFieldSet($name: String!, $desc: String, $sys: Boolean) {
+        upsertFieldSet(name: $name, description: $desc, isSystem: $sys)
+      }
+    `;
+    return graphqlRequest(query, {
+      name: input.name,
+      desc: input.description,
+      sys: input.isSystem,
+    });
+  },
+
+  async assignFieldsToSet(setName: string, fieldKeys: string[]) {
+    const query = `
+      mutation AssignFields($setName: String!, $keys: [String!]!) {
+        assignFieldsToSet(setName: $setName, fieldKeys: $keys)
+      }
+    `;
+    return graphqlRequest(query, { setName, keys: fieldKeys });
+  },
+
+  async setUserVisibility(input: { userId: string; hidden?: boolean; viewScope?: string }) {
+    const query = `
+      mutation SetUserVisibility($userId: String!, $hidden: Boolean, $viewScope: String) {
+        setUserVisibility(userId: $userId, hidden: $hidden, viewScope: $viewScope)
+      }
+    `;
+    return graphqlRequest(query, input);
+  },
+
+  async updateDepartmentLeaders(input: { departmentId: string; leaderUserIds: string[] }) {
+    const query = `
+      mutation UpdateDepartmentLeaders($departmentId: String!, $leaderUserIds: [String!]!) {
+        updateDepartmentLeaders(departmentId: $departmentId, leaderUserIds: $leaderUserIds)
+      }
+    `;
+    return graphqlRequest(query, input);
+  },
+
+  async createTemporaryAccessGrant(input: {
+    granteeId: string;
+    resource: string;
+    fieldKey: string;
+    action: string;
+    startAt: string;
+    endAt: string;
+    allowCrossBoundary?: boolean;
+    scopeDepartmentId?: string;
+  }) {
+    const query = `
+      mutation CreateGrant(
+        $granteeId: String!, $resource: String!, $fieldKey: String!, $action: String!,
+        $startAt: String!, $endAt: String!, $allowCrossBoundary: Boolean, $scopeDepartmentId: String
+      ) {
+        createTemporaryAccessGrant(
+          granteeId: $granteeId,
+          resource: $resource,
+          fieldKey: $fieldKey,
+          action: $action,
+          startAt: $startAt,
+          endAt: $endAt,
+          allowCrossBoundary: $allowCrossBoundary,
+          scopeDepartmentId: $scopeDepartmentId
+        )
+      }
+    `;
+    return graphqlRequest(query, input);
   },
 };
 

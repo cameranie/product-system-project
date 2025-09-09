@@ -9,6 +9,8 @@ import {
   Settings,
   HelpCircle,
   Search,
+  Inbox,
+  Shield,
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -39,6 +41,11 @@ const data = {
       icon: Home,
     },
     {
+      title: "需求池",
+      url: "/requirements",
+      icon: Inbox,
+    },
+    {
       title: "任务看板",
       url: "/kanban",
       icon: Kanban,
@@ -52,6 +59,29 @@ const data = {
       title: "人员管理",
       url: "/personnel",
       icon: Users,
+    },
+    {
+      title: "权限管理",
+      url: "/admin/permissions",
+      icon: Shield,
+      items: [
+        {
+          title: "权限预览",
+          url: "/admin/permissions/preview",
+        },
+        {
+          title: "临时授权",
+          url: "/admin/permissions/grants",
+        },
+        {
+          title: "字段管理",
+          url: "/admin/permissions/fields",
+        },
+        {
+          title: "可见性管理",
+          url: "/admin/permissions/visibility",
+        },
+      ],
     },
   ],
   navSecondary: [
@@ -84,7 +114,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        {/* 简单前端门禁：如果本地未设置管理员开关，则隐藏权限管理入口。
+            后端仍会在访问接口时做 403 拒绝。*/}
+        <NavMain items={process.env.NEXT_PUBLIC_SHOW_ADMIN === '1' ? data.navMain : data.navMain.filter(i => i.title !== '权限管理')} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />

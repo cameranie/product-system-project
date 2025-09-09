@@ -13,6 +13,18 @@ const nextConfig: NextConfig = {
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
+  webpack: (config, { isServer }) => {
+    // Handle matter-js and poly-decomp for client-side
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+      };
+    }
+    
+    return config;
+  },
 };
 
 export default nextConfig;
