@@ -30,8 +30,8 @@ import {
 
 const data = {
   user: {
-    name: "管理员",
-    email: "admin@company.com",
+    name: "未登录",
+    email: "",
     avatar: "/avatars/admin.jpg",
   },
   navMain: [
@@ -90,6 +90,21 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const [profile, setProfile] = React.useState(data.user)
+  React.useEffect(() => {
+    ;(async () => {
+      try {
+        const mod = await import("@/lib/api")
+        const res = await mod.authApi.me()
+        const me = res.me
+        if (me) {
+          setProfile({ name: me.name ?? '用户', email: me.email ?? '', avatar: me.avatar ?? '/avatars/admin.jpg' })
+        }
+      } catch (_) {
+        // 未登录保持默认
+      }
+    })()
+  }, [])
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -119,7 +134,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={process.env.NEXT_PUBLIC_SHOW_ADMIN === '1' ? data.navMain : data.navMain.filter(i => i.title !== '权限管理')} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={profile} />
       </SidebarFooter>
     </Sidebar>
   )

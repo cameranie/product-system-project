@@ -35,8 +35,8 @@ export default function TemporaryGrantsPage() {
         scopeDepartmentId: form.scopeDepartmentId || undefined,
       });
       setMsg(`临时授权已生效至 ${form.endAt}`);
-    } catch (e: any) {
-      setErr(e?.message || '提交失败（可能无权限）');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '提交失败（可能无权限）');
     } finally {
       setLoading(false);
     }

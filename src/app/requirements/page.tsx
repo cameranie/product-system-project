@@ -40,6 +40,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import Link from 'next/link';
 
 // 模拟需求数据 - 基于产品管理系统文档
 import type { 
@@ -461,10 +462,10 @@ export default function RequirementsPage() {
 
           {/* 创建需求按钮 */}
           <Button asChild>
-            <a href="/requirements/new">
+            <Link href="/requirements/new">
               <Plus className="h-4 w-4 mr-2" />
               提交需求
-            </a>
+            </Link>
           </Button>
         </div>
 
@@ -572,10 +573,10 @@ export default function RequirementsPage() {
                           <DropdownMenuLabel>操作</DropdownMenuLabel>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem asChild>
-                            <a href={`/requirements/${requirement.id}`}>
+                            <Link href={`/requirements/${requirement.id}`}>
                               <Eye className="h-4 w-4 mr-2" />
                               查看详情
-                            </a>
+                            </Link>
                           </DropdownMenuItem>
                           {viewMode === 'unscheduled' && requirement.status === 'APPROVED' && (
                             <DropdownMenuItem onClick={() => handleBatchSchedule()}>

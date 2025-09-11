@@ -7,9 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { adminApi } from '@/lib/api';
 
+type FieldDefDto = { key: string; label: string; classification: 'PUBLIC'|'INTERNAL'|'SENSITIVE'|'HIGHLY_SENSITIVE'; selfEditable?: boolean };
+type FieldSetDto = { name: string; description?: string; isSystem?: boolean };
+
 export default function FieldAdminPage() {
-  const [defs, setDefs] = useState<string[]>([]);
-  const [sets, setSets] = useState<string[]>([]);
+  const [defs, setDefs] = useState<FieldDefDto[] | string[]>([]);
+  const [sets, setSets] = useState<FieldSetDto[] | string[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -24,8 +27,8 @@ export default function FieldAdminPage() {
       const [d, s] = await Promise.all([adminApi.fieldDefinitions(), adminApi.fieldSets()]);
       setDefs(d.fieldDefinitions ?? []);
       setSets(s.fieldSets ?? []);
-    } catch (e: any) {
-      setErr(e?.message || '加载失败');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '加载失败');
     } finally {
       setLoading(false);
     }
@@ -46,7 +49,7 @@ export default function FieldAdminPage() {
               <Input placeholder="key" value={defForm.key} onChange={e=>setDefForm({...defForm, key:e.target.value})} />
               <Input placeholder="label" value={defForm.label} onChange={e=>setDefForm({...defForm, label:e.target.value})} />
               <Input placeholder="classification (PUBLIC/INTERNAL/SENSITIVE/HIGHLY_SENSITIVE)" className="col-span-2" value={defForm.classification} onChange={e=>setDefForm({...defForm, classification:e.target.value})} />
-              <Button onClick={async()=>{await adminApi.upsertFieldDefinition(defForm as any); await load();}}>保存字段定义</Button>
+              <Button onClick={async()=>{await adminApi.upsertFieldDefinition(defForm); await load();}}>保存字段定义</Button>
             </div>
           </div>
 
@@ -57,7 +60,7 @@ export default function FieldAdminPage() {
               <Input placeholder="name" value={setForm.name} onChange={e=>setSetForm({...setForm, name:e.target.value})} />
               <Input placeholder="isSystem (true/false)" value={String(setForm.isSystem)} onChange={e=>setSetForm({...setForm, isSystem: e.target.value === 'true'})} />
               <Textarea placeholder="description" className="col-span-2" value={setForm.description} onChange={e=>setSetForm({...setForm, description:e.target.value})} />
-              <Button onClick={async()=>{await adminApi.upsertFieldSet(setForm as any); await load();}}>保存字段集</Button>
+              <Button onClick={async()=>{await adminApi.upsertFieldSet(setForm); await load();}}>保存字段集</Button>
             </div>
           </div>
         </div>

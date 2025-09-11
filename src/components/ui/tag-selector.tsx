@@ -137,7 +137,7 @@ export function TagSelector<T>({
                 <CommandGroup>
                   <CommandItem value={inputValue} onSelect={handleCreate}>
                     <Check className="mr-2 h-4 w-4 opacity-100" />
-                    Create "{inputValue}"
+                    Create &quot;{inputValue}&quot;
                   </CommandItem>
                 </CommandGroup>
               )}

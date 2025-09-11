@@ -1,14 +1,20 @@
 // API客户端 - 使用RESTful方式调用后端GraphQL
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-// 使用产品经理的固定token（从之前的登录获取）
+// 从本地读取登录后的 token
 function getAuthToken(): string | null {
-  // 使用产品经理的token
-  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWYxdXdwdzcwMDRjMTBmMDhhbjNreGF3IiwiZW1haWwiOiJwbUBjb21wYW55LmNvbSIsInVzZXJuYW1lIjoicHJvZHVjdF9tYW5hZ2VyIiwicm9sZXMiOlsicHJvamVjdF9tYW5hZ2VyIl0sInBlcm1pc3Npb25zIjpbInVzZXI6cmVhZCIsInByb2plY3Q6Y3JlYXRlIiwicHJvamVjdDpyZWFkIiwicHJvamVjdDp1cGRhdGUiLCJ0YXNrOmNyZWF0ZSIsInRhc2s6cmVhZCIsInRhc2s6dXBkYXRlIiwidGFzazphc3NpZ24iLCJ0ZWFtOnJlYWQiLCJ0aW1lbG9nOnJlYWQiXSwiaWF0IjoxNzU2Nzc2MTQzLCJleHAiOjE3NTczODA5NDN9.3CoSas-rJCRUZdk3eLAGWnC2KSuggvIXvv3hZzo21wQ";
+  if (typeof window !== 'undefined') {
+    try {
+      return localStorage.getItem('auth_token');
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 // GraphQL查询函数
-async function graphqlRequest(query: string, variables?: Record<string, any>) {
+async function graphqlRequest(query: string, variables?: Record<string, unknown>) {
   const token = getAuthToken();
   
   const response = await fetch(`${API_BASE_URL}/graphql`, {
@@ -23,14 +29,46 @@ async function graphqlRequest(query: string, variables?: Record<string, any>) {
     }),
   });
 
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
+  // 尝试解析 JSON，无论 HTTP 状态码如何
+  let result;
+  try {
+    result = await response.json();
+  } catch {
+    // 如果无法解析 JSON，则抛出 HTTP 错误
+    throw new Error(`HTTP ${response.status}: ${response.statusText} (无法解析响应)`);
   }
 
-  const result = await response.json();
-  
-  if (result.errors) {
-    throw new Error(result.errors[0]?.message || 'GraphQL error');
+  // 检查 GraphQL 错误（优先级更高）
+  if (result.errors && result.errors.length > 0) {
+    const error = result.errors[0];
+    let errorMessage = error.message || 'GraphQL error';
+    
+    // 添加错误扩展信息
+    if (error.extensions) {
+      const { code, status } = error.extensions as { code?: string; status?: number };
+      if (code) errorMessage += ` (${code})`;
+      if (status && status !== response.status) errorMessage += ` [状态: ${status}]`;
+    }
+    
+    // 添加路径信息（如果有）
+    if (error.path && error.path.length > 0) {
+      errorMessage += ` - 路径: ${error.path.join('.')}`;
+    }
+    
+    const customError = new Error(errorMessage) as Error & {
+      extensions?: Record<string, unknown>;
+      locations?: Array<{ line: number; column: number }>;
+      path?: string[];
+    };
+    customError.extensions = error.extensions as Record<string, unknown> | undefined;
+    customError.locations = error.locations as Array<{ line: number; column: number }> | undefined;
+    customError.path = error.path as string[] | undefined;
+    throw customError;
+  }
+
+  // 检查 HTTP 错误（如果没有 GraphQL 错误但 HTTP 不成功）
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
 
   return result.data;
@@ -61,6 +99,13 @@ export const authApi = {
     }
     
     return result.login;
+  },
+  // 当前用户
+  async me() {
+    const query = `
+      query Me { me { id email username name avatar roles permissions } }
+    `;
+    return graphqlRequest(query);
   },
 
   // 登出
@@ -341,6 +386,62 @@ export const userApi = {
     });
   }
   ,
+  // ===== 附件：创建/删除 =====
+  async createUserAttachment(input: {
+    userId: string;
+    attachmentType: string;
+    filename: string;
+    fileUrl: string;
+    mimeType?: string;
+    fileSize?: number;
+    notes?: string;
+  }) {
+    const query = `
+      mutation CreateUserAttachment($input: CreateUserAttachmentInput!) {
+        createUserAttachment(input: $input) { id name attachments }
+      }
+    `;
+    return graphqlRequest(query, { input });
+  },
+  async deleteUserAttachment(id: string) {
+    const query = `
+      mutation DeleteUserAttachment($id: String!) {
+        deleteUserAttachment(id: $id) { id name attachments }
+      }
+    `;
+    return graphqlRequest(query, { id });
+  },
+
+  // ===== 假期余额（只读） =====
+  async getUserLeaveBalances(userId: string) {
+    const query = `
+      query UserLeaveBalances($userId: String!) {
+        userLeaveBalances(userId: $userId) { type total used available }
+      }
+    `;
+    return graphqlRequest(query, { userId });
+  },
+
+  // ===== Storage：获取直传上传URL =====
+  async createAttachmentUploadUrl(params: { userId: string; attachmentType: string; filename: string }) {
+    const query = `
+      mutation CreateAttachmentUploadUrl($userId: String!, $attachmentType: String!, $filename: String!) {
+        createAttachmentUploadUrl(userId: $userId, attachmentType: $attachmentType, filename: $filename)
+      }
+    `;
+    return graphqlRequest(query, params);
+  },
+
+  // ===== Storage：获取签名下载URL =====
+  async createAttachmentDownloadUrl(objectPath: string) {
+    const query = `
+      query CreateAttachmentDownloadUrl($objectPath: String!) {
+        createAttachmentDownloadUrl(objectPath: $objectPath)
+      }
+    `;
+    return graphqlRequest(query, { objectPath });
+  }
+  ,
   async getUser(id: string) {
     const query = `
       query GetUser($id: String!) {
@@ -353,6 +454,7 @@ export const userApi = {
           isActive
           createdAt
           department { id name }
+          attachments
         }
       }
     `;
@@ -370,13 +472,275 @@ export const userApi = {
     return graphqlRequest(query, { input });
   }
   ,
-  async updateUser(id: string, input: { name?: string; phone?: string; departmentId?: string; isActive?: boolean; }) {
+  async updateUser(id: string, input: { 
+    name?: string; 
+    phone?: string; 
+    departmentId?: string; 
+    isActive?: boolean;
+  }) {
     const query = `
       mutation UpdateUser($id: String!, $input: UpdateUserInputType!) {
-        updateUser(id: $id, input: $input) { id name email username phone isActive department { id name } }
+        updateUser(id: $id, input: $input) { 
+          id name email username phone isActive 
+          department { id name }
+          fieldValues {
+            id fieldKey valueString valueNumber valueDate valueJson
+          }
+          educations
+          workExperiences
+          familyMembers
+          emergencyContacts
+          contracts
+          documents
+          bankAccounts
+          attachments
+        }
       }
     `;
     return graphqlRequest(query, { id, input });
+  },
+
+  async updateUserFieldValues(userId: string, entries: Array<{
+    fieldKey: string;
+    valueString?: string;
+    valueNumber?: number;
+    valueDate?: string;
+    valueJson?: unknown;
+  }>) {
+    const query = `
+      mutation UpdateUserFieldValues($userId: String!, $entries: [UpdateUserFieldValueEntryInput!]!) {
+        updateUserFieldValues(userId: $userId, entries: $entries) {
+          id name email username phone isActive 
+          department { id name }
+          fieldValues {
+            id fieldKey valueString valueNumber valueDate valueJson
+          }
+          educations
+          workExperiences
+          familyMembers
+          emergencyContacts
+          contracts
+          documents
+          bankAccounts
+          attachments
+        }
+      }
+    `;
+    return graphqlRequest(query, { userId, entries });
+  },
+
+  async upsertUserEducation(input: {
+    id?: string;
+    userId: string;
+    degree?: string;
+    school?: string;
+    enrollDate?: string;
+    graduateDate?: string;
+    major?: string;
+    studyForm?: string;
+    schoolingYears?: number;
+    degreeName?: string;
+    awardingCountry?: string;
+    awardingInstitution?: string;
+    awardingDate?: string;
+    languageLevel?: string;
+  }) {
+    const query = `
+      mutation UpsertUserEducation($input: UpsertEducationInput!) {
+        upsertUserEducation(input: $input) {
+          id name educations
+        }
+      }
+    `;
+    return graphqlRequest(query, { input });
+  },
+
+  async deleteUserEducation(id: string) {
+    const query = `
+      mutation DeleteUserEducation($id: String!) {
+        deleteUserEducation(id: $id) {
+          id name educations
+        }
+      }
+    `;
+    return graphqlRequest(query, { id });
+  },
+
+  async upsertUserWorkExperience(input: {
+    id?: string;
+    userId: string;
+    company?: string;
+    department?: string;
+    position?: string;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    const query = `
+      mutation UpsertUserWorkExperience($input: UpsertWorkExperienceInput!) {
+        upsertUserWorkExperience(input: $input) {
+          id name workExperiences
+        }
+      }
+    `;
+    return graphqlRequest(query, { input });
+  },
+
+  async deleteUserWorkExperience(id: string) {
+    const query = `
+      mutation DeleteUserWorkExperience($id: String!) {
+        deleteUserWorkExperience(id: $id) {
+          id name workExperiences
+        }
+      }
+    `;
+    return graphqlRequest(query, { id });
+  },
+
+  async upsertUserEmergencyContact(input: {
+    id?: string;
+    userId: string;
+    name: string;
+    relation?: string;
+    phone: string;
+    address?: string;
+  }) {
+    const query = `
+      mutation UpsertUserEmergencyContact($input: UpsertEmergencyContactInput!) {
+        upsertUserEmergencyContact(input: $input) {
+          id name emergencyContacts
+        }
+      }
+    `;
+    return graphqlRequest(query, { input });
+  },
+
+  async deleteUserEmergencyContact(id: string) {
+    const query = `
+      mutation DeleteUserEmergencyContact($id: String!) {
+        deleteUserEmergencyContact(id: $id) {
+          id name emergencyContacts
+        }
+      }
+    `;
+    return graphqlRequest(query, { id });
+  },
+
+  async upsertUserFamilyMember(input: {
+    id?: string;
+    userId: string;
+    name: string;
+    relation: string;
+    organization?: string;
+    contact?: string;
+  }) {
+    const query = `
+      mutation UpsertUserFamilyMember($input: UpsertFamilyMemberInput!) {
+        upsertUserFamilyMember(input: $input) {
+          id name familyMembers
+        }
+      }
+    `;
+    return graphqlRequest(query, { input });
+  },
+
+  async deleteUserFamilyMember(id: string) {
+    const query = `
+      mutation DeleteUserFamilyMember($id: String!) {
+        deleteUserFamilyMember(id: $id) {
+          id name familyMembers
+        }
+      }
+    `;
+    return graphqlRequest(query, { id });
+  },
+
+  async upsertUserContract(input: {
+    id?: string;
+    userId: string;
+    contractNo?: string;
+    company?: string;
+    contractType?: string;
+    startDate?: string;
+    endDate?: string;
+    actualEndDate?: string;
+    signedTimes?: number;
+  }) {
+    const query = `
+      mutation UpsertUserContract($input: UpsertContractInput!) {
+        upsertUserContract(input: $input) {
+          id name contracts
+        }
+      }
+    `;
+    return graphqlRequest(query, { input });
+  },
+
+  async deleteUserContract(id: string) {
+    const query = `
+      mutation DeleteUserContract($id: String!) {
+        deleteUserContract(id: $id) {
+          id name contracts
+        }
+      }
+    `;
+    return graphqlRequest(query, { id });
+  },
+
+  async upsertUserDocument(input: {
+    id?: string;
+    userId: string;
+    docType: string;
+    docNumber: string;
+    validUntil?: string;
+  }) {
+    const query = `
+      mutation UpsertUserDocument($input: UpsertDocumentInput!) {
+        upsertUserDocument(input: $input) {
+          id name documents
+        }
+      }
+    `;
+    return graphqlRequest(query, { input });
+  },
+
+  async deleteUserDocument(id: string) {
+    const query = `
+      mutation DeleteUserDocument($id: String!) {
+        deleteUserDocument(id: $id) {
+          id name documents
+        }
+      }
+    `;
+    return graphqlRequest(query, { id });
+  },
+
+  async upsertUserBankAccount(input: {
+    id?: string;
+    userId: string;
+    accountName?: string;
+    bankName?: string;
+    bankBranch?: string;
+    accountNumber?: string;
+  }) {
+    const query = `
+      mutation UpsertUserBankAccount($input: UpsertBankAccountInput!) {
+        upsertUserBankAccount(input: $input) {
+          id name bankAccounts
+        }
+      }
+    `;
+    return graphqlRequest(query, { input });
+  },
+
+  async deleteUserBankAccount(id: string) {
+    const query = `
+      mutation DeleteUserBankAccount($id: String!) {
+        deleteUserBankAccount(id: $id) {
+          id name bankAccounts
+        }
+      }
+    `;
+    return graphqlRequest(query, { id });
   }
 };
 
@@ -525,7 +889,7 @@ export const visibilityApi = {
     return graphqlRequest(query, params);
   },
 
-  async exportUsersCsv(filters?: Record<string, any>) {
+  async exportUsersCsv(filters?: Record<string, unknown>) {
     const query = `
       query ExportUsers($filters: UserFiltersInput) {
         exportUsersCsv(filters: $filters)

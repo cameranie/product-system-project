@@ -18,6 +18,7 @@ import {
   TableHead as TableHeadRaw,
 } from '@/components/ui/table';
 
+import Link from 'next/link';
 
 import { Search, Plus, Eye } from 'lucide-react';
 
@@ -123,10 +124,10 @@ export default function IssuesPage() {
 
           {/* 创建Issue按钮 */}
           <Button asChild>
-            <a href="/issues/new">
+            <Link href="/issues/new">
               <Plus className="h-4 w-4 mr-2" />
               创建Issue
-            </a>
+            </Link>
           </Button>
         </div>
 
@@ -208,15 +209,11 @@ export default function IssuesPage() {
                       {new Date(issue.createdAt).toLocaleDateString('zh-CN')}
                     </TableCellRaw>
                     <TableCellRaw>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        asChild
-                      >
-                        <a href={`/issues/${issue.id}`}>
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={`/issues/${issue.id}`}>
                           <Eye className="h-4 w-4 mr-1" />
                           详情
-                        </a>
+                        </Link>
                       </Button>
                     </TableCellRaw>
                   </TableRowRaw>

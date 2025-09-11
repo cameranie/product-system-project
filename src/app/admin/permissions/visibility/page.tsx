@@ -22,8 +22,8 @@ export default function VisibilityAdminPage() {
         viewScope: uForm.viewScope || undefined,
       });
       setMsg('用户可见性已更新');
-    } catch (e: any) {
-      setErr(e?.message || '操作失败');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '操作失败');
     } finally {
       setLoading(false);
     }
@@ -35,8 +35,8 @@ export default function VisibilityAdminPage() {
       const ids = dForm.leaderUserIds.split(',').map(s=>s.trim()).filter(Boolean);
       await adminApi.updateDepartmentLeaders({ departmentId: dForm.departmentId, leaderUserIds: ids });
       setMsg('部门负责人已更新');
-    } catch (e: any) {
-      setErr(e?.message || '操作失败');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '操作失败');
     } finally {
       setLoading(false);
     }
