@@ -331,14 +331,14 @@ export default function RequirementDetailPage() {
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => handleStatusChange('REJECTED')}
+                  onClick={() => handleStatusChange('REJECTED' as any)}
                 >
                   <XCircle className="h-4 w-4 mr-2" />
                   审核不通过
                 </Button>
                 <Button 
                   size="sm"
-                  onClick={() => handleStatusChange('APPROVED')}
+                  onClick={() => handleStatusChange('APPROVED' as any)}
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
                   审核通过
