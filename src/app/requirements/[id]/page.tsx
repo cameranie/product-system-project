@@ -27,9 +27,11 @@ import {
   Edit,
   Send
 } from 'lucide-react';
+import { 
+  RequirementStatus
+} from '@/types/issue';
 import type { 
   Requirement, 
-  RequirementStatus, 
   RequirementType, 
   ApplicationPlatform,
   Priority,
@@ -331,14 +333,14 @@ export default function RequirementDetailPage() {
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => handleStatusChange('REJECTED' as any)}
+                  onClick={() => handleStatusChange(RequirementStatus.REJECTED)}
                 >
                   <XCircle className="h-4 w-4 mr-2" />
                   审核不通过
                 </Button>
                 <Button 
                   size="sm"
-                  onClick={() => handleStatusChange('APPROVED' as any)}
+                  onClick={() => handleStatusChange(RequirementStatus.APPROVED)}
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
                   审核通过
@@ -349,7 +351,7 @@ export default function RequirementDetailPage() {
             {requirement.status === 'APPROVED' && (
               <Button 
                 size="sm"
-                onClick={() => handleStatusChange('SCHEDULED')}
+                onClick={() => handleStatusChange(RequirementStatus.SCHEDULED)}
               >
                 <Calendar className="h-4 w-4 mr-2" />
                 加入排期

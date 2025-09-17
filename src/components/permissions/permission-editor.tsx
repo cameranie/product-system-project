@@ -29,9 +29,10 @@ interface User {
 
 interface PermissionEditorProps {
   onUserSelect?: (userId: string) => void;
+  targetUserId?: string; // 新增：直接指定目标用户ID
 }
 
-export function PermissionEditor({ onUserSelect }: PermissionEditorProps) {
+export function PermissionEditor({ onUserSelect, targetUserId }: PermissionEditorProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -43,8 +44,17 @@ export function PermissionEditor({ onUserSelect }: PermissionEditorProps) {
   // 加载初始数据
   useEffect(() => {
     loadRoles();
-    loadUsers();
-  }, []);
+    if (!targetUserId) {
+      loadUsers();
+    }
+  }, [targetUserId]);
+
+  // 当有targetUserId时，直接加载该用户的权限
+  useEffect(() => {
+    if (targetUserId) {
+      loadUserPermissions(targetUserId);
+    }
+  }, [targetUserId]);
 
   const loadRoles = async () => {
     try {
@@ -59,7 +69,7 @@ export function PermissionEditor({ onUserSelect }: PermissionEditorProps) {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const response = await userApi.getUsers({}, { take: 100 });
+      const response = await userApi.getUsers({ take: 100 });
       console.log('Users API response:', response); // 调试日志
       const usersList = response.users || response || [];
       setUsers(Array.isArray(usersList) ? usersList : []);
@@ -78,11 +88,7 @@ export function PermissionEditor({ onUserSelect }: PermissionEditorProps) {
       const user = response.user;
       setSelectedUser(user);
       setSelectedRoles(user.roles.map((role: Role) => role.name));
-      
-      // 通知父组件用户选择变化
-      if (onUserSelect) {
-        onUserSelect(userId);
-      }
+      if (onUserSelect) onUserSelect(userId);
     } catch (error) {
       console.error('Failed to load user permissions:', error);
       toast.error('加载用户权限失败');
@@ -93,14 +99,10 @@ export function PermissionEditor({ onUserSelect }: PermissionEditorProps) {
 
   const saveUserRoles = async () => {
     if (!selectedUser) return;
-    
     try {
       setSaving(true);
       await adminApi.setUserRoles(selectedUser.id, selectedRoles);
-      
-      // 重新加载用户权限信息
       await loadUserPermissions(selectedUser.id);
-      
       toast.success('用户权限更新成功');
     } catch (error) {
       console.error('Failed to save user roles:', error);
@@ -111,25 +113,96 @@ export function PermissionEditor({ onUserSelect }: PermissionEditorProps) {
   };
 
   const handleRoleToggle = (roleName: string, checked: boolean) => {
-    setSelectedRoles(prev => 
-      checked 
-        ? [...prev, roleName]
-        : prev.filter(r => r !== roleName)
-    );
+    setSelectedRoles(prev => (checked ? [...prev, roleName] : prev.filter(r => r !== roleName)));
   };
 
-  const filteredUsers = users.filter(user => 
+  const filteredUsers = users.filter(user =>
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const hasChanges = selectedUser && 
-    JSON.stringify([...selectedRoles].sort()) !== 
-    JSON.stringify(selectedUser.roles.map(r => r.name).sort());
+  const hasChanges =
+    selectedUser &&
+    JSON.stringify([...selectedRoles].sort()) !== JSON.stringify(selectedUser.roles.map(r => r.name).sort());
 
+  // 有 targetUserId 的扁平展示
+  if (targetUserId) {
+    return (
+      <div className="space-y-6 max-w-2xl mx-auto">
+        {/* 当前角色（扁平展示） */}
+        <div>
+          <div className="text-sm text-muted-foreground mb-2">当前角色</div>
+          <div className="flex flex-wrap gap-2">
+            {selectedUser?.roles?.length
+              ? selectedUser.roles.map(role => (
+                  <Badge key={role.id} variant="secondary" className="text-xs">
+                    {role.name}
+                  </Badge>
+                ))
+              : <span className="text-sm text-muted-foreground">未分配角色</span>}
+          </div>
+        </div>
+
+        {/* 角色分配（直接摊开展示） */}
+        <div className="space-y-4">
+          <Label className="text-base font-medium">角色分配</Label>
+          <ScrollArea className="h-[300px] w-full rounded-md border p-4">
+            <div className="space-y-3">
+              {roles.map((role) => (
+                <div key={role.id} className="flex items-start space-x-3">
+                  <Checkbox
+                    id={role.id}
+                    checked={selectedRoles.includes(role.name)}
+                    onCheckedChange={(checked) => handleRoleToggle(role.name, checked as boolean)}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <label htmlFor={role.id} className="text-sm font-medium cursor-pointer">
+                      {role.name}
+                      {role.isSystem && (
+                        <Badge variant="outline" className="ml-2 text-xs">系统角色</Badge>
+                      )}
+                    </label>
+                    {role.description && (
+                      <p className="text-xs text-muted-foreground mt-1">{role.description}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+
+        {/* 操作区 */}
+        <div className="flex gap-2 pt-2">
+          <Button onClick={saveUserRoles} disabled={!hasChanges || saving} className="flex-1">
+            {saving ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> 保存中...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" /> 保存权限
+              </>
+            )}
+          </Button>
+          {selectedUser && (
+            <Button variant="outline" onClick={() => loadUserPermissions(selectedUser.id)} disabled={loading}>
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+
+        {hasChanges && (
+          <div className="text-sm text-orange-600 bg-orange-50 p-3 rounded-lg">注意：当前有未保存的权限更改</div>
+        )}
+      </div>
+    );
+  }
+
+  // 无 targetUserId 的原有布局
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* 用户选择 */}
+      {/* 用户选择 - 只在没有targetUserId时显示 */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -160,9 +233,7 @@ export function PermissionEditor({ onUserSelect }: PermissionEditorProps) {
                   <div
                     key={user.id}
                     className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selectedUser?.id === user.id
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:bg-muted'
+                      selectedUser?.id === user.id ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted'
                     }`}
                     onClick={() => loadUserPermissions(user.id)}
                   >
@@ -190,9 +261,7 @@ export function PermissionEditor({ onUserSelect }: PermissionEditorProps) {
             <Shield className="h-5 w-5" />
             权限编辑
             {selectedUser && (
-              <span className="text-sm font-normal text-muted-foreground">
-                - {selectedUser.name}
-              </span>
+              <span className="text-sm font-normal text-muted-foreground">- {selectedUser.name}</span>
             )}
           </CardTitle>
         </CardHeader>
@@ -208,26 +277,17 @@ export function PermissionEditor({ onUserSelect }: PermissionEditorProps) {
                         <Checkbox
                           id={role.id}
                           checked={selectedRoles.includes(role.name)}
-                          onCheckedChange={(checked) => 
-                            handleRoleToggle(role.name, checked as boolean)
-                          }
+                          onCheckedChange={(checked) => handleRoleToggle(role.name, checked as boolean)}
                         />
                         <div className="flex-1 min-w-0">
-                          <label
-                            htmlFor={role.id}
-                            className="text-sm font-medium cursor-pointer"
-                          >
+                          <label htmlFor={role.id} className="text-sm font-medium cursor-pointer">
                             {role.name}
                             {role.isSystem && (
-                              <Badge variant="outline" className="ml-2 text-xs">
-                                系统角色
-                              </Badge>
+                              <Badge variant="outline" className="ml-2 text-xs">系统角色</Badge>
                             )}
                           </label>
                           {role.description && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {role.description}
-                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">{role.description}</p>
                           )}
                         </div>
                       </div>
@@ -237,36 +297,24 @@ export function PermissionEditor({ onUserSelect }: PermissionEditorProps) {
               </div>
 
               <div className="flex gap-2 pt-4">
-                <Button 
-                  onClick={saveUserRoles}
-                  disabled={!hasChanges || saving}
-                  className="flex-1"
-                >
+                <Button onClick={saveUserRoles} disabled={!hasChanges || saving} className="flex-1">
                   {saving ? (
                     <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      保存中...
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> 保存中...
                     </>
                   ) : (
                     <>
-                      <Save className="h-4 w-4 mr-2" />
-                      保存权限
+                      <Save className="h-4 w-4 mr-2" /> 保存权限
                     </>
                   )}
                 </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => loadUserPermissions(selectedUser.id)}
-                  disabled={loading}
-                >
+                <Button variant="outline" onClick={() => loadUserPermissions(selectedUser.id)} disabled={loading}>
                   <RefreshCw className="h-4 w-4" />
                 </Button>
               </div>
 
               {hasChanges && (
-                <div className="text-sm text-orange-600 bg-orange-50 p-3 rounded-lg">
-                  注意：当前有未保存的权限更改
-                </div>
+                <div className="text-sm text-orange-600 bg-orange-50 p-3 rounded-lg">注意：当前有未保存的权限更改</div>
               )}
             </>
           ) : (

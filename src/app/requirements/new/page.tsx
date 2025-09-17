@@ -307,7 +307,7 @@ export default function CreateRequirementPage() {
                 </FormField>
 
                 {/* 商业价值 */}
-                <FormField label="商业价值" help="描述这个需求能带来的商业价值和收益">
+                <FormField label="商业价值">
                   <WysiwygEditor
                     value={formData.businessValue}
                     onChange={(value) => setFormData({...formData, businessValue: value})}
@@ -318,7 +318,7 @@ export default function CreateRequirementPage() {
                 </FormField>
 
                 {/* 用户影响 */}
-                <FormField label="用户影响" help="描述对用户的影响范围和程度">
+                <FormField label="用户影响">
                   <WysiwygEditor
                     value={formData.userImpact}
                     onChange={(value) => setFormData({...formData, userImpact: value})}
@@ -329,7 +329,7 @@ export default function CreateRequirementPage() {
                 </FormField>
 
                 {/* 技术风险 */}
-                <FormField label="技术风险评估" help="如果了解，可以描述可能的技术实现难点">
+                <FormField label="技术风险评估">
                   <WysiwygEditor
                     value={formData.technicalRisk}
                     onChange={(value) => setFormData({...formData, technicalRisk: value})}
@@ -375,7 +375,7 @@ export default function CreateRequirementPage() {
                     </FormField>
 
                     {/* 附件上传 */}
-                    <FormField label="附件链接" help="可以添加截图、文档、原型图等相关资料的链接">
+                    <FormField label="附件链接">
                       <div className="space-y-2">
                         <Button 
                           type="button"

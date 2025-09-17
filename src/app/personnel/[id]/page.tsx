@@ -295,7 +295,7 @@ export default function PersonnelDetailPage() {
               返回
             </Button>
             <div>
-              <h1 className="text-xl font-semibold">人员详情</h1>
+              {/* 移除页面标题 */}
             </div>
           </div>
           
@@ -310,16 +310,18 @@ export default function PersonnelDetailPage() {
                 编辑
               </Link>
             </Button>
-            <Button 
-              size="sm"
-              variant="secondary"
-              asChild
-            >
-              <Link href={`/admin/permissions/preview?targetUserId=${user.id}`}>
-                <ShieldCheck className="h-4 w-4 mr-2" />
-                权限预览
-              </Link>
-            </Button>
+            {isSuperAdmin && (
+              <Button 
+                size="sm"
+                variant="secondary"
+                asChild
+              >
+                <Link href={`/admin/permissions/preview?targetUserId=${user.id}`}>
+                  <ShieldCheck className="h-4 w-4 mr-2" />
+                  权限管理
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
 

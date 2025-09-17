@@ -16,13 +16,13 @@ export default function CreateUserPage() {
   });
   const [supervisor, setSupervisor] = useState('');
   const [loading, setLoading] = useState(false);
-  const [departments, setDepartments] = useState<Array<{id:string; name:string; parentId?:string|null}>>([]);
+  const [departments, setDepartments] = useState<Array<{id:string; name:string; parentId?:string|null; leaderUserIds?:string[]}>>([]);
   const [deptLeader, setDeptLeader] = useState<string | null>(null);
   useEffect(() => {
     (async () => {
       try {
         const res = await adminApi.departments();
-        setDepartments((res.departments || []) as any);
+        setDepartments((res.departments || []) as { id: string; name: string; parentId?: string | null; leaderUserIds?: string[]; }[]);
       } catch {}
     })();
   }, []);
@@ -32,8 +32,8 @@ export default function CreateUserPage() {
     (async () => {
       try {
         if (!form.departmentId || form.departmentId === 'none') { setDeptLeader(null); setSupervisor(''); return; }
-        const dep = (departments || []).find(x => x.id === form.departmentId) as any;
-        const bu  = (departments || []).find(x => x.id === form.businessUnitId) as any;
+        const dep = (departments || []).find(x => x.id === form.departmentId);
+        const bu  = (departments || []).find(x => x.id === form.businessUnitId);
         let leaderIds: string[] | undefined = dep?.leaderUserIds;
         if (!leaderIds || leaderIds.length === 0) leaderIds = bu?.leaderUserIds;
         if (leaderIds && leaderIds.length > 0) {
@@ -54,13 +54,10 @@ export default function CreateUserPage() {
         email: form.email,
         name: form.name,
         password: form.password || '12345678',
-        departmentId: (form.departmentId !== 'none' ? form.departmentId : (form.businessUnitId !== 'none' ? form.businessUnitId : undefined)) as any,
+        departmentId: (form.departmentId !== 'none' ? form.departmentId : (form.businessUnitId !== 'none' ? form.businessUnitId : undefined)),
         phone: form.phone || undefined,
       });
       // 补充直属上级（EAV：direct_supervisor）
-      try {
-        const created = await userApi.login ? null : null; // 保持占位，防止tree-shaking
-      } catch {}
       try {
         // 重新获取刚创建的用户ID：用邮箱查询列表（服务端支持模糊搜索）。
         const list = await userApi.getUsers({ filters: { search: form.email }, take: 1 });

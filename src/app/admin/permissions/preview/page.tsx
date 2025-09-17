@@ -1,62 +1,74 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AppLayout } from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { visibilityApi } from '@/lib/api';
-import { PermissionEditor } from '@/components/permissions/permission-editor';
-import { Shield, User, Eye, ChevronDown, ChevronRight, Settings } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { visibilityApi, adminApi } from '@/lib/api';
+import { Shield, User, Eye, Save, RefreshCw, Check, X } from 'lucide-react';
+import { toast } from 'sonner';
 
-export default function PermissionsPreviewPage() {
+interface Role {
+  id: string;
+  name: string;
+  description: string;
+  isSystem: boolean;
+}
+
+interface PermissionItem { resource: string; action: string }
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  roles: Role[];
+  permissions?: PermissionItem[];
+}
+
+function PermissionsPreviewContent() {
   const searchParams = useSearchParams();
   const [targetUserId, setTargetUserId] = useState('');
   const [result, setResult] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [showRawData, setShowRawData] = useState(false);
+  const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({});
+  const [isDeptLeader, setIsDeptLeader] = useState(false);
+  
+  // 权限编辑相关状态
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
 
   const run = async (userId?: string) => {
     setLoading(true); setErr(null);
     try {
       const targetId = userId || targetUserId;
-      
-      // 检查认证状态
-      const token = localStorage.getItem('auth_token');
-      console.log('当前认证 Token:', token ? '已存在' : '未找到');
-      
-      console.log('权限预览请求参数:', { 
-        resource: 'user', 
-        targetUserId: targetId || null 
-      });
-      
-      const data = await visibilityApi.accessPreview({
-        resource: 'user',
-        targetUserId: targetId || undefined,
-      });
-      
-      console.log('权限预览响应:', data);
-      
-      // 处理响应数据
+      // 并行刷新：预览数据 + 目标用户权限
+      const [preview] = await Promise.all([
+        visibilityApi.accessPreview({ resource: 'user', targetUserId: targetId || undefined }),
+      ]);
+      const data = preview;
       if (typeof data.accessPreview === 'string') {
         const parsed = JSON.parse(data.accessPreview);
         setResult(parsed);
       } else {
         setResult(data.accessPreview);
       }
+      if (targetId) {
+        const res = await adminApi.getUserPermissions(targetId);
+        setSelectedUser(res.user);
+        setSelectedRoles(res.user.roles.map((r: Role) => r.name));
+      }
     } catch (e: unknown) {
       console.error('权限预览错误:', e);
-      
-      // 显示详细的错误信息
       let errorMessage = '加载失败';
-      if (e instanceof Error && e.message) {
-        errorMessage = e.message;
-      }
-      
+      if (e instanceof Error && e.message) errorMessage = e.message;
       setErr(errorMessage);
       setResult(null);
     } finally {
@@ -64,75 +76,97 @@ export default function PermissionsPreviewPage() {
     }
   };
 
+  // 加载角色列表
+  const loadRoles = async () => {
+    try {
+      const response = await adminApi.getRoles();
+      setRoles(response.roles || []);
+    } catch (error) {
+      console.error('Failed to load roles:', error);
+      toast.error('加载角色列表失败');
+    }
+  };
+
+  // 加载用户权限信息
+  const loadUserPermissions = async (userId: string) => {
+    try {
+      setLoading(true);
+      const response = await adminApi.getUserPermissions(userId);
+      const user = response.user;
+      setSelectedUser(user);
+      setSelectedRoles(user.roles.map((role: Role) => role.name));
+    } catch (error) {
+      console.error('Failed to load user permissions:', error);
+      toast.error('加载用户权限失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 保存用户角色
+  const saveUserRoles = async () => {
+    if (!selectedUser) return;
+    try {
+      setSaving(true);
+      await adminApi.setUserRoles(selectedUser.id, selectedRoles);
+      await loadUserPermissions(selectedUser.id);
+      toast.success('用户权限更新成功');
+    } catch (error) {
+      console.error('Failed to save user roles:', error);
+      toast.error('保存用户权限失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 处理角色切换
+  const handleRoleToggle = (roleName: string, checked: boolean) => {
+    setSelectedRoles(prev => (checked ? [...prev, roleName] : prev.filter(r => r !== roleName)));
+  };
+
+  // 是否有未保存的更改
+  const hasChanges =
+    selectedUser &&
+    JSON.stringify([...selectedRoles].sort()) !== JSON.stringify(selectedUser.roles.map(r => r.name).sort());
+
   useEffect(() => {
     const id = searchParams.get('targetUserId') || '';
+    setTargetUserId(id);
+    // 加载初始数据
+    loadRoles();
     if (id) {
-      setTargetUserId(id);
-      // 自动触发查询
-      run(id);
+      loadUserPermissions(id);
     }
+    // 自动触发查询（无论是否有用户ID）
+    run(id);
+    // 载入字段定义与部门负责人标记
+    (async () => {
+      try {
+        const defs = await adminApi.fieldDefinitions().catch(() => null);
+        const map: Record<string, string> = {};
+        const arr = (defs as unknown as { fieldDefinitions?: Array<{ key: string; label: string }> })?.fieldDefinitions || [];
+        arr.forEach(d => { map[d.key] = d.label; });
+        setFieldLabels(map);
+      } catch {}
+      try {
+        if (id) {
+          const depts = await adminApi.departments().catch(() => null);
+          const list = (depts as unknown as { departments?: Array<{ leaderUserIds?: string[] }> })?.departments || [];
+          const leader = list.some(d => Array.isArray(d.leaderUserIds) && d.leaderUserIds!.includes(id));
+          setIsDeptLeader(leader);
+        } else {
+          setIsDeptLeader(false);
+        }
+      } catch {}
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  const handleUserSelect = (userId: string) => {
-    setTargetUserId(userId);
-    // 自动触发权限预览查询
-    run(userId);
-  };
-
   return (
     <AppLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Shield className="h-6 w-6" />
-            <h1 className="text-2xl font-bold">权限管理</h1>
-          </div>
-        </div>
-
-        <Tabs defaultValue="editor" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="editor" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              权限编辑
-            </TabsTrigger>
-            <TabsTrigger value="preview" className="flex items-center gap-2">
-              <Eye className="h-4 w-4" />
-              权限预览
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="editor" className="space-y-6">
-            <PermissionEditor onUserSelect={handleUserSelect} />
-          </TabsContent>
-
-          <TabsContent value="preview" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Eye className="h-5 w-5" />
-                  权限预览
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex gap-2 max-w-xl">
-                  <Input
-                    placeholder="目标用户ID（留空查看自己的权限）"
-                    value={targetUserId}
-                    onChange={(e) => setTargetUserId(e.target.value)}
-                  />
-                  <Button onClick={() => run()} disabled={loading}>
-                    {loading ? '加载中...' : '查询'}
-                  </Button>
-                </div>
-                
-                <div className="text-sm text-muted-foreground">
-                  {targetUserId ? `查看用户 ${targetUserId} 的权限` : '查看当前登录用户的权限'}
-                </div>
-              </CardContent>
-            </Card>
-            
-            {err && (
+      <div className="space-y-8 max-w-7xl mx-auto">
+        {/* 错误提示 */}
+        {err && (
           <div className="bg-red-50 border border-red-200 rounded p-4">
             <h4 className="font-medium text-red-800 mb-2">请求失败</h4>
             <p className="text-red-600 text-sm">{err}</p>
@@ -144,226 +178,259 @@ export default function PermissionsPreviewPage() {
             </details>
           </div>
         )}
-        
-            {result !== null && (
-              <div className="max-w-4xl mx-auto">
-                <h3 className="text-lg font-medium mb-6">权限预览结果</h3>
-                {(() => {
-                  try {
-                    const data = typeof result === 'string' ? JSON.parse(result) : result;
-                    return (
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* 用户角色卡片 */}
-                    <Card>
-                      <CardContent className="p-6">
-                        <div className="flex items-center gap-2 mb-4">
-                          <User className="h-5 w-5 text-muted-foreground" />
-                          <h4 className="font-medium">用户角色</h4>
-                        </div>
-                        <div className="space-y-3">
-                          {data.roles && data.roles.length > 0 ? (
-                            data.roles.map((role: string, index: number) => (
-                              <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                                <div>
-                                  <div className="font-medium">
-                                    {role === 'super_admin' ? '超级管理员' : 
-                                     role === 'admin' ? '管理员' : 
-                                     role === 'manager' ? '经理' : 
-                                     role === 'user' ? '普通用户' : role}
-                                  </div>
-                                  <div className="text-sm text-muted-foreground">
-                                    {role === 'super_admin' ? '拥有所有系统权限' : 
-                                     role === 'admin' ? '管理系统配置和用户' : 
-                                     role === 'manager' ? '管理部门和团队' : 
-                                     role === 'user' ? '基础用户权限' : '自定义角色'}
-                                  </div>
-                                </div>
-                                <Badge variant="outline">{role}</Badge>
+
+        {/* 角色分配区域 */}
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <User className="h-5 w-5 text-muted-foreground" />
+              <h4 className="font-medium">角色分配</h4>
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <span>当前:</span>
+                <div className="flex flex-wrap gap-1">
+                  {selectedUser?.roles?.length ? (
+                    selectedUser.roles.map(role => {
+                      const roleNameMap: Record<string, string> = {
+                        'admin': '管理员',
+                        'hr_manager': 'HR管理员', 
+                        'member': '成员',
+                        'project_manager': '主管',
+                        'super_admin': '超级管理员'
+                      };
+                      return (
+                        <Badge key={role.id} variant="outline" className="text-xs">
+                          {roleNameMap[role.name] || role.name}
+                        </Badge>
+                      );
+                    })
+                  ) : (
+                    <span className="text-sm text-muted-foreground">未分配</span>
+                  )}
+                  {isDeptLeader && (
+                    <Badge variant="default" className="text-xs">部门负责人</Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={saveUserRoles} disabled={!hasChanges || saving} size="sm">
+                {saving ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> 保存中...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" /> 保存权限
+                  </>
+                )}
+              </Button>
+              <Button onClick={() => run()} disabled={loading} variant="outline" size="sm">
+                {loading ? '加载中...' : '刷新权限信息'}
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-4">
+            {roles.map((role) => {
+              const roleNameMap: Record<string, string> = {
+                'admin': '管理员',
+                'hr_manager': 'HR管理员', 
+                'member': '成员',
+                'project_manager': '主管',
+                'super_admin': '超级管理员'
+              };
+              return (
+                <div key={role.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={role.id}
+                    checked={selectedRoles.includes(role.name)}
+                    onCheckedChange={(checked) => handleRoleToggle(role.name, checked as boolean)}
+                  />
+                  <label htmlFor={role.id} className="text-sm font-medium cursor-pointer">
+                    {roleNameMap[role.name] || role.name}
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+
+          {hasChanges && (
+            <div className="text-sm text-orange-600 bg-orange-50 p-3 rounded-lg">注意：当前有未保存的权限更改</div>
+          )}
+        </div>
+
+        {/* 系统权限 - 横向表格 */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-muted-foreground" />
+            <h4 className="font-medium">系统权限</h4>
+          </div>
+          {/* 使用目标用户的权限集合 */}
+          {selectedUser && (
+            (() => {
+              // 定义权限结构，与文档中的矩阵保持一致
+              const permissionStructure = [
+                {
+                  category: '用户管理',
+                  permissions: [
+                    { key: 'user:create', name: '创建用户' },
+                    { key: 'user:read', name: '查看用户' },
+                    { key: 'user:update', name: '更新用户' },
+                    { key: 'user:delete', name: '删除用户' }
+                  ]
+                },
+                {
+                  category: '项目管理',
+                  permissions: [
+                    { key: 'project:create', name: '创建项目' },
+                    { key: 'project:read', name: '查看项目' },
+                    { key: 'project:update', name: '更新项目' },
+                    { key: 'project:delete', name: '删除项目' }
+                  ]
+                },
+                {
+                  category: '任务管理',
+                  permissions: [
+                    { key: 'task:create', name: '创建任务' },
+                    { key: 'task:read', name: '查看任务' },
+                    { key: 'task:update', name: '更新任务' },
+                    { key: 'task:delete', name: '删除任务' },
+                    { key: 'task:assign', name: '分配任务' }
+                  ]
+                },
+                {
+                  category: '团队管理',
+                  permissions: [
+                    { key: 'team:create', name: '创建团队' },
+                    { key: 'team:read', name: '查看团队' },
+                    { key: 'team:update', name: '更新团队' },
+                    { key: 'team:delete', name: '删除团队' }
+                  ]
+                },
+                {
+                  category: '工时记录',
+                  permissions: [
+                    { key: 'timelog:create', name: '记录工时' },
+                    { key: 'timelog:read', name: '查看工时' },
+                    { key: 'timelog:update', name: '更新工时' },
+                    { key: 'timelog:delete', name: '删除工时' }
+                  ]
+                },
+                {
+                  category: '敏感数据访问',
+                  permissions: [
+                    { key: 'contact:read', name: '查看联系方式' },
+                    { key: 'user_sensitive:read', name: '查看敏感字段' },
+                    { key: 'user_highly_sensitive:read', name: '查看极敏感字段' },
+                    { key: 'export:sensitive', name: '导出敏感字段' },
+                    { key: 'export:highly_sensitive', name: '导出极敏感字段' }
+                  ]
+                },
+                {
+                  category: '系统配置',
+                  permissions: [
+                    { key: 'org_visibility:configure', name: '配置组织可见性' }
+                  ]
+                }
+              ];
+
+              const userPermissions = new Set(
+                (selectedUser.permissions || []).map(p => `${p.resource}:${p.action}`)
+              );
+
+              return (
+                <div className="rounded-md border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[120px] sticky left-0 bg-background border-r">权限分类</TableHead>
+                        {permissionStructure.map((category) => 
+                          category.permissions.map((permission) => (
+                            <TableHead key={permission.key} className="text-center min-w-[80px]">
+                              <div className="flex flex-col items-center gap-1">
+                                <span className="text-xs font-medium">{permission.name}</span>
                               </div>
+                            </TableHead>
+                          ))
+                        )}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {permissionStructure.map((category) => (
+                        <TableRow key={category.category}>
+                          <TableCell className="font-medium text-primary sticky left-0 bg-background border-r">
+                            {category.category}
+                          </TableCell>
+                          {permissionStructure.map((cat) =>
+                            cat.permissions.map((permission) => (
+                              <TableCell key={permission.key} className="text-center">
+                                {category.category === cat.category ? (
+                                  userPermissions.has(permission.key) ? (
+                                    <Check className="h-4 w-4 text-green-600 mx-auto" />
+                                  ) : (
+                                    <X className="h-4 w-4 text-red-500 mx-auto" />
+                                  )
+                                ) : (
+                                  <span className="text-gray-300">-</span>
+                                )}
+                              </TableCell>
                             ))
-                          ) : (
-                            <div className="text-center text-muted-foreground py-4">
-                              未分配角色
-                            </div>
                           )}
-                        </div>
-                      </CardContent>
-                    </Card>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              );
+            })()
+          )}
+        </div>
 
-                    {/* 系统权限卡片 */}
-                    <Card>
-                      <CardContent className="p-6">
-                        <div className="flex items-center gap-2 mb-4">
-                          <Shield className="h-5 w-5 text-muted-foreground" />
-                          <h4 className="font-medium">系统权限</h4>
-                        </div>
-                        <div className="space-y-4 max-h-80 overflow-auto">
-                          {(() => {
-                            // 定义所有权限模块和对应的操作
-                            const permissionModules = {
-                              'user': {
-                                name: '用户管理',
-                                actions: ['create', 'read', 'update', 'delete']
-                              },
-                              'project': {
-                                name: '项目管理',
-                                actions: ['create', 'read', 'update', 'delete']
-                              },
-                              'task': {
-                                name: '任务管理',
-                                actions: ['create', 'read', 'update', 'delete', 'assign']
-                              },
-                              'team': {
-                                name: '团队管理',
-                                actions: ['create', 'read', 'update', 'delete']
-                              },
-                              'contact': {
-                                name: '联系信息',
-                                actions: ['read']
-                              },
-                              'user_sensitive': {
-                                name: '敏感信息',
-                                actions: ['read']
-                              },
-                              'user_highly_sensitive': {
-                                name: '高敏感信息',
-                                actions: ['read']
-                              },
-                              'org_visibility': {
-                                name: '组织可见性',
-                                actions: ['configure']
-                              }
+        {/* 可见字段 */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Eye className="h-5 w-5 text-muted-foreground" />
+            <h4 className="font-medium">可见字段</h4>
+          </div>
+          {result !== null && (
+            (() => {
+              try {
+                const data = typeof result === 'string' ? JSON.parse(result) : result;
+                return (
+                  <Card>
+                    <CardContent className="p-6">
+                      {data.visibleFieldKeys && data.visibleFieldKeys.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                          {data.visibleFieldKeys.map((fieldKey: string, index: number) => {
+                            const fieldName = fieldLabels[fieldKey] || fieldKey;
+                            
+                            const getSensitivityLevel = (key: string) => {
+                              const sensitive = ['salary', 'id_number', 'birthday'];
+                              const internal = ['phone', 'contact_phone', 'emergency_contact', 'address'];
+                              if (sensitive.includes(key)) return { level: '敏感', variant: 'destructive' as const };
+                              if (internal.includes(key)) return { level: '内部', variant: 'default' as const };
+                              return { level: '公开', variant: 'secondary' as const };
                             };
-
-                            const actionNames = {
-                              'create': '创建',
-                              'read': '查看',
-                              'update': '编辑',
-                              'delete': '删除',
-                              'assign': '分配',
-                              'configure': '配置'
-                            };
-
-                            // 解析用户已有的权限
-                            const userPermissions = new Set(data.permissions || []);
-
-                            return Object.entries(permissionModules).map(([resource, moduleInfo]) => (
-                              <div key={resource} className="border rounded-lg p-3">
-                                <div className="font-medium text-sm mb-2">{moduleInfo.name}</div>
-                                <div className="flex flex-wrap gap-1">
-                                  {moduleInfo.actions.map((action) => {
-                                    const permissionKey = `${resource}:${action}`;
-                                    const hasPermission = userPermissions.has(permissionKey);
-                                    
-                                    return (
-                                      <Badge
-                                        key={action}
-                                        variant={hasPermission ? "default" : "outline"}
-                                        className={`text-xs ${
-                                          hasPermission 
-                                            ? action === 'delete' 
-                                              ? 'bg-destructive text-destructive-foreground' 
-                                              : '' 
-                                            : 'text-muted-foreground opacity-60'
-                                        }`}
-                                      >
-                                        {actionNames[action as keyof typeof actionNames]}
-                                      </Badge>
-                                    );
-                                  })}
-                                </div>
+                            
+                            const sensitivity = getSensitivityLevel(fieldKey);
+                            
+                            return (
+                              <div key={index} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                                <span className="text-sm font-medium">{fieldName}</span>
+                                <Badge variant={sensitivity.variant} className="text-xs">
+                                  {sensitivity.level}
+                                </Badge>
                               </div>
-                            ));
-                          })()}
+                            );
+                          })}
                         </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* 可见字段卡片 - 跨两列 */}
-                    <div className="lg:col-span-2">
-                      <Card>
-                        <CardContent className="p-6">
-                          <div className="flex items-center gap-2 mb-4">
-                            <Eye className="h-5 w-5 text-muted-foreground" />
-                            <h4 className="font-medium">可见字段</h4>
-                          </div>
-                          {data.visibleFieldKeys && data.visibleFieldKeys.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                              {data.visibleFieldKeys.map((fieldKey: string, index: number) => {
-                                const fieldName = {
-                                  'name': '姓名',
-                                  'email': '邮箱',
-                                  'phone': '手机号',
-                                  'contact_phone': '联系电话',
-                                  'contact_work_email': '工作邮箱',
-                                  'department': '部门',
-                                  'position': '职位',
-                                  'employee_no': '工号',
-                                  'employment_status': '在职状态',
-                                  'join_date': '入职日期',
-                                  'birthday': '生日',
-                                  'address': '地址',
-                                  'emergency_contact': '紧急联系人',
-                                  'salary': '薪资',
-                                  'id_number': '身份证号'
-                                }[fieldKey] || fieldKey;
-                                
-                                const getSensitivityLevel = (key: string) => {
-                                  const sensitive = ['salary', 'id_number', 'birthday'];
-                                  const internal = ['phone', 'contact_phone', 'emergency_contact', 'address'];
-                                  if (sensitive.includes(key)) return { level: '敏感', variant: 'destructive' as const };
-                                  if (internal.includes(key)) return { level: '内部', variant: 'default' as const };
-                                  return { level: '公开', variant: 'secondary' as const };
-                                };
-                                
-                                const sensitivity = getSensitivityLevel(fieldKey);
-                                
-                                return (
-                                  <div key={index} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                                    <span className="text-sm font-medium">{fieldName}</span>
-                                    <Badge variant={sensitivity.variant} className="text-xs">
-                                      {sensitivity.level}
-                                    </Badge>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <div className="text-center text-muted-foreground py-4">
-                              无可见字段
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* 原始数据卡片 - 跨两列 */}
-                    <div className="lg:col-span-2">
-                      <Card>
-                        <CardContent className="p-6">
-                          <Button
-                            variant="ghost"
-                            onClick={() => setShowRawData(!showRawData)}
-                            className="flex items-center gap-2 w-full justify-start p-0 h-auto font-medium hover:bg-transparent"
-                          >
-                            {showRawData ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                            查看原始数据
-                          </Button>
-                          {showRawData && (
-                            <div className="mt-4">
-                              <pre className="bg-muted p-4 rounded-lg text-xs overflow-auto max-h-64 font-mono">
-                                {JSON.stringify(data, null, 2)}
-                              </pre>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </div>
+                      ) : (
+                        <div className="text-center text-muted-foreground py-4">
+                          无可见字段
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 );
               } catch {
                 return (
@@ -371,22 +438,23 @@ export default function PermissionsPreviewPage() {
                     <CardContent className="p-6">
                       <div className="text-center">
                         <p className="text-destructive font-medium">数据解析错误</p>
-                        <pre className="mt-4 text-xs text-muted-foreground overflow-auto bg-muted p-3 rounded">
-                          {typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
-                        </pre>
                       </div>
                     </CardContent>
                   </Card>
                 );
               }
-                })()}
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+            })()
+          )}
+        </div>
       </div>
     </AppLayout>
   );
 }
 
-
+export default function PermissionsPreviewPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <PermissionsPreviewContent />
+    </Suspense>
+  );
+}
