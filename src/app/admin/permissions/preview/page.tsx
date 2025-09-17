@@ -4,10 +4,8 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AppLayout } from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { visibilityApi, adminApi } from '@/lib/api';
 import { Shield, User, Eye, Save, RefreshCw, Check, X } from 'lucide-react';
@@ -230,28 +228,63 @@ function PermissionsPreviewContent() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-4">
-            {roles.map((role) => {
-              const roleNameMap: Record<string, string> = {
-                'admin': '管理员',
-                'hr_manager': 'HR管理员', 
-                'member': '成员',
-                'project_manager': '主管',
-                'super_admin': '超级管理员'
-              };
-              return (
-                <div key={role.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={role.id}
-                    checked={selectedRoles.includes(role.name)}
-                    onCheckedChange={(checked) => handleRoleToggle(role.name, checked as boolean)}
-                  />
-                  <label htmlFor={role.id} className="text-sm font-medium cursor-pointer">
-                    {roleNameMap[role.name] || role.name}
-                  </label>
-                </div>
-              );
-            })}
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-4">
+              {(() => {
+                // 按权限从大到小排序：super_admin > admin > hr_manager > project_manager > member
+                const roleOrder = ['super_admin', 'admin', 'hr_manager', 'project_manager', 'member'];
+                const sortedRoles = roles.sort((a, b) => {
+                  const indexA = roleOrder.indexOf(a.name);
+                  const indexB = roleOrder.indexOf(b.name);
+                  return indexA - indexB;
+                });
+
+                const roleNameMap: Record<string, string> = {
+                  'admin': '管理员',
+                  'hr_manager': 'HR管理员', 
+                  'member': '成员',
+                  'project_manager': '主管',
+                  'super_admin': '超级管理员'
+                };
+
+                return sortedRoles.map((role) => (
+                  <div key={role.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={role.id}
+                      checked={selectedRoles.includes(role.name)}
+                      onCheckedChange={(checked) => handleRoleToggle(role.name, checked as boolean)}
+                    />
+                    <label htmlFor={role.id} className="text-sm font-medium cursor-pointer">
+                      {roleNameMap[role.name] || role.name}
+                    </label>
+                  </div>
+                ));
+              })()}
+            </div>
+            
+            {/* 权限描述 */}
+            <div className="space-y-2 text-xs text-muted-foreground">
+              <div>
+                <span className="font-medium">超级管理员：</span>
+                <span>拥有任何权限；唯一能授予/回收管理员权限的人</span>
+              </div>
+              <div>
+                <span className="font-medium">管理员：</span>
+                <span>默认无权；通过&quot;权限包&quot;获得具体功能权限与数据范围；不可自我提权</span>
+              </div>
+              <div>
+                <span className="font-medium">HR管理员：</span>
+                <span>专门用于HR敏感资料管理，具有敏感字段访问权限</span>
+              </div>
+              <div>
+                <span className="font-medium">主管：</span>
+                <span>负责项目和任务管理，具有部门级数据访问权限</span>
+              </div>
+              <div>
+                <span className="font-medium">成员：</span>
+                <span>基础的项目参与权限，只能查看公开信息和自己的信息</span>
+              </div>
+            </div>
           </div>
 
           {hasChanges && (
@@ -397,50 +430,44 @@ function PermissionsPreviewContent() {
               try {
                 const data = typeof result === 'string' ? JSON.parse(result) : result;
                 return (
-                  <Card>
-                    <CardContent className="p-6">
-                      {data.visibleFieldKeys && data.visibleFieldKeys.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                          {data.visibleFieldKeys.map((fieldKey: string, index: number) => {
-                            const fieldName = fieldLabels[fieldKey] || fieldKey;
-                            
-                            const getSensitivityLevel = (key: string) => {
-                              const sensitive = ['salary', 'id_number', 'birthday'];
-                              const internal = ['phone', 'contact_phone', 'emergency_contact', 'address'];
-                              if (sensitive.includes(key)) return { level: '敏感', variant: 'destructive' as const };
-                              if (internal.includes(key)) return { level: '内部', variant: 'default' as const };
-                              return { level: '公开', variant: 'secondary' as const };
-                            };
-                            
-                            const sensitivity = getSensitivityLevel(fieldKey);
-                            
-                            return (
-                              <div key={index} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                                <span className="text-sm font-medium">{fieldName}</span>
-                                <Badge variant={sensitivity.variant} className="text-xs">
-                                  {sensitivity.level}
-                                </Badge>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="text-center text-muted-foreground py-4">
-                          无可见字段
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                  <div>
+                    {data.visibleFieldKeys && data.visibleFieldKeys.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                        {data.visibleFieldKeys.map((fieldKey: string, index: number) => {
+                          const fieldName = fieldLabels[fieldKey] || fieldKey;
+                          
+                          const getSensitivityLevel = (key: string) => {
+                            const sensitive = ['salary', 'id_number', 'birthday'];
+                            const internal = ['phone', 'contact_phone', 'emergency_contact', 'address'];
+                            if (sensitive.includes(key)) return { level: '敏感', variant: 'destructive' as const };
+                            if (internal.includes(key)) return { level: '内部', variant: 'default' as const };
+                            return { level: '公开', variant: 'secondary' as const };
+                          };
+                          
+                          const sensitivity = getSensitivityLevel(fieldKey);
+                          
+                          return (
+                            <div key={index} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                              <span className="text-sm font-medium">{fieldName}</span>
+                              <Badge variant={sensitivity.variant} className="text-xs">
+                                {sensitivity.level}
+                              </Badge>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center text-muted-foreground py-4">
+                        无可见字段
+                      </div>
+                    )}
+                  </div>
                 );
               } catch {
                 return (
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="text-center">
-                        <p className="text-destructive font-medium">数据解析错误</p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <div className="text-center">
+                    <p className="text-destructive font-medium">数据解析错误</p>
+                  </div>
                 );
               }
             })()
