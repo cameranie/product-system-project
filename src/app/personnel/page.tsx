@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+// import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { userApi, visibilityApi } from '@/lib/api';
 type ListUser = {
@@ -13,6 +13,7 @@ type ListUser = {
   name: string;
   email: string | null;
   username: string;
+  avatar?: string | null;
   phone: string | null;
   position: string | null;
   employeeNo: string | null;
@@ -39,7 +40,7 @@ const FIELD_KEYS = {
   name: 'name',
   department: 'department',
   position: 'position',
-  employeeNo: 'employee_no',
+  // employeeNo 字段已取消
   employmentStatus: 'employment_status',
   contactWorkEmail: 'contact_work_email',
   contactPhone: 'contact_phone',
@@ -108,14 +109,9 @@ export default function PersonnelPage() {
   const showPhone = visibleKeys.includes(FIELD_KEYS.contactPhone);
   const showPosition = visibleKeys.includes(FIELD_KEYS.position);
   const showDepartment = visibleKeys.includes(FIELD_KEYS.department);
-  const showEmployeeNo = visibleKeys.includes(FIELD_KEYS.employeeNo);
-  const showEmploymentStatus = visibleKeys.includes(FIELD_KEYS.employmentStatus);
-  const columnsCount = 2 +
-    (showPhone ? 1 : 0) +
-    (showEmploymentStatus ? 1 : 0) +
-    (showEmployeeNo ? 1 : 0) +
-    (showDepartment ? 1 : 0) +
-    (showPosition ? 1 : 0);
+  // const showEmployeeNo = false; // 工号字段已取消
+  // 列固定为：姓名、手机、部门、职务、操作
+  const columnsCount = 1 + (showPhone ? 1 : 0) + (showDepartment ? 1 : 0) + (showPosition ? 1 : 0) + 1;
 
   const handleExport = async () => {
     try {
@@ -208,8 +204,7 @@ export default function PersonnelPage() {
               <TableRowRaw>
                 <TableHeadRaw>姓名</TableHeadRaw>
                 {showPhone && <TableHeadRaw>手机号码</TableHeadRaw>}
-                {showEmploymentStatus && <TableHeadRaw>人员状态</TableHeadRaw>}
-                {showEmployeeNo && <TableHeadRaw>工号</TableHeadRaw>}
+                {/* 人员状态与工号列已移除 */}
                 {showDepartment && <TableHeadRaw>部门</TableHeadRaw>}
                 {showPosition && <TableHeadRaw>职务</TableHeadRaw>}
                 <TableHeadRaw>操作</TableHeadRaw>
@@ -234,7 +229,7 @@ export default function PersonnelPage() {
                     <TableCellRaw>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-8 w-8">
-                          <AvatarImage src={`https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${person.username}`} />
+                          <AvatarImage src={person.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${person.username}`} />
                           <AvatarFallback>{person.name[0]}</AvatarFallback>
                         </Avatar>
                         <div>
@@ -247,27 +242,18 @@ export default function PersonnelPage() {
                     </TableCellRaw>
                     {showPhone && (
                       <TableCellRaw className="font-mono text-sm">
-                        {person.phone ?? ''}
+                        {person.phone ?? '-'}
                       </TableCellRaw>
                     )}
-                    {showEmploymentStatus && (
-                      <TableCellRaw>
-                        <Badge variant="outline">{person.employmentStatus ?? ''}</Badge>
-                      </TableCellRaw>
-                    )}
-                    {showEmployeeNo && (
-                      <TableCellRaw>
-                        <div className="text-sm">{person.employeeNo ?? ''}</div>
-                      </TableCellRaw>
-                    )}
+                    {/* 人员状态与工号列已移除 */}
                     {showDepartment && (
                       <TableCellRaw>
-                        <div className="text-sm">{person.department?.name ?? ''}</div>
+                        <div className="text-sm">{person.department?.name ?? '-'}</div>
                       </TableCellRaw>
                     )}
                     {showPosition && (
                       <TableCellRaw>
-                        <div className="text-sm">{person.position ?? ''}</div>
+                        <div className="text-sm">{person.position ?? '-'}</div>
                       </TableCellRaw>
                     )}
                     <TableCellRaw>

@@ -5,10 +5,12 @@ import { useSearchParams } from 'next/navigation';
 import { AppLayout } from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { visibilityApi } from '@/lib/api';
-import { Shield, User, Eye, ChevronDown, ChevronRight } from 'lucide-react';
+import { PermissionEditor } from '@/components/permissions/permission-editor';
+import { Shield, User, Eye, ChevronDown, ChevronRight, Settings } from 'lucide-react';
 
 export default function PermissionsPreviewPage() {
   const searchParams = useSearchParams();
@@ -72,28 +74,65 @@ export default function PermissionsPreviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
+  const handleUserSelect = (userId: string) => {
+    setTargetUserId(userId);
+    // 自动触发权限预览查询
+    run(userId);
+  };
+
   return (
     <AppLayout>
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">权限预览</h2>
-        <div className="space-y-4">
-          <div className="flex gap-2 max-w-xl">
-            <Input
-              placeholder="目标用户ID（留空查看自己的权限）"
-              value={targetUserId}
-              onChange={(e) => setTargetUserId(e.target.value)}
-            />
-            <Button onClick={() => run()} disabled={loading}>
-              {loading ? '加载中...' : '查询'}
-            </Button>
-          </div>
-          
-          <div className="text-sm text-muted-foreground">
-            {targetUserId ? `查看用户 ${targetUserId} 的权限` : '查看当前登录用户的权限'}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Shield className="h-6 w-6" />
+            <h1 className="text-2xl font-bold">权限管理</h1>
           </div>
         </div>
-        
-        {err && (
+
+        <Tabs defaultValue="editor" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="editor" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              权限编辑
+            </TabsTrigger>
+            <TabsTrigger value="preview" className="flex items-center gap-2">
+              <Eye className="h-4 w-4" />
+              权限预览
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="editor" className="space-y-6">
+            <PermissionEditor onUserSelect={handleUserSelect} />
+          </TabsContent>
+
+          <TabsContent value="preview" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Eye className="h-5 w-5" />
+                  权限预览
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex gap-2 max-w-xl">
+                  <Input
+                    placeholder="目标用户ID（留空查看自己的权限）"
+                    value={targetUserId}
+                    onChange={(e) => setTargetUserId(e.target.value)}
+                  />
+                  <Button onClick={() => run()} disabled={loading}>
+                    {loading ? '加载中...' : '查询'}
+                  </Button>
+                </div>
+                
+                <div className="text-sm text-muted-foreground">
+                  {targetUserId ? `查看用户 ${targetUserId} 的权限` : '查看当前登录用户的权限'}
+                </div>
+              </CardContent>
+            </Card>
+            
+            {err && (
           <div className="bg-red-50 border border-red-200 rounded p-4">
             <h4 className="font-medium text-red-800 mb-2">请求失败</h4>
             <p className="text-red-600 text-sm">{err}</p>
@@ -106,14 +145,14 @@ export default function PermissionsPreviewPage() {
           </div>
         )}
         
-{result !== null && (
-          <div className="max-w-4xl mx-auto">
-            <h3 className="text-lg font-medium mb-6">权限预览结果</h3>
-            {(() => {
-              try {
-                const data = typeof result === 'string' ? JSON.parse(result) : result;
-                return (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {result !== null && (
+              <div className="max-w-4xl mx-auto">
+                <h3 className="text-lg font-medium mb-6">权限预览结果</h3>
+                {(() => {
+                  try {
+                    const data = typeof result === 'string' ? JSON.parse(result) : result;
+                    return (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* 用户角色卡片 */}
                     <Card>
                       <CardContent className="p-6">
@@ -340,9 +379,11 @@ export default function PermissionsPreviewPage() {
                   </Card>
                 );
               }
-            })()}
-          </div>
-        )}
+                })()}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );

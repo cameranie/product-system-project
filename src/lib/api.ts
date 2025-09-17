@@ -43,16 +43,25 @@ async function graphqlRequest(query: string, variables?: Record<string, unknown>
     const error = result.errors[0];
     let errorMessage = error.message || 'GraphQL error';
     
-    // 添加错误扩展信息
-    if (error.extensions) {
-      const { code, status } = error.extensions as { code?: string; status?: number };
-      if (code) errorMessage += ` (${code})`;
-      if (status && status !== response.status) errorMessage += ` [状态: ${status}]`;
-    }
+    // 对于用户友好的错误消息，不添加技术性信息
+    const isUserFriendlyError = errorMessage.includes('邮箱') || 
+                               errorMessage.includes('密码') || 
+                               errorMessage.includes('账户') ||
+                               errorMessage.includes('权限') ||
+                               errorMessage.includes('禁用');
     
-    // 添加路径信息（如果有）
-    if (error.path && error.path.length > 0) {
-      errorMessage += ` - 路径: ${error.path.join('.')}`;
+    if (!isUserFriendlyError) {
+      // 只对技术性错误添加调试信息
+      if (error.extensions) {
+        const { code, status } = error.extensions as { code?: string; status?: number };
+        if (code) errorMessage += ` (${code})`;
+        if (status && status !== response.status) errorMessage += ` [状态: ${status}]`;
+      }
+      
+      // 添加路径信息（如果有）
+      if (error.path && error.path.length > 0) {
+        errorMessage += ` - 路径: ${error.path.join('.')}`;
+      }
     }
     
     const customError = new Error(errorMessage) as Error & {
@@ -116,6 +125,20 @@ export const authApi = {
   // 检查是否已登录
   isAuthenticated(): boolean {
     return !!getAuthToken();
+  }
+};
+
+// 我的资料
+export const accountApi = {
+  async updateMyProfile(input: { name?: string; phone?: string; avatar?: string }) {
+    const query = `
+      mutation UpdateMyProfile($input: UpdateUserInputType!) {
+        updateMyProfile(input: $input) {
+          id name email username avatar phone
+        }
+      }
+    `;
+    return graphqlRequest(query, { input });
   }
 };
 
@@ -371,6 +394,7 @@ export const userApi = {
             name
             email
             username
+            avatar
             phone
             department { id name }
           }
@@ -450,10 +474,65 @@ export const userApi = {
           name
           email
           username
+          avatar
           phone
           isActive
           createdAt
+          updatedAt
           department { id name }
+          fieldValues {
+            fieldKey
+            valueString
+            valueNumber
+            valueDate
+            valueJson
+          }
+          educations {
+            id
+            degree
+            school
+            major
+            startDate
+            endDate
+          }
+          workExperiences {
+            id
+            company
+            position
+            startDate
+            endDate
+          }
+          emergencyContacts {
+            id
+            name
+            relation
+            phone
+          }
+          familyMembers {
+            id
+            name
+            relation
+          }
+          contracts {
+            id
+            contractNo
+            contractType
+            company
+            startDate
+            endDate
+          }
+          documents {
+            id
+            docType
+            docNumber
+            validUntil
+          }
+          bankAccounts {
+            id
+            accountName
+            bankName
+            accountNumber
+          }
           attachments
         }
       }
@@ -462,7 +541,7 @@ export const userApi = {
   }
   ,
   async createUser(input: {
-    email: string; username: string; name: string; password: string; departmentId?: string; phone?: string;
+    email: string; username?: string; name: string; password: string; departmentId?: string; phone?: string;
   }) {
     const query = `
       mutation CreateUser($input: CreateUserInputType!) {
@@ -475,24 +554,23 @@ export const userApi = {
   async updateUser(id: string, input: { 
     name?: string; 
     phone?: string; 
+    avatar?: string;
     departmentId?: string; 
     isActive?: boolean;
   }) {
     const query = `
       mutation UpdateUser($id: String!, $input: UpdateUserInputType!) {
         updateUser(id: $id, input: $input) { 
-          id name email username phone isActive 
+          id name email username avatar phone isActive 
           department { id name }
-          fieldValues {
-            id fieldKey valueString valueNumber valueDate valueJson
-          }
-          educations
-          workExperiences
-          familyMembers
-          emergencyContacts
-          contracts
-          documents
-          bankAccounts
+          fieldValues { id fieldKey valueString valueNumber valueDate valueJson }
+          educations { id degree school major startDate endDate }
+          workExperiences { id company position startDate endDate }
+          familyMembers { id name relation }
+          emergencyContacts { id name relation phone }
+          contracts { id contractNo contractType company startDate endDate }
+          documents { id docType docNumber validUntil }
+          bankAccounts { id accountName bankName accountNumber }
           attachments
         }
       }
@@ -512,21 +590,30 @@ export const userApi = {
         updateUserFieldValues(userId: $userId, entries: $entries) {
           id name email username phone isActive 
           department { id name }
-          fieldValues {
-            id fieldKey valueString valueNumber valueDate valueJson
-          }
-          educations
-          workExperiences
-          familyMembers
-          emergencyContacts
-          contracts
-          documents
-          bankAccounts
+          fieldValues { id fieldKey valueString valueNumber valueDate valueJson }
+          educations { id degree school major startDate endDate }
+          workExperiences { id company position startDate endDate }
+          familyMembers { id name relation }
+          emergencyContacts { id name relation phone }
+          contracts { id contractNo contractType company startDate endDate }
+          documents { id docType docNumber validUntil }
+          bankAccounts { id accountName bankName accountNumber }
           attachments
         }
       }
     `;
     return graphqlRequest(query, { userId, entries });
+  },
+
+  async updatePassword(currentPassword: string, newPassword: string) {
+    const query = `
+      mutation UpdatePassword($input: UpdatePasswordInputType!) {
+        updatePassword(input: $input)
+      }
+    `;
+    return graphqlRequest(query, { 
+      input: { currentPassword, newPassword } 
+    });
   },
 
   async upsertUserEducation(input: {
@@ -578,7 +665,7 @@ export const userApi = {
     const query = `
       mutation UpsertUserWorkExperience($input: UpsertWorkExperienceInput!) {
         upsertUserWorkExperience(input: $input) {
-          id name workExperiences
+          id name workExperiences { id company position startDate endDate }
         }
       }
     `;
@@ -589,7 +676,7 @@ export const userApi = {
     const query = `
       mutation DeleteUserWorkExperience($id: String!) {
         deleteUserWorkExperience(id: $id) {
-          id name workExperiences
+          id name workExperiences { id company position startDate endDate }
         }
       }
     `;
@@ -607,7 +694,7 @@ export const userApi = {
     const query = `
       mutation UpsertUserEmergencyContact($input: UpsertEmergencyContactInput!) {
         upsertUserEmergencyContact(input: $input) {
-          id name emergencyContacts
+          id name emergencyContacts { id name relation phone }
         }
       }
     `;
@@ -618,7 +705,7 @@ export const userApi = {
     const query = `
       mutation DeleteUserEmergencyContact($id: String!) {
         deleteUserEmergencyContact(id: $id) {
-          id name emergencyContacts
+          id name emergencyContacts { id name relation phone }
         }
       }
     `;
@@ -901,13 +988,65 @@ export const visibilityApi = {
 
 // 管理端（仅管理员）
 export const adminApi = {
+  async departments() {
+    const query = `
+      query Departments { departments { id name parentId leaderUserIds } }
+    `;
+    return graphqlRequest(query);
+  },
   async fieldDefinitions() {
     const query = `
       query FieldDefs {
-        fieldDefinitions
+        fieldDefinitions {
+          key
+          label
+          classification
+          selfEditable
+        }
       }
     `;
     return graphqlRequest(query);
+  },
+
+  // 获取所有角色
+  async getRoles() {
+    const query = `
+      query GetRoles {
+        roles {
+          id
+          name
+          description
+          isSystem
+        }
+      }
+    `;
+    return graphqlRequest(query);
+  },
+
+  // 设置用户角色
+  async setUserRoles(userId: string, roleNames: string[]) {
+    const query = `
+      mutation SetUserRoles($userId: String!, $roleNames: [String!]!) {
+        setUserRoles(userId: $userId, roleNames: $roleNames)
+      }
+    `;
+    return graphqlRequest(query, { userId, roleNames });
+  },
+
+  // 获取用户详细权限信息
+  async getUserPermissions(userId: string) {
+    const query = `
+      query GetUserPermissions($userId: String!) {
+        user(id: $userId) {
+          id
+          name
+          email
+          roles { id name description isSystem }
+          permissions { id name resource action description }
+        }
+      }
+    `;
+    return graphqlRequest(query, { userId });
   },
 
   async fieldSets() {

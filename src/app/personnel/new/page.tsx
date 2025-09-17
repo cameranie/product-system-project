@@ -1,20 +1,50 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { userApi } from '@/lib/api';
+import { userApi, adminApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 
 export default function CreateUserPage() {
   const router = useRouter();
   const [form, setForm] = useState({
-    email: '', username: '', name: '', password: '', departmentId: 'none', phone: '',
+    email: '', username: '', name: '', password: '', businessUnitId: 'none', departmentId: 'none', phone: '',
   });
+  const [supervisor, setSupervisor] = useState('');
   const [loading, setLoading] = useState(false);
+  const [departments, setDepartments] = useState<Array<{id:string; name:string; parentId?:string|null}>>([]);
+  const [deptLeader, setDeptLeader] = useState<string | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await adminApi.departments();
+        setDepartments((res.departments || []) as any);
+      } catch {}
+    })();
+  }, []);
+
+  // 当部门变化时，尝试预填“部门负责人”为直属上级（必须已选择部门）
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!form.departmentId || form.departmentId === 'none') { setDeptLeader(null); setSupervisor(''); return; }
+        const dep = (departments || []).find(x => x.id === form.departmentId) as any;
+        const bu  = (departments || []).find(x => x.id === form.businessUnitId) as any;
+        let leaderIds: string[] | undefined = dep?.leaderUserIds;
+        if (!leaderIds || leaderIds.length === 0) leaderIds = bu?.leaderUserIds;
+        if (leaderIds && leaderIds.length > 0) {
+          const u = await userApi.getUser(leaderIds[0]);
+          const name = u.user?.name || null;
+          setDeptLeader(name);
+          setSupervisor(name || '');
+        } else { setDeptLeader(null); setSupervisor(''); }
+      } catch { setDeptLeader(null); setSupervisor(''); }
+    })();
+  }, [form.departmentId, form.businessUnitId, departments]);
   const [err, setErr] = useState<string | null>(null);
 
   const submit = async () => {
@@ -22,12 +52,25 @@ export default function CreateUserPage() {
     try {
       await userApi.createUser({
         email: form.email,
-        username: form.username,
         name: form.name,
         password: form.password || '12345678',
-        departmentId: form.departmentId === 'none' ? undefined : form.departmentId,
+        departmentId: (form.departmentId !== 'none' ? form.departmentId : (form.businessUnitId !== 'none' ? form.businessUnitId : undefined)) as any,
         phone: form.phone || undefined,
       });
+      // 补充直属上级（EAV：direct_supervisor）
+      try {
+        const created = await userApi.login ? null : null; // 保持占位，防止tree-shaking
+      } catch {}
+      try {
+        // 重新获取刚创建的用户ID：用邮箱查询列表（服务端支持模糊搜索）。
+        const list = await userApi.getUsers({ filters: { search: form.email }, take: 1 });
+        const newUser = list.users?.users?.[0];
+        if (newUser && supervisor.trim()) {
+          await userApi.updateUserFieldValues(newUser.id, [{ fieldKey: 'direct_supervisor', valueString: supervisor.trim() }]);
+        } else if (newUser && !supervisor.trim() && deptLeader) {
+          await userApi.updateUserFieldValues(newUser.id, [{ fieldKey: 'direct_supervisor', valueString: deptLeader }]);
+        }
+      } catch {}
       router.push('/personnel');
     } catch (e) {
       setErr(e instanceof Error ? e.message : '创建失败');
@@ -39,7 +82,6 @@ export default function CreateUserPage() {
   return (
     <AppLayout>
       <div className="space-y-6 max-w-2xl">
-        <h2 className="text-xl font-semibold">新建人员</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <Label htmlFor="name">姓名 <span className="text-red-500">*</span></Label>
@@ -64,16 +106,7 @@ export default function CreateUserPage() {
             />
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="username">用户名 <span className="text-red-500">*</span></Label>
-            <Input 
-              id="username"
-              placeholder="请输入用户名" 
-              value={form.username} 
-              onChange={e=>setForm({...form, username:e.target.value})} 
-              required
-            />
-          </div>
+          {/* 用户名字段不再必填；默认使用邮箱前缀作为用户名，可在编辑页再改 */}
           
           <div className="space-y-2">
             <Label htmlFor="password">登录密码</Label>
@@ -97,22 +130,57 @@ export default function CreateUserPage() {
           </div>
           
           <div className="space-y-2">
+            <Label htmlFor="bu">所属事业部</Label>
+            <Select value={form.businessUnitId} onValueChange={(v)=>setForm({...form, businessUnitId:v, departmentId:'none'})}>
+              <SelectTrigger id="bu">
+                <SelectValue placeholder="请选择事业部" />
+              </SelectTrigger>
+              <SelectContent>
+                {departments.filter(d=>!d.parentId).map(d => (
+                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="department">所属部门</Label>
-            <Select value={form.departmentId} onValueChange={(v)=>setForm({...form, departmentId:v})}>
+            <Select value={form.departmentId} onValueChange={(v)=>setForm({...form, departmentId:v})} disabled={form.businessUnitId === 'none'}>
               <SelectTrigger id="department">
                 <SelectValue placeholder="请选择部门" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">不选择部门</SelectItem>
+                {departments.filter(d=> d.parentId === (form.businessUnitId !== 'none' ? form.businessUnitId : null)).map(d => (
+                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="supervisor">直属上级（主管）</Label>
+              {deptLeader && (
+                <Button variant="outline" size="sm" onClick={()=>setSupervisor(deptLeader || '')}>
+                  使用部门负责人：{deptLeader}
+                </Button>
+              )}
+            </div>
+            <Input 
+              id="supervisor"
+              placeholder="请选择部门后自动带出负责人" 
+              value={supervisor} 
+              onChange={()=>{}} 
+              disabled={form.departmentId === 'none'}
+            />
           </div>
         </div>
         
         <div className="flex items-center gap-3 pt-4">
           <Button 
             onClick={submit} 
-            disabled={loading || !form.name || !form.email || !form.username}
+            disabled={loading || !form.name || !form.email || form.businessUnitId === 'none'}
             className="min-w-[80px]"
           >
             {loading ? '创建中…' : '创建'}

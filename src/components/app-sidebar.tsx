@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import {
-  Home,
   Kanban,
   MessageSquare,
   Users,
@@ -35,11 +34,6 @@ const data = {
     avatar: "/avatars/admin.jpg",
   },
   navMain: [
-    {
-      title: "项目概览",
-      url: "/",
-      icon: Home,
-    },
     {
       title: "需求池",
       url: "/requirements",
@@ -122,7 +116,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   height={24}
                   className="!size-6"
                 />
-                <span className="text-base font-semibold">AiCoin 产品管理系统</span>
+                <span className="text-base font-semibold">AiCoin OS</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

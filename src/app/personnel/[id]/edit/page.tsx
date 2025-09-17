@@ -20,6 +20,26 @@ const CLASSIFICATION_LABELS = {
   HIGHLY_SENSITIVE: '高度敏感'
 } as const;
 
+// 顶层定义，保持组件类型稳定，避免每次渲染导致子输入控件被卸载而失焦
+function FieldGroup({ label, badge, children, required = false }: {
+  label: string;
+  badge?: React.ReactNode;
+  children: React.ReactNode;
+  required?: boolean;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Label className="text-sm font-medium">
+          {label} {required && <span className="text-red-500">*</span>}
+        </Label>
+        {badge}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export default function EditUserPage() {
   const { id } = useParams();
   const userId = id as string;
@@ -40,8 +60,8 @@ export default function EditUserPage() {
   // 多明细状态
   type Education = { id?: string; userId?: string; degree?: string; school?: string; enrollDate?: string; graduateDate?: string; major?: string; studyForm?: string; schoolingYears?: number; degreeName?: string; awardingCountry?: string; awardingInstitution?: string; awardingDate?: string; languageLevel?: string };
   type WorkExp = { id?: string; userId?: string; company?: string; department?: string; position?: string; startDate?: string; endDate?: string };
-  type EmergencyContact = { id?: string; userId?: string; name?: string; relationship?: string; phone?: string; address?: string };
-  type FamilyMember = { id?: string; userId?: string; name?: string; relationship?: string; organization?: string; contact?: string };
+  type EmergencyContact = { id?: string; userId?: string; name?: string; relation?: string; phone?: string; address?: string };
+  type FamilyMember = { id?: string; userId?: string; name?: string; relation?: string; organization?: string; contact?: string };
   type Contract = { id?: string; userId?: string; contractNo?: string; company?: string; contractType?: string; startDate?: string; endDate?: string; actualEndDate?: string; signedTimes?: number };
   type DocumentT = { id?: string; userId?: string; docType?: string; docNumber?: string; validUntil?: string; remainingDays?: string };
   type BankAccount = { id?: string; userId?: string; accountName?: string; bankName?: string; bankBranch?: string; accountNumber?: string };
@@ -71,11 +91,11 @@ export default function EditUserPage() {
   ];
   const [attachmentType, setAttachmentType] = useState<string>('ID_CARD');
 
-  // 折叠状态 - 参考任务看板风格
+  // 折叠状态 - 默认全部收起
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
-    basicInfo: false,
+    basicInfo: true,
     workInfo: true,
-    personalInfo: false,
+    personalInfo: true,
     educations: true,
     workExperiences: true,
     emergencyContacts: true,
@@ -83,6 +103,7 @@ export default function EditUserPage() {
     contracts: true,
     documents: true,
     bankAccounts: true,
+    attachments: true,
   });
 
   const [loading, setLoading] = useState(true);
@@ -92,6 +113,13 @@ export default function EditUserPage() {
   const [currentUser, setCurrentUser] = useState<{ id: string; roles: string[]; permissions?: string[] } | null>(null);
   const [fieldDefs, setFieldDefs] = useState<Record<string, { label?: string; classification?: string; selfEditable?: boolean }>>({});
   const [onlyEditable, setOnlyEditable] = useState(false);
+
+  // 安全的日期创建函数
+  const safeCreateDate = (value: string | Date | null | undefined): Date | undefined => {
+    if (!value || value === '') return undefined;
+    const d = new Date(value);
+    return !isNaN(d.getTime()) ? d : undefined;
+  };
 
   useEffect(() => {
     const run = async () => {
@@ -155,7 +183,7 @@ export default function EditUserPage() {
     }
   }, [userId]);
 
-  function isEditable(key: string) {
+  const isEditable = useCallback((key: string) => {
     const isSuperAdmin = currentUser?.roles?.includes('super_admin');
     const isSelf = currentUser?.id === userId;
     const hasUserUpdate = currentUser?.permissions?.some(p => p.includes('user:update'));
@@ -164,9 +192,9 @@ export default function EditUserPage() {
     const selfEditable = ['name', 'contact_phone', 'personal_email', 'address'];
     if (isSelf && selfEditable.includes(key)) return true;
     return hasUserUpdate;
-  }
+  }, [currentUser, userId]);
 
-  function getFieldSensitivity(fieldKey: string): string {
+  const getFieldSensitivity = useCallback((fieldKey: string): string => {
     const fieldInfo = fieldDefs[fieldKey];
     if (fieldInfo?.classification) return fieldInfo.classification;
     
@@ -176,7 +204,7 @@ export default function EditUserPage() {
     if (sensitive.includes(fieldKey)) return 'SENSITIVE';
     if (internal.includes(fieldKey)) return 'INTERNAL';
     return 'PUBLIC';
-  }
+  }, [fieldDefs]);
 
   // 切换折叠状态 - 参考任务看板的实现
   const toggleSection = (sectionKey: string) => {
@@ -189,6 +217,10 @@ export default function EditUserPage() {
   const updateFieldValue = useCallback((fieldKey: string, value: string | number | Date | unknown) => {
     setFieldValues(prev => ({ ...prev, [fieldKey]: value }));
   }, []);
+
+  // 仅当字段可见/可渲染时，才生成网格单元，避免出现“半行空白”
+  // 注意：此函数依赖 renderEAVField，需放在其定义之后或通过函数提升处理。
+  let renderCell: (fieldKey: string, label: string) => React.ReactNode = () => null;
 
   // 稳定的更新函数用于各个明细项
   const updateEducation = useCallback((index: number, field: string, value: string | number | Date | unknown) => {
@@ -253,26 +285,9 @@ export default function EditUserPage() {
     </div>
   );
 
-  // 统一的表单字段组件 - 确保标题和input之间有间距
-  const FieldGroup = ({ label, badge, children, required = false }: {
-    label: string;
-    badge?: React.ReactNode;
-    children: React.ReactNode;
-    required?: boolean;
-  }) => (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Label className="text-sm font-medium">
-          {label} {required && <span className="text-red-500">*</span>}
-        </Label>
-        {badge}
-      </div>
-      {children}
-    </div>
-  );
 
   // 优化的EAV字段渲染 - 使用日期选择器
-  const renderEAVField = (fieldKey: string, label: string) => {
+  const renderEAVField = useCallback((fieldKey: string, label: string) => {
     if (!visibleKeys.includes(fieldKey)) return null;
     if (onlyEditable && !isEditable(fieldKey)) return null;
 
@@ -283,10 +298,9 @@ export default function EditUserPage() {
 
     // 日期字段使用DatePicker
     if (fieldKey.includes('date') || fieldKey === 'birth_date') {
-      const dateValue = value ? new Date(value) : undefined;
+      const dateValue = safeCreateDate(value as string);
       return (
         <FieldGroup
-          key={fieldKey}
           label={label}
           badge={<Badge variant="secondary" className="text-xs">{classificationLabel}</Badge>}
         >
@@ -304,13 +318,12 @@ export default function EditUserPage() {
     if (fieldKey.includes('years') || fieldKey.includes('times') || fieldKey.includes('months')) {
       return (
         <FieldGroup
-          key={fieldKey}
           label={label}
           badge={<Badge variant="secondary" className="text-xs">{classificationLabel}</Badge>}
         >
           <Input
             type="number"
-            value={typeof value === 'number' ? String(value) : String(value ?? '')}
+            value={String(value ?? '')}
             onChange={e => updateFieldValue(fieldKey, e.target.value === '' ? '' : Number(e.target.value))}
             disabled={!editable}
             className="h-10"
@@ -325,7 +338,6 @@ export default function EditUserPage() {
       const genderValue = typeof value === 'string' ? value : '';
       return (
         <FieldGroup
-          key={fieldKey}
           label={label}
           badge={<Badge variant="secondary" className="text-xs">{classificationLabel}</Badge>}
         >
@@ -345,20 +357,26 @@ export default function EditUserPage() {
     // 默认文本字段
     return (
       <FieldGroup
-        key={fieldKey}
         label={label}
         badge={<Badge variant="secondary" className="text-xs">{classificationLabel}</Badge>}
       >
         <Input
           placeholder={`请输入${label}`}
-          value={typeof value === 'string' ? value : String(value ?? '')}
+          value={String(value ?? '')}
           onChange={e => updateFieldValue(fieldKey, e.target.value)}
           disabled={!editable}
           className="h-10"
         />
       </FieldGroup>
     );
-  };
+  }, [visibleKeys, onlyEditable, fieldValues, updateFieldValue, getFieldSensitivity, isEditable]);
+
+  // 现在绑定 renderCell，确保不触发“使用前定义”问题
+  renderCell = useCallback((fieldKey: string, label: string) => {
+    const node = renderEAVField(fieldKey, label);
+    if (!node) return null;
+    return <div key={fieldKey}>{node}</div>;
+  }, [renderEAVField]);
 
   const saveBasicInfo = async () => {
     try {
@@ -523,38 +541,37 @@ export default function EditUserPage() {
               <div className="pl-6 space-y-6 pt-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* 基本工作信息 */}
-                  {renderEAVField('employee_no', '工号')}
-                  {renderEAVField('employee_status', '人员状态')}
-                  {renderEAVField('employee_type', '人员类型')}
-                  {renderEAVField('sequence', '序列')}
-                  {renderEAVField('direct_supervisor', '直属上级')}
-                  {renderEAVField('business_unit', '事业部')}
-                  {renderEAVField('business_unit_leader', '事业部负责人')}
-                  {renderEAVField('position_title', '职务')}
-                  {renderEAVField('tags', '标签')}
+                  {renderCell('employee_status', '人员状态')}
+                  {renderCell('employee_type', '人员类型')}
+                  {renderCell('sequence', '序列')}
+                  {renderCell('direct_supervisor', '直属上级')}
+                  {renderCell('business_unit', '事业部')}
+                  {renderCell('business_unit_leader', '事业部负责人')}
+                  {renderCell('position_title', '职务')}
+                  {renderCell('tags', '标签')}
                   
                   {/* 入职相关 */}
-                  {renderEAVField('company_join_date', '加入公司日期')}
-                  {renderEAVField('internship_to_regular_date', '实习转正日期')}
-                  {renderEAVField('join_date', '入职日期')}
-                  {renderEAVField('probation_months', '试用期(月)')}
-                  {renderEAVField('regular_date', '转正日期')}
+                  {renderCell('company_join_date', '加入公司日期')}
+                  {renderCell('internship_to_regular_date', '实习转正日期')}
+                  {renderCell('join_date', '入职日期')}
+                  {renderCell('probation_months', '试用期(月)')}
+                  {renderCell('regular_date', '转正日期')}
                   
                   {/* 社保公积金 */}
-                  {renderEAVField('social_security_no', '社保账号')}
-                  {renderEAVField('housing_fund_no', '个人公积金账号')}
-                  {renderEAVField('join_work_status', '入职时社保状况')}
+                  {renderCell('social_security_no', '社保账号')}
+                  {renderCell('housing_fund_no', '个人公积金账号')}
+                  {renderCell('join_work_status', '入职时社保状况')}
                   
                   {/* 工龄相关 */}
-                  {renderEAVField('first_work_date', '首次参加工作日期')}
-                  {renderEAVField('seniority_calc_date', '工龄计算使用日期')}
-                  {renderEAVField('work_years', '工龄')}
-                  {renderEAVField('company_years', '司龄')}
+                  {renderCell('first_work_date', '首次参加工作日期')}
+                  {renderCell('seniority_calc_date', '工龄计算使用日期')}
+                  {renderCell('work_years', '工龄')}
+                  {renderCell('company_years', '司龄')}
                   
                   {/* 工作地点信息 */}
-                  {renderEAVField('work_location', '工作地点')}
-                  {renderEAVField('company_name', '所属公司')}
-                  {renderEAVField('onboard_location', '入职办理地点')}
+                  {renderCell('work_location', '工作地点')}
+                  {renderCell('company_name', '所属公司')}
+                  {renderCell('onboard_location', '入职办理地点')}
                 </div>
               </div>
             )}
@@ -568,33 +585,34 @@ export default function EditUserPage() {
               <div className="pl-6 space-y-6 pt-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* 个人基础信息 */}
-                  {renderEAVField('english_name', '英文名')}
-                  {renderEAVField('gender', '性别')}
-                  {renderEAVField('birth_date', '出生日期')}
-                  {renderEAVField('age', '年龄')}
-                  {renderEAVField('height', '身高(cm)')}
-                  {renderEAVField('weight', '体重(kg)')}
-                  {renderEAVField('blood_type', '血型')}
-                  {renderEAVField('medical_history', '以往病史')}
+                  {renderCell('english_name', '英文名')}
+                  {renderCell('gender', '性别')}
+                  {renderCell('birth_date', '出生日期')}
+                  {renderCell('age', '年龄')}
+                  {renderCell('height', '身高(cm)')}
+                  {renderCell('weight', '体重(kg)')}
+                  {renderCell('blood_type', '血型')}
+                  {renderCell('medical_history', '以往病史')}
                   
                   {/* 身份信息 */}
-                  {renderEAVField('nationality', '国籍')}
-                  {renderEAVField('ethnicity', '民族')}
-                  {renderEAVField('political_status', '政治面貌')}
-                  {renderEAVField('birthplace', '籍贯(省市)')}
+                  {renderCell('id_number', '身份证号码')}
+                  {renderCell('nationality', '国籍')}
+                  {renderCell('ethnicity', '民族')}
+                  {renderCell('political_status', '政治面貌')}
+                  {renderCell('birthplace', '籍贯(省市)')}
                   
                   {/* 户籍信息 */}
-                  {renderEAVField('household_type', '户籍类型')}
-                  {renderEAVField('household_province', '户籍-省')}
-                  {renderEAVField('household_city', '户籍-市')}
-                  {renderEAVField('household_address', '户籍(户口所在地)')}
-                  {renderEAVField('id_card_address', '身份证地址')}
-                  {renderEAVField('current_address', '现居住地址')}
+                  {renderCell('household_type', '户籍类型')}
+                  {renderCell('household_province', '户籍-省')}
+                  {renderCell('household_city', '户籍-市')}
+                  {renderCell('household_address', '户籍(户口所在地)')}
+                  {renderCell('id_card_address', '身份证地址')}
+                  {renderCell('current_address', '现居住地址')}
                   
                   {/* 联系方式 */}
-                  {renderEAVField('qq', 'QQ')}
-                  {renderEAVField('wechat', '微信')}
-                  {renderEAVField('personal_email', '个人邮箱')}
+                  {renderCell('qq', 'QQ')}
+                  {renderCell('wechat', '微信')}
+                  {renderCell('personal_email', '个人邮箱')}
                 </div>
               </div>
             )}
@@ -677,7 +695,7 @@ export default function EditUserPage() {
                         </FieldGroup>
                         <FieldGroup label="入学日期">
                           <DatePicker 
-                            date={edu.enrollDate ? new Date(edu.enrollDate) : undefined}
+                            date={safeCreateDate(edu.enrollDate)}
                             onDateChange={(d) => {
                               const val = d ? d.toISOString().slice(0,10) : '';
                               updateEducation(index, 'enrollDate', val);
@@ -688,7 +706,7 @@ export default function EditUserPage() {
                         </FieldGroup>
                         <FieldGroup label="毕业日期">
                           <DatePicker 
-                            date={edu.graduateDate ? new Date(edu.graduateDate) : undefined}
+                            date={safeCreateDate(edu.graduateDate)}
                             onDateChange={(d) => {
                               const val = d ? d.toISOString().slice(0,10) : '';
                               updateEducation(index, 'graduateDate', val);
@@ -749,7 +767,7 @@ export default function EditUserPage() {
                         </FieldGroup>
                         <FieldGroup label="学位授予日期">
                           <DatePicker 
-                            date={edu.awardingDate ? new Date(edu.awardingDate) : undefined}
+                            date={safeCreateDate(edu.awardingDate)}
                             onDateChange={(d) => {
                               const val = d ? d.toISOString().slice(0,10) : '';
                               updateEducation(index, 'awardingDate', val);
@@ -847,7 +865,7 @@ export default function EditUserPage() {
                         </FieldGroup>
                         <FieldGroup label="开始时间">
                           <DatePicker 
-                            date={work.startDate ? new Date(work.startDate) : undefined}
+                            date={safeCreateDate(work.startDate)}
                             onDateChange={(d) => {
                               const val = d ? d.toISOString().slice(0,10) : '';
                               updateWorkExperience(index, 'startDate', val);
@@ -858,7 +876,7 @@ export default function EditUserPage() {
                         </FieldGroup>
                         <FieldGroup label="结束时间">
                           <DatePicker 
-                            date={work.endDate ? new Date(work.endDate) : undefined}
+                            date={safeCreateDate(work.endDate)}
                             onDateChange={(d) => {
                               const val = d ? d.toISOString().slice(0,10) : '';
                               updateWorkExperience(index, 'endDate', val);
@@ -885,7 +903,7 @@ export default function EditUserPage() {
                 <Button variant="outline" size="sm" disabled={!isEditable('emergency_name')} onClick={() => {
                   setEmergencyContacts(prev => [
                     ...prev,
-                    { id: undefined, userId, name: '', relationship: '', phone: '' }
+                    { id: undefined, userId, name: '', relation: '', phone: '' }
                   ]);
                 }}>
                   <Plus className="h-4 w-4 mr-1" />
@@ -910,7 +928,7 @@ export default function EditUserPage() {
                               userId,
                               name: contact.name || '',
                               phone: contact.phone || '',
-                              relation: contact.relationship || ''
+                              relation: contact.relation || ''
                             });
                           }}>
                             <Save className="h-4 w-4" />
@@ -935,8 +953,8 @@ export default function EditUserPage() {
                         </FieldGroup>
                         <FieldGroup label="关系">
                           <Input 
-                            value={contact.relationship || ''} 
-                            onChange={e => updateEmergencyContact(index, 'relationship', e.target.value)} 
+                            value={contact.relation || ''} 
+                            onChange={e => updateEmergencyContact(index, 'relation', e.target.value)} 
                             className="h-10" 
                           />
                         </FieldGroup>
@@ -972,7 +990,7 @@ export default function EditUserPage() {
                 <Button variant="outline" size="sm" disabled={!isEditable('family_name')} onClick={() => {
                   setFamilyMembers(prev => [
                     ...prev,
-                    { id: undefined, userId, name: '', relationship: '' }
+                    { id: undefined, userId, name: '', relation: '' }
                   ]);
                 }}>
                   <Plus className="h-4 w-4 mr-1" />
@@ -996,7 +1014,7 @@ export default function EditUserPage() {
                               id: member.id,
                               userId,
                               name: member.name || '',
-                              relation: member.relationship || ''
+                              relation: member.relation || ''
                             });
                           }}>
                             <Save className="h-4 w-4" />
@@ -1021,8 +1039,8 @@ export default function EditUserPage() {
                         </FieldGroup>
                         <FieldGroup label="关系">
                           <Input 
-                            value={member.relationship || ''} 
-                            onChange={e => updateFamilyMember(index, 'relationship', e.target.value)} 
+                            value={member.relation || ''} 
+                            onChange={e => updateFamilyMember(index, 'relation', e.target.value)} 
                             className="h-10" 
                           />
                         </FieldGroup>
@@ -1124,7 +1142,7 @@ export default function EditUserPage() {
                         </FieldGroup>
                         <FieldGroup label="合同开始时间">
                           <DatePicker 
-                            date={contract.startDate ? new Date(contract.startDate) : undefined}
+                            date={safeCreateDate(contract.startDate)}
                             onDateChange={(d) => {
                               const val = d ? d.toISOString().slice(0,10) : '';
                               updateContract(index, 'startDate', val);
@@ -1135,7 +1153,7 @@ export default function EditUserPage() {
                         </FieldGroup>
                         <FieldGroup label="合同结束时间">
                           <DatePicker 
-                            date={contract.endDate ? new Date(contract.endDate) : undefined}
+                            date={safeCreateDate(contract.endDate)}
                             onDateChange={(d) => {
                               const val = d ? d.toISOString().slice(0,10) : '';
                               updateContract(index, 'endDate', val);
@@ -1146,7 +1164,7 @@ export default function EditUserPage() {
                         </FieldGroup>
                         <FieldGroup label="合同实际结束时间">
                           <DatePicker 
-                            date={contract.actualEndDate ? new Date(contract.actualEndDate) : undefined}
+                            date={safeCreateDate(contract.actualEndDate)}
                             onDateChange={(d) => {
                               const val = d ? d.toISOString().slice(0,10) : '';
                               updateContract(index, 'actualEndDate', val);
@@ -1247,7 +1265,7 @@ export default function EditUserPage() {
                         </FieldGroup>
                         <FieldGroup label="有效期至">
                           <DatePicker 
-                            date={doc.validUntil ? new Date(doc.validUntil) : undefined}
+                            date={safeCreateDate(doc.validUntil)}
                             onDateChange={(d) => {
                               const val = d ? d.toISOString().slice(0,10) : '';
                               updateDocument(index, 'validUntil', val);

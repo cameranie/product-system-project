@@ -32,6 +32,8 @@ export function SimpleEmailPasswordLogin({
       }
     } catch (error) {
       console.error("Login error:", error)
+      // 错误处理已在父组件中处理，这里只需要重新抛出
+      throw error
     } finally {
       setIsLoading(false)
     }

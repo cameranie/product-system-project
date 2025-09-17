@@ -17,7 +17,7 @@ interface BreadcrumbItem {
 function generateBreadcrumbs(pathname: string): BreadcrumbItem[] {
   const segments = pathname.split('/').filter(Boolean)
   const breadcrumbs: BreadcrumbItem[] = [
-    { title: "首页", href: "/" }
+    { title: "首页", href: "/kanban" }
   ]
 
   // 人员管理相关路径

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { userApi, visibilityApi, adminApi } from '@/lib/api';
+import { userApi, visibilityApi, adminApi, authApi } from '@/lib/api';
 import Link from 'next/link';
 
 import { 
@@ -19,7 +19,6 @@ import {
   ShieldCheck,
   EyeOff,
   Calendar,
-  MapPin,
   User,
   CreditCard,
   FileText,
@@ -47,12 +46,12 @@ const maskValue = (value: string | null | undefined, visible: boolean): string =
 };
 
 type AttachmentRef = { id: string; attachmentType?: string; attachment?: { fileUrl?: string }; fileUrl?: string };
-type DetailUserLite = { id: string; name: string; email: string | null; username: string; phone: string | null; isActive: boolean; createdAt: string; department?: { id: string; name: string } | null; attachments?: AttachmentRef[] };
 type DetailUser = {
   id: string;
   name: string;
   email: string | null;
   username: string;
+  avatar?: string | null;
   phone: string | null;
   isActive: boolean;
   createdAt: string;
@@ -82,13 +81,13 @@ type DetailUser = {
   emergencyContacts?: Array<{
     id: string;
     name: string;
-    relationship: string;
+    relation: string;
     phone?: string;
   }>;
   familyMembers?: Array<{
     id: string;
     name: string;
-    relationship: string;
+    relation: string;
   }>;
   contracts?: Array<{
     id: string;
@@ -158,26 +157,30 @@ export default function PersonnelDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [visibleKeys, setVisibleKeys] = useState<string[]>([]);
-  const [fieldDefs, setFieldDefs] = useState<Record<string, { label?: string; classification?: string }>>({});
+  const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
+  const [fieldDefs, setFieldDefs] = useState<Record<string, { label?: string; classification?: string; selfEditable?: boolean }>>({});
 
   // 加载用户数据 + 可见字段 + 字段定义
   useEffect(() => {
     const loadUser = async () => {
       try {
         setLoading(true);
-        const [userRes, keysRes, fieldDefsRes] = await Promise.all([
+        const [userRes, keysRes, fieldDefsRes, meRes] = await Promise.all([
           userApi.getUser(userId),
           visibilityApi.visibleFieldKeys({ resource: 'user', targetUserId: userId }),
           adminApi.fieldDefinitions(),
+          authApi.me().catch(()=>null),
         ]);
-        setUser(userRes.user as unknown as DetailUserLite);
+        setUser(userRes.user as unknown as DetailUser);
         setVisibleKeys(keysRes.visibleFieldKeys || []);
-        const defsRaw = (fieldDefsRes as unknown as { fieldDefinitions?: unknown })?.fieldDefinitions;
-        if (defsRaw) {
-          const parsed = typeof defsRaw === 'string' ? JSON.parse(defsRaw) : defsRaw;
-          const map: Record<string, { label?: string; classification?: string }> = {};
-          (parsed as Array<{ key: string; label: string; classification: string }> | undefined)?.forEach((d) => {
-            map[d.key] = { label: d.label, classification: d.classification };
+        type MeResult = { me?: { roles?: string[] } } | null | undefined;
+        const roles: string[] | undefined = (meRes as MeResult)?.me?.roles;
+        setIsSuperAdmin(Array.isArray(roles) && roles.includes('super_admin'));
+        const defsArray = (fieldDefsRes as unknown as { fieldDefinitions?: Array<{ key: string; label: string; classification: string; selfEditable?: boolean }> })?.fieldDefinitions;
+        if (defsArray) {
+          const map: Record<string, { label?: string; classification?: string; selfEditable?: boolean }> = {};
+          defsArray.forEach((d) => {
+            map[d.key] = { label: d.label, classification: d.classification, selfEditable: d.selfEditable };
           });
           setFieldDefs(map);
         }
@@ -194,10 +197,16 @@ export default function PersonnelDetailPage() {
     }
   }, [userId]);
 
-  // 判断字段是否应该展示（非敏感信息）
-  const shouldShowField = (classification: string) => {
-    // 根据 SENSITIVITY_MATRIX.md，展示 PUBLIC 和 INTERNAL 级别字段
-    return ['PUBLIC', 'INTERNAL'].includes(classification);
+  // 判断字段是否应该展示（基于用户权限）
+  const shouldShowField = (fieldKey: string) => {
+    // 如果字段在可见字段列表中，说明后端已经检查过权限
+    return visibleKeys.includes(fieldKey);
+  };
+
+  // 详情页分组型资源（非EAV）可见性：超管直接可见
+  const isSectionVisible = (sectionKey: string) => {
+    if (isSuperAdmin) return true;
+    return visibleKeys.includes(sectionKey);
   };
 
   const handleBack = () => {
@@ -328,7 +337,7 @@ export default function PersonnelDetailPage() {
                 <CardContent className="space-y-4">
                   <div className="text-center">
                     <Avatar className="h-24 w-24 mx-auto mb-4">
-                      <AvatarImage src={`https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username}`} />
+                      <AvatarImage src={user.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username}`} />
                       <AvatarFallback className="text-2xl">{user.name[0]}</AvatarFallback>
                     </Avatar>
                     <h2 className="text-xl font-semibold mb-2">{user.name}</h2>
@@ -366,9 +375,17 @@ export default function PersonnelDetailPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {user.fieldValues?.filter(field => {
                       const fieldDef = fieldDefs[field.fieldKey];
-                      return fieldDef && shouldShowField(fieldDef.classification || 'PUBLIC') && 
-                             ['employee_no', 'employee_status', 'employee_type', 'sequence', 'position_title', 
-                              'work_location', 'company_name', 'join_date', 'regular_date'].includes(field.fieldKey);
+                      return fieldDef && shouldShowField(field.fieldKey) && 
+                             [
+                               'employment_status',
+                               'employee_type',
+                               'sequence',
+                               'position',
+                               'work_location',
+                               'company_belong',
+                               'join_date',
+                               'regularization_date',
+                             ].includes(field.fieldKey);
                     }).map((field) => {
                       const fieldDef = fieldDefs[field.fieldKey];
                       const value = field.valueString || field.valueNumber || field.valueDate || field.valueJson;
@@ -393,9 +410,18 @@ export default function PersonnelDetailPage() {
                     {/* 如果没有任何工作信息字段，显示提示 */}
                     {user.fieldValues?.filter(field => {
                       const fieldDef = fieldDefs[field.fieldKey];
-                      return fieldDef && shouldShowField(fieldDef.classification || 'PUBLIC') && 
-                             ['employee_no', 'employee_status', 'employee_type', 'sequence', 'position_title', 
-                              'work_location', 'company_name', 'join_date', 'regular_date'].includes(field.fieldKey);
+                      return fieldDef && shouldShowField(field.fieldKey) && 
+                             [
+                               'employee_no',
+                               'employment_status',
+                               'employee_type',
+                               'sequence',
+                               'position',
+                               'work_location',
+                               'company_belong',
+                               'join_date',
+                               'regularization_date',
+                             ].includes(field.fieldKey);
                     }).length === 0 && (
                       <p className="text-muted-foreground text-sm col-span-2">暂无可显示的工作信息</p>
                     )}
@@ -417,12 +443,25 @@ export default function PersonnelDetailPage() {
                       const fieldDef = fieldDefs[field.fieldKey];
                       if (!fieldDef) return false;
                       
-                      // 工作相关字段
-                      const workFields = ['employee_no', 'employee_status', 'employee_type', 'sequence', 'direct_supervisor', 
-                                        'business_unit', 'business_unit_leader', 'position_title', 'tags', 'company_join_date',
-                                        'join_date', 'probation_months', 'regular_date', 'work_location', 'company_name'];
+                      // 工作相关字段（对齐后端种子 key）
+                      const workFields = [
+                        'employment_status',
+                        'employee_type',
+                        'sequence',
+                        'reporting_manager',
+                        'business_unit',
+                        'business_unit_leader',
+                        'position',
+                        'tags',
+                        'company_join_date',
+                        'join_date',
+                        'probation_months',
+                        'regularization_date',
+                        'work_location',
+                        'company_belong',
+                      ];
                       
-                      return workFields.includes(field.fieldKey) && shouldShowField(fieldDef.classification || 'PUBLIC');
+                      return workFields.includes(field.fieldKey) && shouldShowField(field.fieldKey);
                     }).map((field) => {
                       const fieldDef = fieldDefs[field.fieldKey];
                       const value = field.valueString || field.valueNumber || field.valueDate || field.valueJson;
@@ -447,10 +486,24 @@ export default function PersonnelDetailPage() {
                     {/* 如果没有任何工作信息字段，显示提示 */}
                     {user.fieldValues?.filter(field => {
                       const fieldDef = fieldDefs[field.fieldKey];
-                      const workFields = ['employee_no', 'employee_status', 'employee_type', 'sequence', 'direct_supervisor', 
-                                        'business_unit', 'business_unit_leader', 'position_title', 'tags', 'company_join_date',
-                                        'join_date', 'probation_months', 'regular_date', 'work_location', 'company_name'];
-                      return fieldDef && workFields.includes(field.fieldKey) && shouldShowField(fieldDef.classification || 'PUBLIC');
+                      const workFields = [
+                        'employee_no',
+                        'employment_status',
+                        'employee_type',
+                        'sequence',
+                        'reporting_manager',
+                        'business_unit',
+                        'business_unit_leader',
+                        'position',
+                        'tags',
+                        'company_join_date',
+                        'join_date',
+                        'probation_months',
+                        'regularization_date',
+                        'work_location',
+                        'company_belong',
+                      ];
+                      return fieldDef && workFields.includes(field.fieldKey) && shouldShowField(field.fieldKey);
                     }).length === 0 && (
                       <p className="text-muted-foreground text-sm col-span-2">暂无可显示的工作信息</p>
                     )}
@@ -472,13 +525,31 @@ export default function PersonnelDetailPage() {
                       const fieldDef = fieldDefs[field.fieldKey];
                       if (!fieldDef) return false;
                       
-                      // 个人信息相关字段
-                      const personalFields = ['english_name', 'gender', 'birth_date', 'age', 'height', 'weight', 'blood_type',
-                                            'nationality', 'ethnicity', 'political_status', 'birthplace', 'household_type',
-                                            'household_province', 'household_city', 'household_address', 'id_card_address',
-                                            'current_address', 'qq', 'wechat', 'personal_email'];
+                      // 个人信息相关字段（对齐后端种子 key）
+                      const personalFields = [
+                        'english_name',
+                        'gender',
+                        'birth_date',
+                        'age',
+                        'height_cm',
+                        'weight_kg',
+                        'blood_type',
+                        'nationality',
+                        'ethnicity',
+                        'political_status',
+                        'native_place',
+                        'household_type',
+                        'household_province',
+                        'household_city',
+                        'household_register',
+                        'id_card_address',
+                        'current_address',
+                        'contact_qq',
+                        'contact_wechat',
+                        'contact_personal_email',
+                      ];
                       
-                      return personalFields.includes(field.fieldKey) && shouldShowField(fieldDef.classification || 'PUBLIC');
+                      return personalFields.includes(field.fieldKey) && shouldShowField(field.fieldKey);
                     }).map((field) => {
                       const fieldDef = fieldDefs[field.fieldKey];
                       const value = field.valueString || field.valueNumber || field.valueDate || field.valueJson;
@@ -503,11 +574,29 @@ export default function PersonnelDetailPage() {
                     {/* 如果没有任何个人信息字段，显示提示 */}
                     {user.fieldValues?.filter(field => {
                       const fieldDef = fieldDefs[field.fieldKey];
-                      const personalFields = ['english_name', 'gender', 'birth_date', 'age', 'height', 'weight', 'blood_type',
-                                            'nationality', 'ethnicity', 'political_status', 'birthplace', 'household_type',
-                                            'household_province', 'household_city', 'household_address', 'id_card_address',
-                                            'current_address', 'qq', 'wechat', 'personal_email'];
-                      return fieldDef && personalFields.includes(field.fieldKey) && shouldShowField(fieldDef.classification || 'PUBLIC');
+                      const personalFields = [
+                        'english_name',
+                        'gender',
+                        'birth_date',
+                        'age',
+                        'height_cm',
+                        'weight_kg',
+                        'blood_type',
+                        'nationality',
+                        'ethnicity',
+                        'political_status',
+                        'native_place',
+                        'household_type',
+                        'household_province',
+                        'household_city',
+                        'household_register',
+                        'id_card_address',
+                        'current_address',
+                        'contact_qq',
+                        'contact_wechat',
+                        'contact_personal_email',
+                      ];
+                      return fieldDef && personalFields.includes(field.fieldKey) && shouldShowField(field.fieldKey);
                     }).length === 0 && (
                       <p className="text-muted-foreground text-sm col-span-2">暂无可显示的个人信息</p>
                     )}
@@ -529,7 +618,7 @@ export default function PersonnelDetailPage() {
               </Card>
 
               {/* 教育经历 */}
-              {user.educations && user.educations.length > 0 && (
+              {isSectionVisible('educations') && user.educations && user.educations.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -540,7 +629,7 @@ export default function PersonnelDetailPage() {
                   <CardContent>
                     <div className="space-y-4">
                       {user.educations.map((edu) => {
-                        const visible = visibleKeys.includes('educations');
+                        const visible = isSuperAdmin || visibleKeys.includes('educations');
                         return (
                           <div key={edu.id} className="border-l-2 border-muted pl-4">
                             <div className="flex items-center gap-2 mb-1">
@@ -555,7 +644,7 @@ export default function PersonnelDetailPage() {
                                 {visible ? `${edu.startDate || ''} - ${edu.endDate || '至今'}` : '****/**/** - ****/**/**'}
                               </p>
                             )}
-                      </div>
+                          </div>
                         );
                       })}
                     </div>
@@ -564,7 +653,7 @@ export default function PersonnelDetailPage() {
               )}
 
               {/* 工作经历 */}
-              {user.workExperiences && user.workExperiences.length > 0 && (
+              {isSectionVisible('work_experiences') && user.workExperiences && user.workExperiences.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -575,7 +664,7 @@ export default function PersonnelDetailPage() {
                   <CardContent>
                     <div className="space-y-4">
                       {user.workExperiences.map((work) => {
-                        const visible = visibleKeys.includes('work_experiences');
+                        const visible = isSuperAdmin || visibleKeys.includes('work_experiences');
                         return (
                           <div key={work.id} className="border-l-2 border-muted pl-4">
                             <div className="flex items-center gap-2 mb-1">
@@ -588,7 +677,7 @@ export default function PersonnelDetailPage() {
                                 {visible ? `${work.startDate || ''} - ${work.endDate || '至今'}` : '****/**/** - ****/**/**'}
                               </p>
                             )}
-                      </div>
+                          </div>
                         );
                       })}
                     </div>
@@ -597,7 +686,7 @@ export default function PersonnelDetailPage() {
               )}
 
               {/* 紧急联系人 */}
-              {user.emergencyContacts && user.emergencyContacts.length > 0 && (
+              {isSectionVisible('emergency_contacts') && user.emergencyContacts && user.emergencyContacts.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -608,20 +697,20 @@ export default function PersonnelDetailPage() {
                   <CardContent>
                     <div className="space-y-3">
                       {user.emergencyContacts.map((contact) => {
-                        const visible = visibleKeys.includes('emergency_contacts');
+                        const visible = isSuperAdmin || visibleKeys.includes('emergency_contacts');
                         return (
-                          <div key={contact.id} className="flex items-center justify-between p-3 border rounded">
+                          <div key={contact.id} className="flex items-center justify-between py-3">
                             <div className="flex items-center gap-3">
                               <div>
                                 <p className="font-medium flex items-center gap-2">
                                   {maskValue(contact.name, visible)}
                                   {!visible && <EyeOff className="h-3 w-3 text-muted-foreground" />}
                                 </p>
-                                <p className="text-sm text-muted-foreground">{maskValue(contact.relationship, visible)}</p>
+                                <p className="text-sm text-muted-foreground">{maskValue(contact.relation, visible)}</p>
                               </div>
                             </div>
                             <p className="text-sm">{maskValue(contact.phone || '', visible)}</p>
-                      </div>
+                          </div>
                         );
                       })}
                     </div>
@@ -630,7 +719,7 @@ export default function PersonnelDetailPage() {
               )}
 
               {/* 家庭成员 */}
-              {user.familyMembers && user.familyMembers.length > 0 && (
+              {isSectionVisible('family_members') && user.familyMembers && user.familyMembers.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -641,14 +730,14 @@ export default function PersonnelDetailPage() {
                   <CardContent>
                     <div className="space-y-3">
                       {user.familyMembers.map((member) => {
-                        const visible = visibleKeys.includes('family_members');
+                        const visible = isSuperAdmin || visibleKeys.includes('family_members');
                         return (
-                          <div key={member.id} className="flex items-center justify-between p-3 border rounded">
+                          <div key={member.id} className="flex items-center justify-between py-3">
                             <div className="flex items-center gap-2">
                               <p className="font-medium">{maskValue(member.name, visible)}</p>
                               {!visible && <EyeOff className="h-3 w-3 text-muted-foreground" />}
                             </div>
-                            <p className="text-sm text-muted-foreground">{maskValue(member.relationship, visible)}</p>
+                            <p className="text-sm text-muted-foreground">{maskValue(member.relation, visible)}</p>
                           </div>
                         );
                       })}
@@ -658,7 +747,7 @@ export default function PersonnelDetailPage() {
               )}
 
               {/* 合同信息 */}
-              {user.contracts && user.contracts.length > 0 && (
+              {isSectionVisible('contracts') && user.contracts && user.contracts.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -669,7 +758,7 @@ export default function PersonnelDetailPage() {
                   <CardContent>
                     <div className="space-y-4">
                       {user.contracts.map((contract) => {
-                        const visible = visibleKeys.includes('contracts');
+                        const visible = isSuperAdmin || visibleKeys.includes('contracts');
                         return (
                           <div key={contract.id} className="border-l-2 border-muted pl-4">
                             <div className="flex items-center gap-2 mb-1">
@@ -687,13 +776,13 @@ export default function PersonnelDetailPage() {
                           </div>
                         );
                       })}
-                  </div>
-                </CardContent>
-              </Card>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
 
               {/* 证件信息 */}
-              {user.documents && user.documents.length > 0 && (
+              {isSectionVisible('documents') && user.documents && user.documents.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -704,9 +793,9 @@ export default function PersonnelDetailPage() {
                   <CardContent>
                     <div className="space-y-3">
                       {user.documents.map((doc) => {
-                        const visible = visibleKeys.includes('documents');
+                        const visible = isSuperAdmin || visibleKeys.includes('documents');
                         return (
-                          <div key={doc.id} className="flex items-center justify-between p-3 border rounded">
+                          <div key={doc.id} className="flex items-center justify-between py-3">
                             <div className="flex items-center gap-2">
                               <div>
                                 <p className="font-medium">{maskValue(doc.docType, visible)}</p>
@@ -728,7 +817,7 @@ export default function PersonnelDetailPage() {
               )}
 
               {/* 资料附件 */}
-              {(user as unknown as { attachments?: Array<AttachmentRef> }).attachments && (user as unknown as { attachments?: Array<AttachmentRef> }).attachments!.length > 0 && (
+              {isSectionVisible('attachments') && (user as unknown as { attachments?: Array<AttachmentRef> }).attachments && (user as unknown as { attachments?: Array<AttachmentRef> }).attachments!.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
