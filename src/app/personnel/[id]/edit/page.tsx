@@ -8,17 +8,26 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+// import { Checkbox } from '@/components/ui/checkbox'; // 已移除主管可见功能
 import { authApi, userApi, visibilityApi, adminApi } from '@/lib/api';
-import { Plus, Trash2, Save, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, Save, ChevronDown, ChevronUp, Settings } from 'lucide-react';
 import { DatePicker } from '@/components/ui/date-picker';
 
 // 可见性等级的中文映射
 const CLASSIFICATION_LABELS = {
   PUBLIC: '公开',
-  INTERNAL: '内部',
   SENSITIVE: '敏感',
-  HIGHLY_SENSITIVE: '高度敏感'
+  CONFIDENTIAL: '保密'
 } as const;
+
+// 统一旧枚举到三档模型
+function normalizeClassification(input?: string): 'PUBLIC' | 'SENSITIVE' | 'CONFIDENTIAL' {
+  if (!input) return 'PUBLIC';
+  if (input === 'INTERNAL') return 'PUBLIC';
+  if (input === 'HIGHLY_SENSITIVE') return 'CONFIDENTIAL';
+  if (input === 'PUBLIC' || input === 'SENSITIVE' || input === 'CONFIDENTIAL') return input;
+  return 'PUBLIC';
+}
 
 // 顶层定义，保持组件类型稳定，避免每次渲染导致子输入控件被卸载而失焦
 function FieldGroup({ label, badge, children, required = false }: {
@@ -53,6 +62,12 @@ export default function EditUserPage() {
     isActive: 'true',
     email: '',
   });
+
+  // 组织选择（事业部/部门/负责人）
+  const [departments, setDepartments] = useState<Array<{ id: string; name: string; parentId?: string | null; leaderUserIds?: string[] }>>([]);
+  const [businessUnitId, setBusinessUnitId] = useState<string>('none');
+  const [deptLeader, setDeptLeader] = useState<string | null>(null);
+  const [supervisor, setSupervisor] = useState<string>('');
 
   // EAV 字段值
   const [fieldValues, setFieldValues] = useState<Record<string, string | number | Date | unknown>>({});
@@ -91,6 +106,37 @@ export default function EditUserPage() {
   ];
   const [attachmentType, setAttachmentType] = useState<string>('ID_CARD');
 
+  // 字段定义和模块可见性
+  const [fieldDefs, setFieldDefs] = useState<Record<string, { classification: string }>>({});
+  const [moduleVisibilities] = useState<Record<string, { classification: string; allowManagerVisible: boolean }>>({});
+  
+  // 分组到字段集的映射
+  const GROUP_TO_FIELDSET_MAP = {
+    'basicInfo': '企业内展示集',
+    'workInfo': '组织信息集', 
+    'personalInfo': '个人信息集',
+    'educations': '教育经历集',
+    'workExperiences': '工作经历集',
+    'emergencyContacts': '紧急联系人集（敏感）',
+    'familyMembers': '家庭成员集（敏感）',
+    'contracts': '合同信息集（敏感）',
+    'documents': '证件信息集（极敏感）',
+    'bankAccounts': '银行卡信息集（极敏感）',
+    'attachments': '资料附件集（极敏感）'
+  } as const;
+
+  // 模块到模块键的映射
+  const MODULE_KEY_MAP = {
+    'educations': 'education',
+    'workExperiences': 'work_experience', 
+    'emergencyContacts': 'emergency_contacts',
+    'familyMembers': 'family_members',
+    'contracts': 'contracts',
+    'documents': 'documents',
+    'bankAccounts': 'bank_accounts',
+    'attachments': 'attachments'
+  } as const;
+
   // 折叠状态 - 默认全部收起
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     basicInfo: true,
@@ -111,7 +157,7 @@ export default function EditUserPage() {
   const [err, setErr] = useState<string | null>(null);
   const [visibleKeys, setVisibleKeys] = useState<string[]>([]);
   const [currentUser, setCurrentUser] = useState<{ id: string; roles: string[]; permissions?: string[] } | null>(null);
-  const [fieldDefs, setFieldDefs] = useState<Record<string, { label?: string; classification?: string; selfEditable?: boolean }>>({});
+  const [fieldDefsOld, setFieldDefsOld] = useState<Record<string, { label?: string; classification?: string; selfEditable?: boolean }>>({});
   const [onlyEditable, setOnlyEditable] = useState(false);
 
   // 安全的日期创建函数
@@ -125,12 +171,16 @@ export default function EditUserPage() {
     const run = async () => {
       try {
         setLoading(true);
-        const [userRes, keysRes, meRes, defsRes] = await Promise.all([
+        const [userRes, keysRes, meRes, defsRes, depsRes] = await Promise.all([
           userApi.getUser(userId),
           visibilityApi.visibleFieldKeys({ resource: 'user', targetUserId: userId }),
           authApi.me(),
           adminApi.fieldDefinitions().catch(() => null),
+          adminApi.departments().catch(() => ({ departments: [] })),
         ]);
+        
+        // 加载可见性配置
+        await loadVisibilityConfig();
 
         const u = userRes.user;
         setForm({
@@ -141,13 +191,35 @@ export default function EditUserPage() {
           email: u.email ?? '',
         });
 
+        // 部门/事业部初始化
+        const depRows = (depsRes as unknown as { departments?: Array<{ id: string; name: string; parentId?: string | null; leaderUserIds?: string[] }> })?.departments || [];
+        setDepartments(depRows);
+        const currentDeptId: string | undefined = u.department?.id || undefined;
+        if (currentDeptId) {
+          const currentDept = depRows.find(d => d.id === currentDeptId);
+          if (currentDept) {
+            if (currentDept.parentId) {
+              setBusinessUnitId(currentDept.parentId);
+              setForm(prev => ({ ...prev, departmentId: currentDept.id }));
+            } else {
+              setBusinessUnitId(currentDept.id);
+              setForm(prev => ({ ...prev, departmentId: 'none' }));
+            }
+          }
+        }
+
         // 解析 EAV 字段值
         const fieldValuesMap: Record<string, string | number | Date | unknown> = {};
         (u.fieldValues || []).forEach((fv: { fieldKey: string; valueString?: string; valueNumber?: number; valueDate?: string; valueJson?: unknown }) => {
           const value = fv.valueString ?? fv.valueNumber ?? fv.valueDate ?? fv.valueJson;
-          fieldValuesMap[fv.fieldKey] = value;
+          const key = fv.fieldKey === 'direct_supervisor' ? 'reporting_manager' : fv.fieldKey;
+          fieldValuesMap[key] = value;
         });
         setFieldValues(fieldValuesMap);
+
+        // 初始化“直属上级”显示值
+        const initialSupervisor = (fieldValuesMap['reporting_manager'] as string) || '';
+        setSupervisor(typeof initialSupervisor === 'string' ? initialSupervisor : '');
 
         // 设置多明细
         setEducations(Array.isArray(u.educations) ? u.educations : []);
@@ -166,10 +238,10 @@ export default function EditUserPage() {
         if (defsRaw) {
           const parsed = typeof defsRaw === 'string' ? JSON.parse(defsRaw) : defsRaw;
           const map: Record<string, { label?: string; classification?: string; selfEditable?: boolean }> = {};
-          (parsed as Array<{ key: string; label: string; classification: string; selfEditable?: boolean }> | undefined)?.forEach((d) => {
+          (parsed as Array<{ key: string; label: string; classification: string; selfEditable?: boolean }> | undefined)?.forEach((d: { key: string; label: string; classification: string; selfEditable?: boolean }) => {
             map[d.key] = { label: d.label, classification: d.classification, selfEditable: d.selfEditable };
           });
-          setFieldDefs(map);
+          setFieldDefsOld(map);
         }
       } catch (error) {
         setErr(error instanceof Error ? error.message : '加载失败');
@@ -183,6 +255,28 @@ export default function EditUserPage() {
     }
   }, [userId]);
 
+  // 根据所选部门/事业部，计算负责人并可一键填充
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!departments || departments.length === 0) { setDeptLeader(null); return; }
+        const dep = (form.departmentId && form.departmentId !== 'none') ? departments.find(x => x.id === form.departmentId) : undefined;
+        const bu = (businessUnitId && businessUnitId !== 'none') ? departments.find(x => x.id === businessUnitId) : undefined;
+        let leaderIds: string[] | undefined = dep?.leaderUserIds;
+        if (!leaderIds || leaderIds.length === 0) leaderIds = bu?.leaderUserIds;
+        if (leaderIds && leaderIds.length > 0) {
+          const u = await userApi.getUser(leaderIds[0]).catch(() => null);
+          const name = (u && typeof u === 'object' && 'user' in u) ? (u as { user?: { name?: string } }).user?.name ?? null : null;
+          setDeptLeader(name);
+        } else {
+          setDeptLeader(null);
+        }
+      } catch {
+        setDeptLeader(null);
+      }
+    })();
+  }, [form.departmentId, businessUnitId, departments]);
+
   const isEditable = useCallback((key: string) => {
     const isSuperAdmin = currentUser?.roles?.includes('super_admin');
     const isSelf = currentUser?.id === userId;
@@ -195,16 +289,16 @@ export default function EditUserPage() {
   }, [currentUser, userId]);
 
   const getFieldSensitivity = useCallback((fieldKey: string): string => {
-    const fieldInfo = fieldDefs[fieldKey];
-    if (fieldInfo?.classification) return fieldInfo.classification;
+    const fieldInfo = fieldDefsOld[fieldKey];
+    if (fieldInfo?.classification) return normalizeClassification(fieldInfo.classification);
     
     const sensitive = ['base_salary', 'id_number', 'bank_account', 'social_security_number'];
     const internal = ['birthday', 'emergency_contact', 'personal_email'];
     
     if (sensitive.includes(fieldKey)) return 'SENSITIVE';
-    if (internal.includes(fieldKey)) return 'INTERNAL';
+    if (internal.includes(fieldKey)) return 'PUBLIC';
     return 'PUBLIC';
-  }, [fieldDefs]);
+  }, [fieldDefsOld]);
 
   // 切换折叠状态 - 参考任务看板的实现
   const toggleSection = (sectionKey: string) => {
@@ -255,35 +349,150 @@ export default function EditUserPage() {
   const addAttachmentLocal = (att: AttachmentRef) => setAttachments(prev => [att, ...prev]);
   const removeAttachmentLocal = (id: string) => setAttachments(prev => prev.filter((a) => a.id !== id));
 
+  // 加载字段定义和模块可见性
+  const loadVisibilityConfig = useCallback(async () => {
+    try {
+      // 加载字段定义
+      const fieldDefsResponse = await adminApi.fieldDefinitions();
+      const fieldDefsMap: Record<string, { classification: string }> = {};
+      fieldDefsResponse.fieldDefinitions?.forEach((field: { key: string; classification: string }) => {
+        fieldDefsMap[field.key] = {
+          classification: field.classification || 'PUBLIC'
+        };
+      });
+      setFieldDefs(fieldDefsMap);
+
+      // 加载模块可见性 (暂时注释掉，等待后端API)
+      // const moduleVisResponse = await adminApi.moduleVisibilities();
+      // const moduleVisMap: Record<string, { classification: string; allowManagerVisible: boolean }> = {};
+      // moduleVisResponse.moduleVisibilities?.forEach((module: any) => {
+      //   moduleVisMap[module.moduleKey] = {
+      //     classification: module.classification || 'PUBLIC',
+      //     allowManagerVisible: module.allowManagerVisible || false
+      //   };
+      // });
+      // setModuleVisibilities(moduleVisMap);
+    } catch (error) {
+      console.error('Failed to load visibility config:', error);
+    }
+  }, []);
+
+  // 应用分组可见性
+  const applyGroupVisibility = async (sectionKey: string, classification: string) => {
+    try {
+      const setName = GROUP_TO_FIELDSET_MAP[sectionKey as keyof typeof GROUP_TO_FIELDSET_MAP];
+      if (!setName) return;
+      
+      await adminApi.applyGroupVisibility(setName, classification);
+      // 重新加载配置
+      await loadVisibilityConfig();
+    } catch (error) {
+      console.error('Failed to apply group visibility:', error);
+    }
+  };
+
+  // 更新模块可见性
+  const updateModuleVisibility = async (sectionKey: string, classification: string) => {
+    try {
+      const moduleKey = MODULE_KEY_MAP[sectionKey as keyof typeof MODULE_KEY_MAP];
+      if (!moduleKey) return;
+      
+      await adminApi.upsertModuleVisibility({ moduleKey, classification });
+      // 重新加载配置
+      await loadVisibilityConfig();
+    } catch (error) {
+      console.error('Failed to update module visibility:', error);
+    }
+  };
+
+  // 可见性控件组件
+  const VisibilityControls = ({ sectionKey, isModule = false }: { 
+    sectionKey: string; 
+    isModule?: boolean;
+  }) => {
+    const currentConfig = isModule 
+      ? moduleVisibilities[MODULE_KEY_MAP[sectionKey as keyof typeof MODULE_KEY_MAP] || ''] 
+      : null; // 简化：仅展示选择，不读取组级初始值
+
+    const [localClassification, setLocalClassification] = useState(currentConfig?.classification || 'PUBLIC');
+
+    // 当配置更新时同步本地状态
+    useEffect(() => {
+      if (currentConfig) {
+        setLocalClassification(currentConfig.classification);
+      }
+    }, [currentConfig]);
+
+    const handleApply = async () => {
+      if (isModule) {
+        await updateModuleVisibility(sectionKey, localClassification);
+      } else {
+        await applyGroupVisibility(sectionKey, localClassification);
+      }
+    };
+
+    return (
+      <div className="flex items-center gap-2 text-xs">
+        <Settings className="h-3 w-3 text-gray-500" />
+        <Select value={localClassification} onValueChange={setLocalClassification}>
+          <SelectTrigger className="h-7 w-20 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="PUBLIC">公开</SelectItem>
+            <SelectItem value="CONFIDENTIAL">保密</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handleApply}
+          className="h-6 px-2 text-xs"
+        >
+          应用到{isModule ? '模块' : '本组'}
+        </Button>
+      </div>
+    );
+  };
+
   // 看板风格的区域标题组件
   const SectionHeader = ({ title, sectionKey, badge, actions }: {
     title: string;
     sectionKey: string;
     badge?: React.ReactNode;
     actions?: React.ReactNode;
-  }) => (
-    <div className="flex items-center py-2">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => toggleSection(sectionKey)}
-        className="flex items-center gap-2 text-sm font-medium p-0 h-auto hover:bg-transparent"
-      >
-        <span className="text-lg font-semibold">{title}</span>
-        {badge}
-        {collapsedSections[sectionKey] ? (
-          <ChevronDown className="h-4 w-4" />
-        ) : (
-          <ChevronUp className="h-4 w-4" />
-        )}
-      </Button>
-      {actions && (
-        <div className="ml-4">
-          {actions}
+  }) => {
+    const isMultiDetailModule = ['educations', 'workExperiences', 'emergencyContacts', 'familyMembers', 'contracts', 'documents', 'bankAccounts', 'attachments'].includes(sectionKey);
+    
+    return (
+      <div className="flex items-center justify-between py-2">
+        <div className="flex items-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => toggleSection(sectionKey)}
+            className="flex items-center gap-2 text-sm font-medium p-0 h-auto hover:bg-transparent"
+          >
+            <span className="text-lg font-semibold">{title}</span>
+            {badge}
+            {collapsedSections[sectionKey] ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronUp className="h-4 w-4" />
+            )}
+          </Button>
+          {actions && (
+            <div className="ml-4">
+              {actions}
+            </div>
+          )}
         </div>
-      )}
-    </div>
-  );
+        
+        {/* 可见性控件 */}
+        <VisibilityControls sectionKey={sectionKey} isModule={isMultiDetailModule} />
+      </div>
+    );
+  };
 
 
   // 优化的EAV字段渲染 - 使用日期选择器
@@ -294,7 +503,7 @@ export default function EditUserPage() {
     const value = (fieldValues[fieldKey] ?? '') as string | number | Date;
     const sensitivity = getFieldSensitivity(fieldKey);
     const editable = isEditable(fieldKey);
-    const classificationLabel = CLASSIFICATION_LABELS[sensitivity as keyof typeof CLASSIFICATION_LABELS] || sensitivity;
+    const classificationLabel = CLASSIFICATION_LABELS[normalizeClassification(sensitivity) as keyof typeof CLASSIFICATION_LABELS];
 
     // 日期字段使用DatePicker
     if (fieldKey.includes('date') || fieldKey === 'birth_date') {
@@ -384,17 +593,29 @@ export default function EditUserPage() {
       setErr(null);
 
       // 保存基本信息
+      const computedDepartmentId = form.departmentId !== 'none'
+        ? form.departmentId
+        : (businessUnitId !== 'none' ? businessUnitId : undefined);
+
       const basicData = {
         name: form.name,
         phone: form.phone,
-        departmentId: form.departmentId === 'none' ? undefined : form.departmentId,
+        departmentId: computedDepartmentId,
         isActive: form.isActive === 'true',
       };
 
       await userApi.updateUser(userId, basicData);
 
+      // 自动同步EAV：事业部/事业部负责人/直属上级
+      const buName = (businessUnitId !== 'none') ? (departments.find(d => d.id === businessUnitId)?.name || '') : '';
+      const fvToSave: Record<string, unknown> = { ...fieldValues };
+      delete (fvToSave as Record<string, unknown>)['direct_supervisor'];
+      if (supervisor && typeof supervisor === 'string') fvToSave['reporting_manager'] = supervisor;
+      if (buName) fvToSave['business_unit'] = buName;
+      if (deptLeader) fvToSave['business_unit_leader'] = deptLeader;
+
       // 保存EAV字段
-      const fieldValueEntries = Object.entries(fieldValues).map(([key, value]) => ({
+      const fieldValueEntries = Object.entries(fvToSave).map(([key, value]) => ({
         fieldKey: key,
         value: value
       }));
@@ -474,7 +695,7 @@ export default function EditUserPage() {
 
                   <FieldGroup 
                     label="手机号码"
-                    badge={<Badge variant="secondary" className="text-xs">内部</Badge>}
+                    badge={<Badge variant="secondary" className="text-xs">{CLASSIFICATION_LABELS[normalizeClassification(getFieldSensitivity('contact_phone')) as keyof typeof CLASSIFICATION_LABELS]}</Badge>}
                   >
                     <Input
                       placeholder="请输入手机号码"
@@ -492,27 +713,11 @@ export default function EditUserPage() {
                     <Input value={form.email} disabled className="h-10" />
                   </FieldGroup>
 
-                  <FieldGroup 
-                    label="所属部门"
-                    badge={<Badge variant="secondary" className="text-xs">公开</Badge>}
-                  >
-                    <Select 
-                      value={form.departmentId} 
-                      onValueChange={v => setForm({ ...form, departmentId: v })}
-                      disabled={!isEditable('department')}
-                    >
-                      <SelectTrigger className="h-10">
-                        <SelectValue placeholder="不选择部门" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">不选择部门</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FieldGroup>
+                  {/* 原“所属部门”移动到“工作信息”分组 */}
 
                   <FieldGroup 
                     label="入职状态"
-                    badge={<Badge variant="secondary" className="text-xs">内部</Badge>}
+                    badge={<Badge variant="secondary" className="text-xs">{CLASSIFICATION_LABELS[normalizeClassification(getFieldSensitivity('employment_status')) as keyof typeof CLASSIFICATION_LABELS]}</Badge>}
                   >
                     <Select 
                       value={form.isActive} 
@@ -540,13 +745,56 @@ export default function EditUserPage() {
             {!collapsedSections.workInfo && (
               <div className="pl-6 space-y-6 pt-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* 事业部/部门/负责人（选择区） */}
+                  <FieldGroup label="所属事业部" badge={<Badge variant="secondary" className="text-xs">公开</Badge>}>
+                    <Select value={businessUnitId} onValueChange={(v) => { setBusinessUnitId(v); setForm(prev => ({ ...prev, departmentId: 'none' })); }} disabled={!isEditable('department')}>
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="请选择事业部" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departments.filter(d => !d.parentId).map(d => (
+                          <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FieldGroup>
+
+                  <FieldGroup label="所属部门" badge={<Badge variant="secondary" className="text-xs">公开</Badge>}>
+                    <Select value={form.departmentId} onValueChange={(v) => setForm(prev => ({ ...prev, departmentId: v }))} disabled={!isEditable('department') || businessUnitId === 'none'}>
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="请选择部门" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">不选择部门</SelectItem>
+                        {departments.filter(d => d.parentId === (businessUnitId !== 'none' ? businessUnitId : null)).map(d => (
+                          <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FieldGroup>
+
+                  <FieldGroup label="直属上级（主管）" badge={<Badge variant="secondary" className="text-xs">公开</Badge>}>
+                    <div className="flex items-center gap-2">
+                      <Input 
+                        placeholder="请选择部门后自动带出负责人" 
+                        value={supervisor}
+                        onChange={() => {}}
+                        disabled={form.departmentId === 'none' || !isEditable('department')}
+                        className="h-10"
+                      />
+                      {deptLeader && (
+                        <Button variant="outline" size="sm" onClick={() => setSupervisor(deptLeader || '')}>
+                          使用部门负责人：{deptLeader}
+                        </Button>
+                      )}
+                    </div>
+                  </FieldGroup>
+
                   {/* 基本工作信息 */}
                   {renderCell('employee_status', '人员状态')}
                   {renderCell('employee_type', '人员类型')}
                   {renderCell('sequence', '序列')}
-                  {renderCell('direct_supervisor', '直属上级')}
-                  {renderCell('business_unit', '事业部')}
-                  {renderCell('business_unit_leader', '事业部负责人')}
+                  {/* 由上方选择区统一维护：reporting_manager/business_unit/business_unit_leader */}
                   {renderCell('position_title', '职务')}
                   {renderCell('tags', '标签')}
                   
@@ -1071,7 +1319,7 @@ export default function EditUserPage() {
             <SectionHeader 
               title="合同信息" 
               sectionKey="contracts"
-              badge={<Badge variant="secondary" className="text-xs">内部</Badge>}
+              badge={<Badge variant="destructive" className="text-xs">敏感</Badge>}
               actions={
                 <Button variant="outline" size="sm" disabled={!isEditable('contract_no')} onClick={() => {
                   setContracts(prev => [
@@ -1194,7 +1442,7 @@ export default function EditUserPage() {
             <SectionHeader 
               title="证件信息" 
               sectionKey="documents"
-              badge={<Badge variant="destructive" className="text-xs">高度敏感</Badge>}
+              badge={<Badge variant="destructive" className="text-xs">保密</Badge>}
               actions={
                 <Button variant="outline" size="sm" disabled={!isEditable('id_type')} onClick={() => {
                   setDocuments(prev => [
@@ -1295,7 +1543,7 @@ export default function EditUserPage() {
             <SectionHeader 
               title="银行账户" 
               sectionKey="bankAccounts"
-              badge={<Badge variant="destructive" className="text-xs">高度敏感</Badge>}
+              badge={<Badge variant="destructive" className="text-xs">保密</Badge>}
               actions={
                 <Button variant="outline" size="sm" disabled={!isEditable('bank_account_name')} onClick={() => {
                   setBankAccounts(prev => [
@@ -1376,7 +1624,7 @@ export default function EditUserPage() {
             <SectionHeader 
               title="资料附件" 
               sectionKey="attachments"
-              badge={<Badge variant="destructive" className="text-xs">高度敏感</Badge>}
+              badge={<Badge variant="destructive" className="text-xs">保密</Badge>}
               actions={
                 <div className="flex items-center gap-2">
                   <Select value={attachmentType} onValueChange={setAttachmentType}>

@@ -9,6 +9,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { visibilityApi, adminApi } from '@/lib/api';
 import { Shield, User, Eye, Save, RefreshCw, Check, X } from 'lucide-react';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 
 interface Role {
@@ -35,6 +42,7 @@ function PermissionsPreviewContent() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({});
+  const [fieldDefsMap, setFieldDefsMap] = useState<Record<string, { label: string; classification: 'PUBLIC'|'CONFIDENTIAL'; selfEditable?: boolean }>>({});
   const [isDeptLeader, setIsDeptLeader] = useState(false);
   
   // 权限编辑相关状态
@@ -142,9 +150,14 @@ function PermissionsPreviewContent() {
       try {
         const defs = await adminApi.fieldDefinitions().catch(() => null);
         const map: Record<string, string> = {};
-        const arr = (defs as unknown as { fieldDefinitions?: Array<{ key: string; label: string }> })?.fieldDefinitions || [];
-        arr.forEach(d => { map[d.key] = d.label; });
+        const defsMap: Record<string, { label: string; classification: 'PUBLIC'|'CONFIDENTIAL'; selfEditable?: boolean }> = {};
+        const arr = (defs as unknown as { fieldDefinitions?: Array<{ key: string; label: string; classification: 'PUBLIC'|'CONFIDENTIAL'; selfEditable?: boolean }> })?.fieldDefinitions || [];
+        arr.forEach(d => { 
+          map[d.key] = d.label; 
+          defsMap[d.key] = { label: d.label, classification: d.classification, selfEditable: d.selfEditable };
+        });
         setFieldLabels(map);
+        setFieldDefsMap(defsMap);
       } catch {}
       try {
         if (id) {
@@ -162,7 +175,7 @@ function PermissionsPreviewContent() {
 
   return (
     <AppLayout>
-      <div className="space-y-8 max-w-7xl mx-auto">
+      <div className="space-y-8 max-w-7xl mx-auto overflow-x-hidden">
         {/* 错误提示 */}
         {err && (
           <div className="bg-red-50 border border-red-200 rounded p-4">
@@ -274,7 +287,7 @@ function PermissionsPreviewContent() {
               </div>
               <div>
                 <span className="font-medium">HR管理员：</span>
-                <span>专门用于HR敏感资料管理，具有敏感字段访问权限</span>
+                <span>仅可查看本公司“保密”信息；跨公司不可见</span>
               </div>
               <div>
                 <span className="font-medium">主管：</span>
@@ -292,7 +305,9 @@ function PermissionsPreviewContent() {
           )}
         </div>
 
-        {/* 系统权限 - 横向表格 */}
+        
+
+        {/* 系统权限 - 横向表格（仅内部横向滚动；避免覆盖侧边栏） */}
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-muted-foreground" />
@@ -350,13 +365,13 @@ function PermissionsPreviewContent() {
                   ]
                 },
                 {
-                  category: '敏感数据访问',
+                  category: '保密数据访问',
                   permissions: [
                     { key: 'contact:read', name: '查看联系方式' },
-                    { key: 'user_sensitive:read', name: '查看敏感字段' },
-                    { key: 'user_highly_sensitive:read', name: '查看极敏感字段' },
-                    { key: 'export:sensitive', name: '导出敏感字段' },
-                    { key: 'export:highly_sensitive', name: '导出极敏感字段' }
+                    { key: 'user_sensitive:read', name: '查看保密字段（旧权限名）' },
+                    { key: 'user_highly_sensitive:read', name: '查看保密字段（旧权限名）' },
+                    { key: 'export:sensitive', name: '导出保密字段（旧权限名）' },
+                    { key: 'export:highly_sensitive', name: '导出保密字段（旧权限名）' }
                   ]
                 },
                 {
@@ -372,107 +387,211 @@ function PermissionsPreviewContent() {
               );
 
               return (
-                <div className="rounded-md border overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[120px] sticky left-0 bg-background border-r">权限分类</TableHead>
-                        {permissionStructure.map((category) => 
-                          category.permissions.map((permission) => (
-                            <TableHead key={permission.key} className="text-center min-w-[80px]">
-                              <div className="flex flex-col items-center gap-1">
-                                <span className="text-xs font-medium">{permission.name}</span>
-                              </div>
-                            </TableHead>
-                          ))
-                        )}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {permissionStructure.map((category) => (
-                        <TableRow key={category.category}>
-                          <TableCell className="font-medium text-primary sticky left-0 bg-background border-r">
-                            {category.category}
-                          </TableCell>
-                          {permissionStructure.map((cat) =>
-                            cat.permissions.map((permission) => (
-                              <TableCell key={permission.key} className="text-center">
-                                {category.category === cat.category ? (
-                                  userPermissions.has(permission.key) ? (
-                                    <Check className="h-4 w-4 text-green-600 mx-auto" />
-                                  ) : (
-                                    <X className="h-4 w-4 text-red-500 mx-auto" />
-                                  )
-                                ) : (
-                                  <span className="text-gray-300">-</span>
-                                )}
+                <div className="w-full">
+                  <div className="rounded-md border">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[120px] sticky left-0 bg-background border-r">权限分类</TableHead>
+                            {permissionStructure.map((category) => 
+                              category.permissions.map((permission) => (
+                                <TableHead key={permission.key} className="text-center min-w-[80px] whitespace-nowrap">
+                                  <div className="flex flex-col items-center gap-1">
+                                    <span className="text-xs font-medium">{permission.name}</span>
+                                  </div>
+                                </TableHead>
+                              ))
+                            )}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {permissionStructure.map((category) => (
+                          <TableRow key={category.category}>
+                              <TableCell className="font-medium text-primary sticky left-0 bg-background border-r">
+                                {category.category}
                               </TableCell>
-                            ))
-                          )}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                              {permissionStructure.map((cat) =>
+                                cat.permissions.map((permission) => (
+                                  <TableCell key={permission.key} className="text-center">
+                                    {category.category === cat.category ? (
+                                      userPermissions.has(permission.key) ? (
+                                        <Check className="h-4 w-4 text-green-600 mx-auto" />
+                                      ) : (
+                                        <X className="h-4 w-4 text-red-500 mx-auto" />
+                                      )
+                                    ) : (
+                                      <span className="text-gray-300">-</span>
+                                    )}
+                                  </TableCell>
+                                ))
+                              )}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
                 </div>
               );
             })()
           )}
         </div>
 
-        {/* 可见字段 */}
+        {/* 可见字段与对外展示配置（合并） */}
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Eye className="h-5 w-5 text-muted-foreground" />
-            <h4 className="font-medium">可见字段</h4>
+            <h4 className="font-medium">可见字段与对外展示配置（按分组）</h4>
           </div>
-          {result !== null && (
-            (() => {
-              try {
-                const data = typeof result === 'string' ? JSON.parse(result) : result;
-                return (
-                  <div>
-                    {data.visibleFieldKeys && data.visibleFieldKeys.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                        {data.visibleFieldKeys.map((fieldKey: string, index: number) => {
-                          const fieldName = fieldLabels[fieldKey] || fieldKey;
-                          
-                          const getSensitivityLevel = (key: string) => {
-                            const sensitive = ['salary', 'id_number', 'birthday'];
-                            const internal = ['phone', 'contact_phone', 'emergency_contact', 'address'];
-                            if (sensitive.includes(key)) return { level: '敏感', variant: 'destructive' as const };
-                            if (internal.includes(key)) return { level: '内部', variant: 'default' as const };
-                            return { level: '公开', variant: 'secondary' as const };
-                          };
-                          
-                          const sensitivity = getSensitivityLevel(fieldKey);
-                          
-                          return (
-                            <div key={index} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                              <span className="text-sm font-medium">{fieldName}</span>
-                              <Badge variant={sensitivity.variant} className="text-xs">
-                                {sensitivity.level}
-                              </Badge>
-                            </div>
-                          );
-                        })}
+          {result !== null && (() => {
+            try {
+              const data = typeof result === 'string' ? JSON.parse(result) : result;
+              const keys: string[] = data.visibleFieldKeys || [];
+              const show = (k: string) => keys.includes(k);
+              const item = (k: string) => (
+                <div key={k} className="flex items-center justify-between p-2 bg-muted/30 rounded">
+                  <span className="text-sm">{fieldLabels[k] || k}</span>
+                </div>
+              );
+
+              // 完整的11个分组映射（对齐编辑页）
+              const groupDefs: Array<{ title: string; keys: string[] }> = [
+                {
+                  title: '基本信息',
+                  keys: ['name','department','contact_work_email','contact_phone','is_active']
+                },
+                {
+                  title: '工作信息',
+                  keys: [
+                    'employment_status','employee_type','sequence',
+                    'reporting_manager','business_unit','business_unit_leader',
+                    'position','tags','company_join_date','intern_conversion_date','join_date','probation_months','regularization_date',
+                    'first_work_date','seniority_base_date','seniority_years','tenure_years',
+                    'work_location','company_belong','onboarding_location'
+                  ]
+                },
+                {
+                  title: '个人信息',
+                  keys: [
+                    'english_name','gender','birth_date','age','height_cm','weight_kg','blood_type','medical_history',
+                    'nationality','ethnicity','political_status','native_place','household_type','household_province','household_city','household_register','id_card_address','current_address',
+                    'contact_wechat','contact_qq','contact_personal_email'
+                  ]
+                },
+                {
+                  title: '教育经历',
+                  keys: ['education_level', 'education_school', 'education_major', 'education_start_date', 'education_end_date']
+                },
+                {
+                  title: '工作经历',
+                  keys: ['work_company', 'work_position', 'work_start_date', 'work_end_date', 'work_description']
+                },
+                {
+                  title: '紧急联系人',
+                  keys: ['emergency_contact_name', 'emergency_contact_relation', 'emergency_contact_phone']
+                },
+                {
+                  title: '家庭成员',
+                  keys: ['family_member_name', 'family_member_relation', 'family_member_birth_date', 'family_member_occupation']
+                },
+                {
+                  title: '合同信息',
+                  keys: ['contract_type', 'contract_start_date', 'contract_end_date', 'contract_duration', 'contract_file']
+                },
+                {
+                  title: '证件信息',
+                  keys: ['id_card_number', 'passport_number', 'driver_license', 'other_certificates']
+                },
+                {
+                  title: '银行账户',
+                  keys: ['bank_name', 'bank_account_number', 'bank_account_name']
+                },
+                {
+                  title: '资料附件',
+                  keys: ['resume_file', 'photo_file', 'certificate_files', 'other_files']
+                },
+              ];
+
+            const options = [
+              { v: 'PUBLIC', t: '公开' },
+              { v: 'CONFIDENTIAL', t: '保密' },
+            ] as const;
+
+              return (
+                <div className="space-y-6">
+                  {groupDefs.map(g => {
+                    const visibleKeys = g.keys.filter(show);
+                    const clsArray = g.keys.map(k => fieldDefsMap[k]?.classification).filter(Boolean) as string[];
+                    const allSame = clsArray.length > 0 && clsArray.every(c => c === clsArray[0]);
+                    const current = allSame ? clsArray[0] : 'MIXED';
+                    const selectId = `merged-group-select-${g.title}`;
+                    return (
+                      <div key={g.title} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-medium text-muted-foreground">{g.title}</div>
+                          <div className="flex items-center gap-2">
+                            <label htmlFor={selectId} className="text-xs text-muted-foreground">对外分级：</label>
+                            <Select defaultValue={current === 'MIXED' ? undefined : (current as string)}>
+                              <SelectTrigger id={selectId} className="h-8 w-[160px]">
+                                <SelectValue placeholder={current === 'MIXED' ? '（当前混合）选择统一分级' : '选择分级'} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {options.map(o => (
+                                  <SelectItem key={o.v} value={o.v}>{o.t}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button size="sm" onClick={async () => {
+                              const trigger = document.getElementById(selectId) as HTMLElement | null;
+                              const clsAttr = (trigger && (trigger as HTMLElement).getAttribute('data-value')) || '';
+                              const cls = clsAttr as 'PUBLIC'|'CONFIDENTIAL';
+                              if (!cls) return;
+                              try {
+                                toast.dismiss();
+                                toast.info(`正在更新 ${g.title} 分组…`);
+                                await Promise.all(g.keys.map(async (k) => {
+                                  const def = fieldDefsMap[k] || { label: k, classification: cls };
+                                  await adminApi.upsertFieldDefinition({ key: k, label: def.label || k, classification: cls, selfEditable: def.selfEditable });
+                                }));
+                                const defs = await adminApi.fieldDefinitions().catch(() => null);
+                              const newMap: Record<string, { label: string; classification: 'PUBLIC'|'CONFIDENTIAL'; selfEditable?: boolean }> = {};
+                              const arr = (defs as unknown as { fieldDefinitions?: Array<{ key: string; label: string; classification: 'PUBLIC'|'CONFIDENTIAL'; selfEditable?: boolean }> })?.fieldDefinitions || [];
+                                arr.forEach((d) => { newMap[d.key] = { label: d.label, classification: d.classification, selfEditable: d.selfEditable }; });
+                                setFieldDefsMap(newMap);
+                                toast.success('已更新');
+                              } catch (e) {
+                                toast.error(e instanceof Error ? e.message : '更新失败');
+                              }
+                            }}>保存</Button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+                          {visibleKeys.length > 0 ? visibleKeys.map(k => item(k)) : (
+                            <div className="text-sm text-muted-foreground">（该分组下当前无可见字段）</div>
+                          )}
+                        </div>
                       </div>
-                    ) : (
-                      <div className="text-center text-muted-foreground py-4">
-                        无可见字段
-                      </div>
-                    )}
-                  </div>
-                );
-              } catch {
-                return (
-                  <div className="text-center">
-                    <p className="text-destructive font-medium">数据解析错误</p>
-                  </div>
-                );
-              }
-            })()
-          )}
+                    );
+                  })}
+                  {/* 如果所有分组都为空，显示提示 */}
+                  {groupDefs.every(g => g.keys.filter(show).length === 0) && (
+                    <div className="text-center text-muted-foreground py-8">
+                      暂无可见字段
+                    </div>
+                  )}
+                </div>
+              );
+            } catch {
+              return (
+                <div className="text-center">
+                  <p className="text-destructive font-medium">数据解析错误</p>
+                </div>
+              );
+            }
+          })()}
         </div>
+
       </div>
     </AppLayout>
   );

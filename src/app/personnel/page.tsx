@@ -1,302 +1,459 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { AppLayout } from '@/components/layout/app-layout';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-// import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { userApi, visibilityApi } from '@/lib/api';
-type ListUser = {
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Search, Plus, Upload, Download } from 'lucide-react';
+import { userApi, adminApi } from '@/lib/api';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import * as XLSX from 'xlsx';
+
+interface User {
   id: string;
   name: string;
-  email: string | null;
-  username: string;
-  avatar?: string | null;
-  phone: string | null;
-  position: string | null;
-  employeeNo: string | null;
-  employmentStatus: string | null;
-  department?: { id: string; name: string } | null;
-};
-import Link from 'next/link';
+  email: string;
+  username?: string;
+  phone?: string;
+  avatar?: string;
+  department?: {
+    id: string;
+    name: string;
+  };
+  roles?: Array<{
+    id: string;
+    name: string;
+  }>;
+}
 
-import {
-  Table,
-  TableHeader as TableHeaderRaw,
-  TableBody as TableBodyRaw,
-  TableRow as TableRowRaw,
-  TableCell as TableCellRaw,
-  TableHead as TableHeadRaw,
-} from '@/components/ui/table';
+interface Department {
+  id: string;
+  name: string;
+}
 
-import { Search, Plus, Eye, ShieldCheck } from 'lucide-react';
-
-// （列显隐已由 visibleFieldKeys 控制）
-
-// 可见字段 keys -> 控制列显隐
-const FIELD_KEYS = {
-  name: 'name',
-  department: 'department',
-  position: 'position',
-  // employeeNo 字段已取消
-  employmentStatus: 'employment_status',
-  contactWorkEmail: 'contact_work_email',
-  contactPhone: 'contact_phone',
-} as const;
-
-export default function PersonnelPage() {
-  const [personnel, setPersonnel] = useState<ListUser[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
+export default function PersonnelManagementPage() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [visibleKeys, setVisibleKeys] = useState<string[]>([]);
-  const [exporting, setExporting] = useState(false);
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [total, setTotal] = useState(0);
-  const [isActive, setIsActive] = useState<'all' | 'active' | 'inactive'>('all');
-  const [departmentId, setDepartmentId] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('');
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importMethod, setImportMethod] = useState<'text' | 'file'>('file');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
-  // 搜索防抖
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300);
-    return () => clearTimeout(t);
-  }, [searchTerm]);
+    loadData();
+  }, []);
 
-  // 加载人员数据 + 可见字段
-  useEffect(() => {
-    const loadPersonnel = async () => {
-      try {
-        setLoading(true);
-        const [usersRes, keysRes] = await Promise.all([
-          userApi.getUsers({
-            filters: {
-              ...(debouncedSearch ? { search: debouncedSearch } : {}),
-              ...(isActive === 'active' ? { isActive: true } : {}),
-              ...(isActive === 'inactive' ? { isActive: false } : {}),
-              ...(departmentId && departmentId !== 'all' ? { departmentId } : {}),
-            },
-            skip: (page - 1) * pageSize,
-            take: pageSize,
-          }),
-          visibilityApi.visibleFieldKeys({ resource: 'user' }),
-        ]);
-        setPersonnel(usersRes.users.users);
-        setTotal(usersRes.users.total ?? 0);
-        setVisibleKeys(keysRes.visibleFieldKeys);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : '加载失败');
-        console.error('Failed to load personnel:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadPersonnel();
-  }, [debouncedSearch, page, pageSize, isActive, departmentId]);
-
-  // 搜索变更时重置页码
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, isActive, departmentId]);
-
-  // 过滤人员
-  const filteredPersonnel = personnel; // 过滤交由后端 search
-
-  const showPhone = visibleKeys.includes(FIELD_KEYS.contactPhone);
-  const showPosition = visibleKeys.includes(FIELD_KEYS.position);
-  const showDepartment = visibleKeys.includes(FIELD_KEYS.department);
-  // const showEmployeeNo = false; // 工号字段已取消
-  // 列固定为：姓名、手机、部门、职务、操作
-  const columnsCount = 1 + (showPhone ? 1 : 0) + (showDepartment ? 1 : 0) + (showPosition ? 1 : 0) + 1;
-
-  const handleExport = async () => {
+  const loadData = async () => {
     try {
-      setExporting(true);
-      const filters: Record<string, string | boolean> = {};
-      if (debouncedSearch) filters.search = debouncedSearch;
-      if (isActive === 'active') filters.isActive = true;
-      if (isActive === 'inactive') filters.isActive = false;
-      if (departmentId && departmentId !== 'all') filters.departmentId = departmentId;
-      const data = await visibilityApi.exportUsersCsv(Object.keys(filters).length ? filters : undefined);
-      const csv = data.exportUsersCsv as string;
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `users-${new Date().toISOString().slice(0,10)}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : '导出失败（可能无导出权限）';
-      alert(message);
+      setLoading(true);
+      
+      // 并发加载用户和部门数据
+      const [usersRes, departmentsRes] = await Promise.all([
+        userApi.getUsers({ take: 1000 }),
+        adminApi.departments()
+      ]);
+      
+      setUsers(usersRes.users?.users || []);
+      setDepartments(departmentsRes.departments || []);
+    } catch (error) {
+      console.error('Failed to load data:', error);
     } finally {
-      setExporting(false);
+      setLoading(false);
     }
   };
 
-  return (
-    <AppLayout>
-      <div className="space-y-6">
-        {/* 顶部操作栏 */}
-        <div className="flex items-center gap-4">
-          {/* 搜索框 */}
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="搜索人员..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
+  const filteredUsers = users.filter(user => {
+    // 文本搜索过滤
+    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.department?.name.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // 部门筛选
+    const matchesDepartment = !selectedDepartment || selectedDepartment === 'all' ||
+      (selectedDepartment === 'unassigned' ? !user.department : user.department?.id === selectedDepartment);
+    
+    return matchesSearch && matchesDepartment;
+  });
+
+  const getRoleBadge = (roles: Array<{id: string; name: string}>) => {
+    if (!roles || roles.length === 0) return null;
+    
+    const roleNames = roles.map(r => r.name);
+    if (roleNames.includes('super_admin')) {
+      return <Badge variant="destructive">超级管理员</Badge>;
+    }
+    if (roleNames.includes('admin')) {
+      return <Badge variant="secondary">管理员</Badge>;
+    }
+    if (roleNames.includes('hr_manager')) {
+      return <Badge variant="outline">HR</Badge>;
+    }
+    return <Badge variant="default">成员</Badge>;
+  };
+
+  // 处理XLSX文件转换为CSV文本
+  const handleFileUpload = async (file: File) => {
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      
+      // 获取第一个工作表
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      
+      // 转换为CSV文本
+      const csvText = XLSX.utils.sheet_to_csv(worksheet);
+      setImportText(csvText);
+    } catch (error) {
+      console.error('文件解析失败:', error);
+      alert('文件解析失败，请确保文件格式正确');
+    }
+  };
+
+  // 下载CSV模板
+  const downloadCSVTemplate = () => {
+    const csv = '姓名,邮箱,部门,手机,员工编码\n张三,zhangsan@example.com,产品部,13800000000,EMP001\n李四,lisi@example.com,测试部,13900000000,EMP002';
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; 
+    a.download = '人员导入模板.csv'; 
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // 下载XLSX模板
+  const downloadXLSXTemplate = () => {
+    const data = [
+      ['姓名', '邮箱', '部门', '手机', '员工编码'],
+      ['张三', 'zhangsan@example.com', '产品部', '13800000000', 'EMP001'],
+      ['李四', 'lisi@example.com', '测试部', '13900000000', 'EMP002']
+    ];
+    
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '人员信息');
+    XLSX.writeFile(wb, '人员导入模板.xlsx');
+  };
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="container mx-auto p-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+              <p className="mt-2 text-gray-600">加载人员信息...</p>
             </div>
           </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
-          {/* 添加人员按钮 */}
-          <Button asChild>
+  return (
+    <AppLayout>
+      <div className="container mx-auto p-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex-1"></div>
+          {/* 右侧按钮区域在搜索/筛选右侧 */}
+        </div>
+
+        {/* Search and Filter */}
+        <div className="flex items-center gap-4 justify-between">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="搜索人员姓名、邮箱或部门..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-96 bg-background border-border focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+          
+          <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="筛选部门" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部部门</SelectItem>
+              <SelectItem value="unassigned">未分配</SelectItem>
+              {departments.map((department) => (
+                <SelectItem key={department.id} value={department.id}>
+                  {department.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="flex items-center gap-2 ml-auto">
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              导入人员
+            </Button>
             <Link href="/personnel/new">
-              <Plus className="h-4 w-4 mr-2" />
-              添加人员
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                添加人员
+              </Button>
             </Link>
-          </Button>
-          {/* 状态筛选 */}
-          <div className="w-40">
-            <Select value={isActive} onValueChange={(v) => setIsActive(v as 'all' | 'active' | 'inactive')}>
-              <SelectTrigger>
-                <SelectValue placeholder="状态" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">全部状态</SelectItem>
-                <SelectItem value="active">在职</SelectItem>
-                <SelectItem value="inactive">未激活/离职</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
-          {/* 部门筛选（从当前结果中聚合） */}
-          <div className="w-48">
-            <Select value={departmentId} onValueChange={(v) => setDepartmentId(v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="部门" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">全部部门</SelectItem>
-                {[...new Map(personnel.map(u => (u.department ? [u.department.id, u.department.name] : null)).filter(Boolean) as [string, string][])].map(([id, name]) => (
-                  <SelectItem key={id} value={id}>{name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button variant="secondary" onClick={handleExport} disabled={exporting}>
-            {exporting ? '导出中…' : '导出 CSV'}
-          </Button>
         </div>
 
-        {/* 人员表格 */}
-        <div className="rounded-md border overflow-x-auto">
-          <Table className="min-w-full">
-            <TableHeaderRaw>
-              <TableRowRaw>
-                <TableHeadRaw>姓名</TableHeadRaw>
-                {showPhone && <TableHeadRaw>手机号码</TableHeadRaw>}
-                {/* 人员状态与工号列已移除 */}
-                {showDepartment && <TableHeadRaw>部门</TableHeadRaw>}
-                {showPosition && <TableHeadRaw>职务</TableHeadRaw>}
-                <TableHeadRaw>操作</TableHeadRaw>
-              </TableRowRaw>
-            </TableHeaderRaw>
-            <TableBodyRaw>
-              {loading ? (
-                <TableRowRaw>
-                  <TableCellRaw colSpan={columnsCount} className="h-24 text-center">
-                    加载中...
-                  </TableCellRaw>
-                </TableRowRaw>
-              ) : error ? (
-                <TableRowRaw>
-                  <TableCellRaw colSpan={columnsCount} className="h-24 text-center text-red-600">
-                    {error}
-                  </TableCellRaw>
-                </TableRowRaw>
-              ) : filteredPersonnel.length > 0 ? (
-                filteredPersonnel.map((person) => (
-                  <TableRowRaw key={person.id}>
-                    <TableCellRaw>
-                      <div className="flex items-center gap-3">
+        {/* Users Table */}
+        <Card>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>姓名</TableHead>
+                  <TableHead>邮箱</TableHead>
+                  <TableHead>手机号</TableHead>
+                  <TableHead>部门</TableHead>
+                  <TableHead>角色</TableHead>
+                  <TableHead>操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.map((user) => (
+                  <TableRow key={user.id} className="hover:bg-muted/50">
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
                         <Avatar className="h-8 w-8">
-                          <AvatarImage src={person.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${person.username}`} />
-                          <AvatarFallback>{person.name[0]}</AvatarFallback>
+                          <AvatarImage src={user.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${user.username || user.email || user.name}` } />
+                          <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
                         </Avatar>
-                        <div>
-                          <div className="font-medium">{person.name}</div>
-                          {visibleKeys.includes(FIELD_KEYS.contactWorkEmail) && (
-                            <div className="text-sm text-muted-foreground">{person.email}</div>
-                          )}
-                        </div>
+                        <span>{user.name}</span>
                       </div>
-                    </TableCellRaw>
-                    {showPhone && (
-                      <TableCellRaw className="font-mono text-sm">
-                        {person.phone ?? '-'}
-                      </TableCellRaw>
-                    )}
-                    {/* 人员状态与工号列已移除 */}
-                    {showDepartment && (
-                      <TableCellRaw>
-                        <div className="text-sm">{person.department?.name ?? '-'}</div>
-                      </TableCellRaw>
-                    )}
-                    {showPosition && (
-                      <TableCellRaw>
-                        <div className="text-sm">{person.position ?? '-'}</div>
-                      </TableCellRaw>
-                    )}
-                    <TableCellRaw>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        asChild
-                      >
-                        <Link href={`/personnel/${person.id}`}>
-                          <Eye className="h-4 w-4 mr-1" />
-                          详情
-                        </Link>
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        asChild
-                      >
-                        <Link href={`/admin/permissions/preview?targetUserId=${person.id}`}>
-                          <ShieldCheck className="h-4 w-4 mr-1" />
-                          权限
-                        </Link>
-                      </Button>
-                    </TableCellRaw>
-                  </TableRowRaw>
-                ))
-              ) : (
-                <TableRowRaw>
-                  <TableCellRaw colSpan={columnsCount} className="h-24 text-center">
-                    暂无人员数据
-                  </TableCellRaw>
-                </TableRowRaw>
-              )}
-            </TableBodyRaw>
-          </Table>
-        </div>
-        {/* 分页 */}
-        <div className="flex items-center justify-end gap-2">
-          <div className="text-sm text-muted-foreground mr-2">共 {total} 条</div>
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>上一页</Button>
-          <div className="text-sm text-muted-foreground">第 {page} 页</div>
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page * pageSize >= total}>下一页</Button>
-        </div>
+                    </TableCell>
+                    <TableCell>
+                      {user.email}
+                    </TableCell>
+                    <TableCell>
+                      {user.phone || <span className="text-muted-foreground">-</span>}
+                    </TableCell>
+                    <TableCell>
+                      {user.department ? user.department.name : <span className="text-muted-foreground">未分配</span>}
+                    </TableCell>
+                    <TableCell>
+                      {getRoleBadge(user.roles || [])}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => router.push(`/personnel/${user.id}`)}
+                        >
+                          查看
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => router.push(`/personnel/${user.id}/edit`)}
+                        >
+                          编辑
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            
+            {filteredUsers.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                {searchTerm ? '未找到匹配的人员' : '暂无人员数据'}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 导入人员对话框 */}
+        <Dialog open={importOpen} onOpenChange={(open) => {
+          setImportOpen(open);
+          if (!open) {
+            setImportText('');
+            setImportMethod('file');
+          }
+        }}>
+          <DialogContent className="w-[840px] max-w-[90vw] max-h-[90vh] overflow-y-auto overflow-x-hidden">
+            <DialogHeader>
+              <DialogTitle>导入人员</DialogTitle>
+            </DialogHeader>
+            
+            <Tabs value={importMethod} onValueChange={(value) => setImportMethod(value as 'text' | 'file')}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="file">文件上传</TabsTrigger>
+                <TabsTrigger value="text">文本粘贴</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="file" className="space-y-4">
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    支持上传 Excel (.xlsx)、CSV 或 Markdown 文件。表头应包含：姓名、邮箱（可选：部门、手机、员工编码）
+                  </p>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async ()=>{
+                        try {
+                          const res = await userApi.userImportHeaders();
+                          const headers: string[] = res?.userImportHeaders || ['姓名','邮箱','部门','手机','员工编码'];
+                          // 生成 Excel 模板
+                          const ws = XLSX.utils.aoa_to_sheet([headers]);
+                          const wb = XLSX.utils.book_new();
+                          XLSX.utils.book_append_sheet(wb, ws, '人员信息');
+                          XLSX.writeFile(wb, '人员导入模板.xlsx');
+                        } catch {
+                          downloadXLSXTemplate();
+                        }
+                      }}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      下载Excel模板
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async ()=>{
+                        try {
+                          const res = await userApi.userImportHeaders();
+                          const headers: string[] = res?.userImportHeaders || ['姓名','邮箱','部门','手机','员工编码'];
+                          const csv = headers.join(',') + '\n';
+                          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url; a.download = '人员导入模板.csv'; a.click();
+                          URL.revokeObjectURL(url);
+                        } catch {
+                          downloadCSVTemplate();
+                        }
+                      }}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      下载CSV模板
+                    </Button>
+                  </div>
+
+                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls,.csv,.md,.markdown,.txt"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        
+                        if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                          await handleFileUpload(file);
+                        } else {
+                          const text = await file.text();
+                          setImportText(text);
+                        }
+                      }}
+                      className="hidden"
+                    />
+                    <div className="text-center">
+                      <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
+                      <div className="mt-4">
+                        <Button 
+                          type="button" 
+                          variant="outline"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          选择文件
+                        </Button>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          或拖拽文件到此处
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {importText && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">预览数据：</p>
+                      <div className="bg-muted p-3 rounded text-xs max-h-32 overflow-y-auto overflow-x-hidden">
+                        <pre className="whitespace-pre-wrap break-all">
+                          {importText.slice(0, 500)}{importText.length > 500 ? '...' : ''}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="text" className="space-y-4">
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    直接粘贴 CSV 或 Markdown 表格数据。表头应包含：姓名、邮箱（可选：部门、手机、员工编码）
+                  </p>
+                  
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">示例格式：</p>
+                    <div className="bg-muted p-3 rounded text-xs overflow-y-auto overflow-x-hidden">
+                      <pre className="whitespace-pre-wrap break-all">姓名,邮箱,部门,手机,员工编码
+张三,zhangsan@example.com,产品部,13800000000,EMP001
+李四,lisi@example.com,测试部,13900000000,EMP002</pre>
+                    </div>
+                  </div>
+
+                  <Textarea
+                    value={importText}
+                    onChange={(e) => setImportText(e.target.value)}
+                    placeholder="在此粘贴CSV或Markdown表格..."
+                    className="min-h-[200px]"
+                  />
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setImportOpen(false)}>
+                取消
+              </Button>
+              <Button 
+                disabled={importing || !importText.trim()} 
+                onClick={async () => {
+                  try {
+                    setImporting(true);
+                    const res = await userApi.importUsers(importText);
+                    const info: { created: number; skipped: number; errors: string[] } = res.importUsers;
+                    await loadData();
+                    setImportOpen(false);
+                    setImportText('');
+                    alert(`导入完成：新增 ${info.created} 条，跳过 ${info.skipped} 条${(info.errors?.length ? `\n错误:\n` + info.errors.join('\n') : '')}`);
+                  } catch (e) {
+                    const msg = e instanceof Error ? e.message : String(e);
+                    alert('导入失败：' + msg);
+                  } finally {
+                    setImporting(false);
+                  }
+                }}
+              >
+                {importing ? '导入中...' : '确定导入'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );

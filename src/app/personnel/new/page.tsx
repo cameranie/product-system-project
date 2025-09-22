@@ -63,9 +63,9 @@ export default function CreateUserPage() {
         const list = await userApi.getUsers({ filters: { search: form.email }, take: 1 });
         const newUser = list.users?.users?.[0];
         if (newUser && supervisor.trim()) {
-          await userApi.updateUserFieldValues(newUser.id, [{ fieldKey: 'direct_supervisor', valueString: supervisor.trim() }]);
+          await userApi.updateUserFieldValues(newUser.id, [{ fieldKey: 'reporting_manager', valueString: supervisor.trim() }]);
         } else if (newUser && !supervisor.trim() && deptLeader) {
-          await userApi.updateUserFieldValues(newUser.id, [{ fieldKey: 'direct_supervisor', valueString: deptLeader }]);
+          await userApi.updateUserFieldValues(newUser.id, [{ fieldKey: 'reporting_manager', valueString: deptLeader }]);
         }
       } catch {}
       router.push('/personnel');

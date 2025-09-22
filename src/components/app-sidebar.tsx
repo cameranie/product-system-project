@@ -10,6 +10,7 @@ import {
   Search,
   Inbox,
   Shield,
+  BookOpen,
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -48,6 +49,11 @@ const data = {
       title: "Issues",
       url: "/issues",
       icon: MessageSquare,
+    },
+    {
+      title: "通讯录",
+      url: "/directory",
+      icon: BookOpen,
     },
     {
       title: "人员管理",

@@ -27,13 +27,8 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
-// 可见性等级的中文映射
-const CLASSIFICATION_LABELS = {
-  PUBLIC: '公开',
-  INTERNAL: '内部',
-  SENSITIVE: '敏感',
-  HIGHLY_SENSITIVE: '高度敏感'
-} as const;
+// 详情页不再显示分级标签，保留空对象以便后续扩展（避免误用）
+// const CLASSIFICATION_LABELS = {} as const;
 
 // 遮罩处理函数
 const maskValue = (value: string | null | undefined, visible: boolean): string => {
@@ -159,6 +154,7 @@ export default function PersonnelDetailPage() {
   const [visibleKeys, setVisibleKeys] = useState<string[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
   const [fieldDefs, setFieldDefs] = useState<Record<string, { label?: string; classification?: string; selfEditable?: boolean }>>({});
+  const [deleting, setDeleting] = useState(false);
 
   // 加载用户数据 + 可见字段 + 字段定义
   useEffect(() => {
@@ -258,7 +254,6 @@ export default function PersonnelDetailPage() {
 
   // 渲染字段带标签和权限标识
   const renderFieldWithLabel = (fieldKey: string, value: unknown, icon?: React.ReactNode) => {
-    const fieldDef = fieldDefs[fieldKey];
     const visible = visibleKeys.includes(fieldKey);
     
     return (
@@ -267,11 +262,7 @@ export default function PersonnelDetailPage() {
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <span>{renderFieldValue(fieldKey, value)}</span>
-            {fieldDef && (
-              <Badge variant={visible ? "secondary" : "outline"} className="text-xs">
-                {CLASSIFICATION_LABELS[fieldDef.classification as keyof typeof CLASSIFICATION_LABELS] || fieldDef.classification}
-              </Badge>
-            )}
+            {/* 详情页不展示可见性标签 */}
             {!visible && <EyeOff className="h-3 w-3 text-muted-foreground" />}
           </div>
         </div>
@@ -322,6 +313,32 @@ export default function PersonnelDetailPage() {
                 </Link>
               </Button>
             )}
+            {isSuperAdmin && (
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={deleting}
+                onClick={async ()=>{
+                  if (!confirm('确认删除该用户？此操作不可恢复。')) return;
+                  try {
+                    setDeleting(true);
+                    const res = await userApi.deleteUser(user.id);
+                    if (res?.deleteUser?.success) {
+                      alert('已删除');
+                      window.location.href = '/personnel';
+                    } else {
+                      alert(res?.deleteUser?.message || '删除失败');
+                    }
+                  } catch (e:any) {
+                    alert('删除失败：' + (e?.message || e));
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+              >
+                {deleting ? '删除中...' : '删除'}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -365,73 +382,7 @@ export default function PersonnelDetailPage() {
 
             {/* 右侧：详细信息 */}
             <div className="lg:col-span-2 space-y-6">
-              {/* 工作信息 */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Briefcase className="h-5 w-5" />
-                    工作信息
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {user.fieldValues?.filter(field => {
-                      const fieldDef = fieldDefs[field.fieldKey];
-                      return fieldDef && shouldShowField(field.fieldKey) && 
-                             [
-                               'employment_status',
-                               'employee_type',
-                               'sequence',
-                               'position',
-                               'work_location',
-                               'company_belong',
-                               'join_date',
-                               'regularization_date',
-                             ].includes(field.fieldKey);
-                    }).map((field) => {
-                      const fieldDef = fieldDefs[field.fieldKey];
-                      const value = field.valueString || field.valueNumber || field.valueDate || field.valueJson;
-                      const visible = visibleKeys.includes(field.fieldKey);
-                      
-                      return (
-                        <div key={field.fieldKey} className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <label className="text-sm font-medium text-muted-foreground">
-                              {fieldDef.label}
-                            </label>
-                            <Badge variant={visible ? "secondary" : "outline"} className="text-xs">
-                              {CLASSIFICATION_LABELS[fieldDef.classification as keyof typeof CLASSIFICATION_LABELS] || fieldDef.classification}
-                            </Badge>
-                            {!visible && <EyeOff className="h-3 w-3 text-muted-foreground" />}
-                          </div>
-                          <p className="text-sm">{renderFieldValue(field.fieldKey, value)}</p>
-                    </div>
-                      );
-                    })}
-                    
-                    {/* 如果没有任何工作信息字段，显示提示 */}
-                    {user.fieldValues?.filter(field => {
-                      const fieldDef = fieldDefs[field.fieldKey];
-                      return fieldDef && shouldShowField(field.fieldKey) && 
-                             [
-                               'employee_no',
-                               'employment_status',
-                               'employee_type',
-                               'sequence',
-                               'position',
-                               'work_location',
-                               'company_belong',
-                               'join_date',
-                               'regularization_date',
-                             ].includes(field.fieldKey);
-                    }).length === 0 && (
-                      <p className="text-muted-foreground text-sm col-span-2">暂无可显示的工作信息</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* 工作信息 */}
+              {/* 工作信息（与编辑页分组一致） */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -445,7 +396,7 @@ export default function PersonnelDetailPage() {
                       const fieldDef = fieldDefs[field.fieldKey];
                       if (!fieldDef) return false;
                       
-                      // 工作相关字段（对齐后端种子 key）
+                      // 工作相关字段（对齐编辑页和权限预览页的工作信息分组）
                       const workFields = [
                         'employment_status',
                         'employee_type',
@@ -456,11 +407,17 @@ export default function PersonnelDetailPage() {
                         'position',
                         'tags',
                         'company_join_date',
+                        'intern_conversion_date',
                         'join_date',
                         'probation_months',
                         'regularization_date',
+                        'first_work_date',
+                        'seniority_base_date',
+                        'seniority_years',
+                        'tenure_years',
                         'work_location',
                         'company_belong',
+                        'onboarding_location'
                       ];
                       
                       return workFields.includes(field.fieldKey) && shouldShowField(field.fieldKey);
@@ -475,9 +432,7 @@ export default function PersonnelDetailPage() {
                             <label className="text-sm font-medium text-muted-foreground">
                               {fieldDef?.label}
                             </label>
-                            <Badge variant={visible ? "secondary" : "outline"} className="text-xs">
-                              {CLASSIFICATION_LABELS[fieldDef?.classification as keyof typeof CLASSIFICATION_LABELS] || fieldDef?.classification}
-                            </Badge>
+                            {/* 详情页不展示可见性标签 */}
                             {!visible && <EyeOff className="h-3 w-3 text-muted-foreground" />}
                           </div>
                           <p className="text-sm">{renderFieldValue(field.fieldKey, value)}</p>
@@ -489,7 +444,6 @@ export default function PersonnelDetailPage() {
                     {user.fieldValues?.filter(field => {
                       const fieldDef = fieldDefs[field.fieldKey];
                       const workFields = [
-                        'employee_no',
                         'employment_status',
                         'employee_type',
                         'sequence',
@@ -499,11 +453,17 @@ export default function PersonnelDetailPage() {
                         'position',
                         'tags',
                         'company_join_date',
+                        'intern_conversion_date',
                         'join_date',
                         'probation_months',
                         'regularization_date',
+                        'first_work_date',
+                        'seniority_base_date',
+                        'seniority_years',
+                        'tenure_years',
                         'work_location',
                         'company_belong',
+                        'onboarding_location'
                       ];
                       return fieldDef && workFields.includes(field.fieldKey) && shouldShowField(field.fieldKey);
                     }).length === 0 && (
@@ -563,9 +523,7 @@ export default function PersonnelDetailPage() {
                             <label className="text-sm font-medium text-muted-foreground">
                               {fieldDef?.label}
                             </label>
-                            <Badge variant={visible ? "secondary" : "outline"} className="text-xs">
-                              {CLASSIFICATION_LABELS[fieldDef?.classification as keyof typeof CLASSIFICATION_LABELS] || fieldDef?.classification}
-                            </Badge>
+                            {/* 详情页不展示可见性标签 */}
                             {!visible && <EyeOff className="h-3 w-3 text-muted-foreground" />}
                           </div>
                           <p className="text-sm">{renderFieldValue(field.fieldKey, value)}</p>
@@ -850,7 +808,7 @@ export default function PersonnelDetailPage() {
                 </Card>
               )}
 
-              {/* 合同信息 - INTERNAL，可显示 */}
+              {/* 合同信息 - 敏感，可显示 */}
               {/* 合同信息已集成到工作信息中 */}
               {false && (
                 <Card>
@@ -893,8 +851,8 @@ export default function PersonnelDetailPage() {
               {/* 敏感和高度敏感信息不在详情页显示 */}
               {/* - 紧急联系人 (SENSITIVE) */}
               {/* - 家庭成员 (SENSITIVE) */}
-              {/* - 证件信息 (HIGHLY_SENSITIVE) */}
-              {/* - 银行账户 (HIGHLY_SENSITIVE) */}
+              {/* - 证件信息 (CONFIDENTIAL) */}
+              {/* - 银行账户 (CONFIDENTIAL) */}
             </div>
           </div>
         </div>

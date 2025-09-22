@@ -1,5 +1,6 @@
 // API客户端 - 使用RESTful方式调用后端GraphQL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+// 约定：API_BASE_URL 指向后端“API前缀根”，例如 http://localhost:3001/api 或 https://xxx.up.railway.app/api
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 // 从本地读取登录后的 token
 function getAuthToken(): string | null {
@@ -397,6 +398,10 @@ export const userApi = {
             avatar
             phone
             department { id name }
+            roles {
+              id
+              name
+            }
           }
           total
         }
@@ -614,6 +619,31 @@ export const userApi = {
     return graphqlRequest(query, { 
       input: { currentPassword, newPassword } 
     });
+  },
+
+  async importUsers(text: string) {
+    const query = `
+      mutation ImportUsers($text: String!) {
+        importUsers(text: $text) { created skipped errors }
+      }
+    `;
+    return graphqlRequest(query, { text });
+  },
+
+  async deleteUser(id: string) {
+    const query = `
+      mutation DeleteUser($id: String!) {
+        deleteUser(id: $id) { success message }
+      }
+    `;
+    return graphqlRequest(query, { id });
+  },
+
+  async userImportHeaders() {
+    const query = `
+      query UserImportHeaders { userImportHeaders }
+    `;
+    return graphqlRequest(query, {});
   },
 
   async upsertUserEducation(input: {
@@ -988,9 +1018,28 @@ export const visibilityApi = {
 
 // 管理端（仅管理员）
 export const adminApi = {
+  async companies() {
+    const query = `
+      query Companies { 
+        companies { 
+          id 
+          name 
+          code 
+        } 
+      }
+    `;
+    return graphqlRequest(query);
+  },
   async departments() {
     const query = `
-      query Departments { departments { id name parentId leaderUserIds } }
+      query Departments { 
+        departments { 
+          id 
+          name 
+          parentId 
+          leaderUserIds
+        } 
+      }
     `;
     return graphqlRequest(query);
   },
@@ -1072,6 +1121,24 @@ export const adminApi = {
       cls: input.classification,
       self: input.selfEditable,
     });
+  },
+
+  async upsertModuleVisibility(input: { moduleKey: string; classification: string }) {
+    const query = `
+      mutation UpsertModuleVisibility($moduleKey: String!, $cls: String!) {
+        upsertModuleVisibility(moduleKey: $moduleKey, classification: $cls)
+      }
+    `;
+    return graphqlRequest(query, { moduleKey: input.moduleKey, cls: input.classification });
+  },
+
+  async applyGroupVisibility(setName: string, classification: string) {
+    const query = `
+      mutation ApplyGroupVisibility($setName: String!, $cls: String!) {
+        applyGroupVisibility(setName: $setName, classification: $cls)
+      }
+    `;
+    return graphqlRequest(query, { setName, cls: classification });
   },
 
   async upsertFieldSet(input: { name: string; description?: string; isSystem?: boolean }) {
