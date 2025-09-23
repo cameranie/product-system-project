@@ -380,7 +380,7 @@ export default function PersonnelPage() {
 
       const handleClick = () => {
         if (node.type === 'user' && node.data) {
-          router.push(`/personnel/${(node.data as User).id}`);
+          router.push(`/directory/${(node.data as User).id}`);
         }
       };
 

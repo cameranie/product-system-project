@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { userApi, visibilityApi, adminApi, authApi } from '@/lib/api';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 import { 
   ArrowLeft, 
@@ -153,6 +154,7 @@ export default function PersonnelDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [visibleKeys, setVisibleKeys] = useState<string[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
+  const [isHRorSuper, setIsHRorSuper] = useState<boolean>(false);
   const [fieldDefs, setFieldDefs] = useState<Record<string, { label?: string; classification?: string; selfEditable?: boolean }>>({});
   const [deleting, setDeleting] = useState(false);
 
@@ -169,9 +171,12 @@ export default function PersonnelDetailPage() {
         ]);
         setUser(userRes.user as unknown as DetailUser);
         setVisibleKeys(keysRes.visibleFieldKeys || []);
-        type MeResult = { me?: { roles?: string[] } } | null | undefined;
-        const roles: string[] | undefined = (meRes as MeResult)?.me?.roles;
-        setIsSuperAdmin(Array.isArray(roles) && roles.includes('super_admin'));
+        type MeRoleObj = { name: string };
+        type MeResult = { me?: { roles?: Array<string | MeRoleObj> } } | null | undefined;
+        const rolesMixed = (meRes as MeResult)?.me?.roles || [];
+        const roleNames = rolesMixed.map((r: any) => (typeof r === 'string' ? r : r?.name)).filter(Boolean) as string[];
+        setIsSuperAdmin(roleNames.includes('super_admin'));
+        setIsHRorSuper(roleNames.includes('super_admin') || roleNames.includes('hr_manager'));
         const defsArray = (fieldDefsRes as unknown as { fieldDefinitions?: Array<{ key: string; label: string; classification: string; selfEditable?: boolean }> })?.fieldDefinitions;
         if (defsArray) {
           const map: Record<string, { label?: string; classification?: string; selfEditable?: boolean }> = {};
@@ -195,13 +200,14 @@ export default function PersonnelDetailPage() {
 
   // 判断字段是否应该展示（基于用户权限）
   const shouldShowField = (fieldKey: string) => {
-    // 如果字段在可见字段列表中，说明后端已经检查过权限
+    // HR/超级管理员：展示全部
+    if (isHRorSuper) return true;
     return visibleKeys.includes(fieldKey);
   };
 
   // 详情页分组型资源（非EAV）可见性：超管直接可见
   const isSectionVisible = (sectionKey: string) => {
-    if (isSuperAdmin) return true;
+    if (isHRorSuper) return true;
     return visibleKeys.includes(sectionKey);
   };
 
@@ -237,7 +243,7 @@ export default function PersonnelDetailPage() {
 
   // 辅助函数：渲染字段值
   const renderFieldValue = (fieldKey: string, value: unknown): string => {
-    const visible = visibleKeys.includes(fieldKey);
+    const visible = isHRorSuper ? true : visibleKeys.includes(fieldKey);
     
     if (typeof value === 'string') {
       return maskValue(value, visible);
@@ -263,7 +269,7 @@ export default function PersonnelDetailPage() {
           <div className="flex items-center gap-2">
             <span>{renderFieldValue(fieldKey, value)}</span>
             {/* 详情页不展示可见性标签 */}
-            {!visible && <EyeOff className="h-3 w-3 text-muted-foreground" />}
+            {!visible && !isHRorSuper && <EyeOff className="h-3 w-3 text-muted-foreground" />}
           </div>
         </div>
       </div>
@@ -313,7 +319,7 @@ export default function PersonnelDetailPage() {
                 </Link>
               </Button>
             )}
-            {isSuperAdmin && (
+            {isHRorSuper && (
               <Button
                 size="sm"
                 variant="destructive"
@@ -324,13 +330,13 @@ export default function PersonnelDetailPage() {
                     setDeleting(true);
                     const res = await userApi.deleteUser(user.id);
                     if (res?.deleteUser?.success) {
-                      alert('已删除');
+                      toast.success('已删除');
                       window.location.href = '/personnel';
                     } else {
-                      alert(res?.deleteUser?.message || '删除失败');
+                      toast.error(res?.deleteUser?.message || '删除失败');
                     }
                   } catch (e:any) {
-                    alert('删除失败：' + (e?.message || e));
+                    toast.error('删除失败：' + (e?.message || e));
                   } finally {
                     setDeleting(false);
                   }
@@ -380,202 +386,48 @@ export default function PersonnelDetailPage() {
               </Card>
             </div>
 
-            {/* 右侧：详细信息 */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* 工作信息（与编辑页分组一致） */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Briefcase className="h-5 w-5" />
-                    工作信息
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {user.fieldValues?.filter(field => {
-                      const fieldDef = fieldDefs[field.fieldKey];
-                      if (!fieldDef) return false;
-                      
-                      // 工作相关字段（对齐编辑页和权限预览页的工作信息分组）
-                      const workFields = [
-                        'employment_status',
-                        'employee_type',
-                        'sequence',
-                        'reporting_manager',
-                        'business_unit',
-                        'business_unit_leader',
-                        'position',
-                        'tags',
-                        'company_join_date',
-                        'intern_conversion_date',
-                        'join_date',
-                        'probation_months',
-                        'regularization_date',
-                        'first_work_date',
-                        'seniority_base_date',
-                        'seniority_years',
-                        'tenure_years',
-                        'work_location',
-                        'company_belong',
-                        'onboarding_location'
-                      ];
-                      
-                      return workFields.includes(field.fieldKey) && shouldShowField(field.fieldKey);
-                    }).map((field) => {
-                      const fieldDef = fieldDefs[field.fieldKey];
-                      const value = field.valueString || field.valueNumber || field.valueDate || field.valueJson;
-                      const visible = visibleKeys.includes(field.fieldKey);
-                      
-                      return (
-                        <div key={field.fieldKey} className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <label className="text-sm font-medium text-muted-foreground">
-                              {fieldDef?.label}
-                            </label>
-                            {/* 详情页不展示可见性标签 */}
-                            {!visible && <EyeOff className="h-3 w-3 text-muted-foreground" />}
-                          </div>
-                          <p className="text-sm">{renderFieldValue(field.fieldKey, value)}</p>
-                        </div>
-                      );
-                    })}
-                    
-                    {/* 如果没有任何工作信息字段，显示提示 */}
-                    {user.fieldValues?.filter(field => {
-                      const fieldDef = fieldDefs[field.fieldKey];
-                      const workFields = [
-                        'employment_status',
-                        'employee_type',
-                        'sequence',
-                        'reporting_manager',
-                        'business_unit',
-                        'business_unit_leader',
-                        'position',
-                        'tags',
-                        'company_join_date',
-                        'intern_conversion_date',
-                        'join_date',
-                        'probation_months',
-                        'regularization_date',
-                        'first_work_date',
-                        'seniority_base_date',
-                        'seniority_years',
-                        'tenure_years',
-                        'work_location',
-                        'company_belong',
-                        'onboarding_location'
-                      ];
-                      return fieldDef && workFields.includes(field.fieldKey) && shouldShowField(field.fieldKey);
-                    }).length === 0 && (
-                      <p className="text-muted-foreground text-sm col-span-2">暂无可显示的工作信息</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* 个人信息 */}
+            {/* 右侧整体卡片：全部字段 */}
+            <div className="lg:col-span-2">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <User className="h-5 w-5" />
-                    个人信息
+                    全部字段
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {user.fieldValues?.filter(field => {
-                      const fieldDef = fieldDefs[field.fieldKey];
-                      if (!fieldDef) return false;
-                      
-                      // 个人信息相关字段（对齐后端种子 key）
-                      const personalFields = [
-                        'english_name',
-                        'gender',
-                        'birth_date',
-                        'age',
-                        'height_cm',
-                        'weight_kg',
-                        'blood_type',
-                        'nationality',
-                        'ethnicity',
-                        'political_status',
-                        'native_place',
-                        'household_type',
-                        'household_province',
-                        'household_city',
-                        'household_register',
-                        'id_card_address',
-                        'current_address',
-                        'contact_qq',
-                        'contact_wechat',
-                        'contact_personal_email',
-                      ];
-                      
-                      return personalFields.includes(field.fieldKey) && shouldShowField(field.fieldKey);
-                    }).map((field) => {
-                      const fieldDef = fieldDefs[field.fieldKey];
-                      const value = field.valueString || field.valueNumber || field.valueDate || field.valueJson;
-                      const visible = visibleKeys.includes(field.fieldKey);
-                      
-                      return (
-                        <div key={field.fieldKey} className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <label className="text-sm font-medium text-muted-foreground">
-                              {fieldDef?.label}
-                            </label>
-                            {/* 详情页不展示可见性标签 */}
-                            {!visible && <EyeOff className="h-3 w-3 text-muted-foreground" />}
+                    {(() => {
+                      const defKeys = Object.keys(fieldDefs || {});
+                      const byLabel = (a:string,b:string) => ((fieldDefs[a]?.label || a).localeCompare(fieldDefs[b]?.label || b));
+                      const exitLabels = new Set(['离职时间','离职类型','离职原因分类','离职具体原因']);
+                      const normal = defKeys.filter(k => !exitLabels.has(fieldDefs[k]?.label || k)).sort(byLabel);
+                      const exits = defKeys.filter(k => exitLabels.has(fieldDefs[k]?.label || k));
+                      const ordered = [...normal, ...exits];
+                      return ordered.map((key) => {
+                        const label = fieldDefs[key]?.label || key;
+                        if (!shouldShowField(key)) return null;
+                        const fv = (user.fieldValues || []).find(f => f.fieldKey === key);
+                        const value = fv?.valueString || fv?.valueNumber || fv?.valueDate || fv?.valueJson || '';
+                        const visible = visibleKeys.includes(key) || isHRorSuper;
+                        return (
+                          <div key={key} className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <label className="text-sm font-medium text-muted-foreground">{label}</label>
+                              {!visible && <EyeOff className="h-3 w-3 text-muted-foreground" />}
+                            </div>
+                            <p className="text-sm">{renderFieldValue(key, value)}</p>
                           </div>
-                          <p className="text-sm">{renderFieldValue(field.fieldKey, value)}</p>
-                        </div>
-                      );
-                    })}
-                    
-                    {/* 如果没有任何个人信息字段，显示提示 */}
-                    {user.fieldValues?.filter(field => {
-                      const fieldDef = fieldDefs[field.fieldKey];
-                      const personalFields = [
-                        'english_name',
-                        'gender',
-                        'birth_date',
-                        'age',
-                        'height_cm',
-                        'weight_kg',
-                        'blood_type',
-                        'nationality',
-                        'ethnicity',
-                        'political_status',
-                        'native_place',
-                        'household_type',
-                        'household_province',
-                        'household_city',
-                        'household_register',
-                        'id_card_address',
-                        'current_address',
-                        'contact_qq',
-                        'contact_wechat',
-                        'contact_personal_email',
-                      ];
-                      return fieldDef && personalFields.includes(field.fieldKey) && shouldShowField(field.fieldKey);
-                    }).length === 0 && (
-                      <p className="text-muted-foreground text-sm col-span-2">暂无可显示的个人信息</p>
-                    )}
+                        );
+                      });
+                    })()}
                   </div>
                 </CardContent>
               </Card>
+            </div>
 
               {/* 假期余额（仅HR/超管可见；若无权限后端会返回错误，这里容错隐藏） */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    假期余额
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <LeaveBalances userId={user.id} />
-                </CardContent>
-              </Card>
+              {/* 按要求：先不显示假期余额 */}
 
               {/* 教育经历 */}
               {isSectionVisible('educations') && user.educations && user.educations.length > 0 && (
@@ -808,51 +660,7 @@ export default function PersonnelDetailPage() {
                 </Card>
               )}
 
-              {/* 合同信息 - 敏感，可显示 */}
-              {/* 合同信息已集成到工作信息中 */}
-              {false && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      合同信息
-                      <Badge variant="outline" className="text-xs">内部</Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {user?.contracts?.map((contract, index) => {
-                        const visible = visibleKeys.includes('contracts');
-                        return (
-                          <div key={contract.id || index} className="border-l-2 border-muted pl-4">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-medium">{maskValue(contract.contractType || '', visible)}</h4>
-                              {!visible && <EyeOff className="h-3 w-3 text-muted-foreground" />}
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              合同号: {maskValue(contract.contractNo || '', visible)}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              签约公司: {maskValue(contract.company || '', visible)}
-                            </p>
-                            {contract.startDate && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                开始日期: {maskValue(new Date(contract.startDate).toLocaleDateString('zh-CN'), visible)}
-                              </p>
-                            )}
-                          </div>
-                        );
-                      })}
-                  </div>
-                </CardContent>
-              </Card>
-              )}
-
-              {/* 敏感和高度敏感信息不在详情页显示 */}
-              {/* - 紧急联系人 (SENSITIVE) */}
-              {/* - 家庭成员 (SENSITIVE) */}
-              {/* - 证件信息 (CONFIDENTIAL) */}
-              {/* - 银行账户 (CONFIDENTIAL) */}
+              {/* 结束：右侧整体卡片中的明细模块 */}
             </div>
           </div>
         </div>

@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
+import { toast } from 'sonner';
 
 interface User {
   id: string;
@@ -77,10 +78,12 @@ export default function PersonnelManagementPage() {
   };
 
   const filteredUsers = users.filter(user => {
-    // 文本搜索过滤
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.department?.name.toLowerCase().includes(searchTerm.toLowerCase());
+    // 文本搜索过滤（姓名/手机号/部门）
+    const q = searchTerm.toLowerCase();
+    const matchesSearch =
+      user.name.toLowerCase().includes(q) ||
+      (user.phone ? String(user.phone).toLowerCase().includes(q) : false) ||
+      (user.department?.name ? user.department.name.toLowerCase().includes(q) : false);
     
     // 部门筛选
     const matchesDepartment = !selectedDepartment || selectedDepartment === 'all' ||
@@ -120,7 +123,7 @@ export default function PersonnelManagementPage() {
       setImportText(csvText);
     } catch (error) {
       console.error('文件解析失败:', error);
-      alert('文件解析失败，请确保文件格式正确');
+      toast.error('文件解析失败，请确保文件格式正确');
     }
   };
 
@@ -179,7 +182,7 @@ export default function PersonnelManagementPage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="搜索人员姓名、邮箱或部门..."
+              placeholder="搜索人员姓名、手机号或部门..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 w-96 bg-background border-border focus:ring-2 focus:ring-primary/20"
@@ -202,6 +205,9 @@ export default function PersonnelManagementPage() {
           </Select>
 
           <div className="flex items-center gap-2 ml-auto">
+            <Button variant="outline" onClick={()=>{ window.location.href='/admin/fields'; }}>
+              字段配置
+            </Button>
             <Button variant="outline" onClick={() => setImportOpen(true)}>
               <Upload className="h-4 w-4 mr-2" />
               导入人员
@@ -222,7 +228,6 @@ export default function PersonnelManagementPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>姓名</TableHead>
-                  <TableHead>邮箱</TableHead>
                   <TableHead>手机号</TableHead>
                   <TableHead>部门</TableHead>
                   <TableHead>角色</TableHead>
@@ -240,9 +245,6 @@ export default function PersonnelManagementPage() {
                         </Avatar>
                         <span>{user.name}</span>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      {user.email}
                     </TableCell>
                     <TableCell>
                       {user.phone || <span className="text-muted-foreground">-</span>}
@@ -306,7 +308,7 @@ export default function PersonnelManagementPage() {
               <TabsContent value="file" className="space-y-4">
                 <div className="space-y-3">
                   <p className="text-sm text-muted-foreground">
-                    支持上传 Excel (.xlsx)、CSV 或 Markdown 文件。表头应包含：姓名、邮箱（可选：部门、手机、员工编码）
+                    支持上传 Excel (.xlsx)、CSV 或 Markdown 文件。表头应包含：姓名，且邮箱或手机至少一项（可选：部门、员工编码）
                   </p>
                   
                   <div className="flex gap-2">
@@ -440,10 +442,14 @@ export default function PersonnelManagementPage() {
                     await loadData();
                     setImportOpen(false);
                     setImportText('');
-                    alert(`导入完成：新增 ${info.created} 条，跳过 ${info.skipped} 条${(info.errors?.length ? `\n错误:\n` + info.errors.join('\n') : '')}`);
+                    if (info.errors?.length) {
+                      toast.message(`导入完成：新增 ${info.created} 条，跳过 ${info.skipped} 条`, { description: info.errors.join('\n') });
+                    } else {
+                      toast.success(`导入完成：新增 ${info.created} 条，跳过 ${info.skipped} 条`);
+                    }
                   } catch (e) {
                     const msg = e instanceof Error ? e.message : String(e);
-                    alert('导入失败：' + msg);
+                    toast.error('导入失败：' + msg);
                   } finally {
                     setImporting(false);
                   }

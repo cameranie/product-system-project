@@ -110,6 +110,21 @@ export const authApi = {
     
     return result.login;
   },
+  // 字段定义配置（公开/保密）
+  async upsertFieldDefinition(key: string, label: string, classification: 'PUBLIC' | 'CONFIDENTIAL', selfEditable?: boolean) {
+    const query = `
+      mutation UpsertFieldDef($key: String!, $label: String!, $classification: String!, $selfEditable: Boolean) {
+        upsertFieldDefinition(key: $key, label: $label, classification: $classification, selfEditable: $selfEditable)
+      }
+    `;
+    return graphqlRequest(query, { key, label, classification, selfEditable });
+  },
+  async deleteFieldDefinition(key: string) {
+    const query = `
+      mutation DeleteFieldDef($key: String!) { deleteFieldDefinition(key: $key) }
+    `;
+    return graphqlRequest(query, { key });
+  },
   // 当前用户
   async me() {
     const query = `
