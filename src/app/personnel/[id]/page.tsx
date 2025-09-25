@@ -28,14 +28,9 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
-// 详情页不再显示分级标签，保留空对象以便后续扩展（避免误用）
-// const CLASSIFICATION_LABELS = {} as const;
-
-// 遮罩处理函数
 const maskValue = (value: string | null | undefined, visible: boolean): string => {
   if (!value) return '';
   if (visible) return value;
-  // 根据内容长度返回对应的遮罩
   if (value.length <= 3) return '***';
   if (value.length <= 6) return '****';
   return '******';
@@ -107,44 +102,6 @@ type DetailUser = {
   }>;
 };
 
-// 假期余额子组件（轻量封装）
-function LeaveBalances({ userId }: { userId: string }) {
-  const [items, setItems] = React.useState<Array<{ type: string; total: number; used: number; available: number }>>([]);
-  const [error, setError] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    let mounted = true;
-    userApi.getUserLeaveBalances(userId)
-      .then((res: { userLeaveBalances?: Array<{ type: string; total: number; used: number; available: number }> }) => {
-        if (!mounted) return;
-        setItems(res.userLeaveBalances || []);
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setError('');
-      });
-    return () => { mounted = false; };
-  }, [userId]);
-
-  if (error !== null && items.length === 0) return null;
-
-  const labelMap: Record<string, string> = {
-    ANNUAL: '年假', PERSONAL: '事假', PAID_SICK: '带薪病假', MARRIAGE: '婚假', MATERNITY: '产假', PATERNITY: '陪产假', FUNERAL: '丧假', PRENATAL_CHECK: '产检假', SICK: '病假(非全薪)', OTHER: '其他',
-  };
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-      {items.map((it) => (
-        <div key={it.type} className="flex items-center justify-between rounded-md border px-3 py-2">
-          <span className="text-sm text-muted-foreground">{labelMap[it.type] || it.type}</span>
-          <span className="text-sm">{it.available}</span>
-        </div>
-      ))}
-      {items.length === 0 && <p className="text-muted-foreground text-sm">暂无假期余额</p>}
-    </div>
-  );
-}
-
 export default function PersonnelDetailPage() {
   const params = useParams();
   const userId = params.id as string;
@@ -158,7 +115,6 @@ export default function PersonnelDetailPage() {
   const [fieldDefs, setFieldDefs] = useState<Record<string, { label?: string; classification?: string; selfEditable?: boolean }>>({});
   const [deleting, setDeleting] = useState(false);
 
-  // 加载用户数据 + 可见字段 + 字段定义
   useEffect(() => {
     const loadUser = async () => {
       try {
@@ -174,7 +130,7 @@ export default function PersonnelDetailPage() {
         type MeRoleObj = { name: string };
         type MeResult = { me?: { roles?: Array<string | MeRoleObj> } } | null | undefined;
         const rolesMixed = (meRes as MeResult)?.me?.roles || [];
-        const roleNames = rolesMixed.map((r: any) => (typeof r === 'string' ? r : r?.name)).filter(Boolean) as string[];
+        const roleNames = rolesMixed.map((r: string | MeRoleObj) => (typeof r === 'string' ? r : r?.name)).filter(Boolean) as string[];
         setIsSuperAdmin(roleNames.includes('super_admin'));
         setIsHRorSuper(roleNames.includes('super_admin') || roleNames.includes('hr_manager'));
         const defsArray = (fieldDefsRes as unknown as { fieldDefinitions?: Array<{ key: string; label: string; classification: string; selfEditable?: boolean }> })?.fieldDefinitions;
@@ -198,14 +154,11 @@ export default function PersonnelDetailPage() {
     }
   }, [userId]);
 
-  // 判断字段是否应该展示（基于用户权限）
   const shouldShowField = (fieldKey: string) => {
-    // HR/超级管理员：展示全部
     if (isHRorSuper) return true;
     return visibleKeys.includes(fieldKey);
   };
 
-  // 详情页分组型资源（非EAV）可见性：超管直接可见
   const isSectionVisible = (sectionKey: string) => {
     if (isHRorSuper) return true;
     return visibleKeys.includes(sectionKey);
@@ -241,7 +194,6 @@ export default function PersonnelDetailPage() {
     );
   }
 
-  // 辅助函数：渲染字段值
   const renderFieldValue = (fieldKey: string, value: unknown): string => {
     const visible = isHRorSuper ? true : visibleKeys.includes(fieldKey);
     
@@ -252,13 +204,11 @@ export default function PersonnelDetailPage() {
     } else if (value instanceof Date) {
       return visible ? value.toLocaleDateString('zh-CN') : '****/**/**';
     } else if (typeof value === 'string' && value.includes('T')) {
-      // 处理日期字符串
       return visible ? new Date(value).toLocaleDateString('zh-CN') : '****/**/**';
     }
     return visible ? String(value || '') : '***';
   };
 
-  // 渲染字段带标签和权限标识
   const renderFieldWithLabel = (fieldKey: string, value: unknown, icon?: React.ReactNode) => {
     const visible = visibleKeys.includes(fieldKey);
     
@@ -268,7 +218,6 @@ export default function PersonnelDetailPage() {
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <span>{renderFieldValue(fieldKey, value)}</span>
-            {/* 详情页不展示可见性标签 */}
             {!visible && !isHRorSuper && <EyeOff className="h-3 w-3 text-muted-foreground" />}
           </div>
         </div>
@@ -279,7 +228,6 @@ export default function PersonnelDetailPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        {/* 顶部导航 */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button 
@@ -291,12 +239,8 @@ export default function PersonnelDetailPage() {
               <ArrowLeft className="h-4 w-4" />
               返回
             </Button>
-            <div>
-              {/* 移除页面标题 */}
-            </div>
           </div>
           
-          {/* 编辑按钮 */}
           <div className="flex items-center gap-3">
             <Button 
               size="sm"
@@ -335,8 +279,8 @@ export default function PersonnelDetailPage() {
                     } else {
                       toast.error(res?.deleteUser?.message || '删除失败');
                     }
-                  } catch (e:any) {
-                    toast.error('删除失败：' + (e?.message || e));
+                  } catch (e: unknown) {
+                    toast.error('删除失败：' + (e instanceof Error ? e.message : String(e)));
                   } finally {
                     setDeleting(false);
                   }
@@ -350,7 +294,6 @@ export default function PersonnelDetailPage() {
 
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* 左侧：基本信息卡片 */}
             <div className="lg:col-span-1">
               <Card>
                 <CardHeader>
@@ -368,7 +311,7 @@ export default function PersonnelDetailPage() {
                     <h2 className="text-xl font-semibold mb-2">{user.name}</h2>
                     <Badge variant={user.isActive ? "default" : "secondary"}>
                       {user.isActive ? '在职' : '离职'}
-                      </Badge>
+                    </Badge>
                   </div>
 
                   <div className="space-y-3">
@@ -386,7 +329,6 @@ export default function PersonnelDetailPage() {
               </Card>
             </div>
 
-            {/* 右侧整体卡片：全部字段 */}
             <div className="lg:col-span-2">
               <Card>
                 <CardHeader>
@@ -406,7 +348,7 @@ export default function PersonnelDetailPage() {
                       const ordered = [...normal, ...exits];
                       return ordered.map((key) => {
                         const label = fieldDefs[key]?.label || key;
-                        if (!shouldShowField(key)) return null;
+                        if (!shouldShowField(key) && !isHRorSuper) return null;
                         const fv = (user.fieldValues || []).find(f => f.fieldKey === key);
                         const value = fv?.valueString || fv?.valueNumber || fv?.valueDate || fv?.valueJson || '';
                         const visible = visibleKeys.includes(key) || isHRorSuper;
@@ -424,14 +366,9 @@ export default function PersonnelDetailPage() {
                   </div>
                 </CardContent>
               </Card>
-            </div>
 
-              {/* 假期余额（仅HR/超管可见；若无权限后端会返回错误，这里容错隐藏） */}
-              {/* 按要求：先不显示假期余额 */}
-
-              {/* 教育经历 */}
               {isSectionVisible('educations') && user.educations && user.educations.length > 0 && (
-                <Card>
+                <Card className="mt-6">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <GraduationCap className="h-5 w-5" />
@@ -464,9 +401,8 @@ export default function PersonnelDetailPage() {
                 </Card>
               )}
 
-              {/* 工作经历 */}
               {isSectionVisible('work_experiences') && user.workExperiences && user.workExperiences.length > 0 && (
-                <Card>
+                <Card className="mt-6">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Briefcase className="h-5 w-5" />
@@ -497,9 +433,8 @@ export default function PersonnelDetailPage() {
                 </Card>
               )}
 
-              {/* 紧急联系人 */}
               {isSectionVisible('emergency_contacts') && user.emergencyContacts && user.emergencyContacts.length > 0 && (
-                <Card>
+                <Card className="mt-6">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <AlertTriangle className="h-5 w-5" />
@@ -530,9 +465,8 @@ export default function PersonnelDetailPage() {
                 </Card>
               )}
 
-              {/* 家庭成员 */}
               {isSectionVisible('family_members') && user.familyMembers && user.familyMembers.length > 0 && (
-                <Card>
+                <Card className="mt-6">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Users className="h-5 w-5" />
@@ -558,9 +492,8 @@ export default function PersonnelDetailPage() {
                 </Card>
               )}
 
-              {/* 合同信息 */}
               {isSectionVisible('contracts') && user.contracts && user.contracts.length > 0 && (
-                <Card>
+                <Card className="mt-6">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <FileText className="h-5 w-5" />
@@ -593,9 +526,8 @@ export default function PersonnelDetailPage() {
                 </Card>
               )}
 
-              {/* 证件信息 */}
               {isSectionVisible('documents') && user.documents && user.documents.length > 0 && (
-                <Card>
+                <Card className="mt-6">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <CreditCard className="h-5 w-5" />
@@ -628,9 +560,8 @@ export default function PersonnelDetailPage() {
                 </Card>
               )}
 
-              {/* 资料附件 */}
               {isSectionVisible('attachments') && (user as unknown as { attachments?: Array<AttachmentRef> }).attachments && (user as unknown as { attachments?: Array<AttachmentRef> }).attachments!.length > 0 && (
-                <Card>
+                <Card className="mt-6">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <FileText className="h-5 w-5" />
@@ -659,8 +590,6 @@ export default function PersonnelDetailPage() {
                   </CardContent>
                 </Card>
               )}
-
-              {/* 结束：右侧整体卡片中的明细模块 */}
             </div>
           </div>
         </div>

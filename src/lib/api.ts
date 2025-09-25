@@ -1138,6 +1138,15 @@ export const adminApi = {
     });
   },
 
+  async deleteFieldDefinition(key: string) {
+    const query = `
+      mutation DeleteFieldDefinition($key: String!) {
+        deleteFieldDefinition(key: $key)
+      }
+    `;
+    return graphqlRequest(query, { key });
+  },
+
   async upsertModuleVisibility(input: { moduleKey: string; classification: string }) {
     const query = `
       mutation UpsertModuleVisibility($moduleKey: String!, $cls: String!) {

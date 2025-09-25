@@ -27,7 +27,12 @@ export default function FieldVisibilityPage() {
   const saveOne = async (f: FieldDef) => {
     try {
       setSaving(true);
-      await adminApi.upsertFieldDefinition(f.key, f.label, f.classification, f.selfEditable);
+      await adminApi.upsertFieldDefinition({
+        key: f.key,
+        label: f.label,
+        classification: f.classification,
+        selfEditable: f.selfEditable,
+      });
     } finally {
       setSaving(false);
     }
@@ -50,7 +55,7 @@ export default function FieldVisibilityPage() {
               />
               <div className="flex items-center gap-3">
                 <span className="text-sm">可见性</span>
-                <Select value={f.classification} onValueChange={(v:any) => setField(idx, { classification: v })}>
+                <Select value={f.classification} onValueChange={(v: 'PUBLIC' | 'CONFIDENTIAL') => setField(idx, { classification: v })}>
                   <SelectTrigger className="h-9 w-36">
                     <SelectValue />
                   </SelectTrigger>

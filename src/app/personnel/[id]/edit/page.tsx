@@ -361,33 +361,6 @@ export default function EditUserPage() {
     }
   }, []);
 
-  // 应用分组可见性
-  const applyGroupVisibility = async (sectionKey: string, classification: string) => {
-    try {
-      const setName = GROUP_TO_FIELDSET_MAP[sectionKey as keyof typeof GROUP_TO_FIELDSET_MAP];
-      if (!setName) return;
-      
-      await adminApi.applyGroupVisibility(setName, classification);
-      // 重新加载配置
-      await loadVisibilityConfig();
-    } catch (error) {
-      console.error('Failed to apply group visibility:', error);
-    }
-  };
-
-  // 更新模块可见性
-  const updateModuleVisibility = async (sectionKey: string, classification: string) => {
-    try {
-      const moduleKey = MODULE_KEY_MAP[sectionKey as keyof typeof MODULE_KEY_MAP];
-      if (!moduleKey) return;
-      
-      await adminApi.upsertModuleVisibility({ moduleKey, classification });
-      // 重新加载配置
-      await loadVisibilityConfig();
-    } catch (error) {
-      console.error('Failed to update module visibility:', error);
-    }
-  };
 
   // 移除在编辑页内的可见性设置入口（单独开入口）
 
