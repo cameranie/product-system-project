@@ -66,10 +66,6 @@ const data = {
       icon: Shield,
       items: [
         {
-          title: "权限预览",
-          url: "/admin/permissions/preview",
-        },
-        {
           title: "临时授权",
           url: "/admin/permissions/grants",
         },
