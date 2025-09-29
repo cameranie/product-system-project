@@ -203,10 +203,23 @@ export default function CreateRequirementPage() {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    const { validateFiles } = require('@/lib/file-upload-utils');
+    
+    const { validFiles, errors } = validateFiles(files, formData.attachments.length);
+    
+    if (errors.length > 0) {
+      toast.error(errors.join(', '));
+      return;
+    }
+    
     setFormData(prev => ({
       ...prev,
-      attachments: [...prev.attachments, ...files]
+      attachments: [...prev.attachments, ...validFiles]
     }));
+    
+    if (validFiles.length > 0) {
+      toast.success(`成功上传 ${validFiles.length} 个文件`);
+    }
   };
 
   const handleRemoveAttachment = (index: number) => {

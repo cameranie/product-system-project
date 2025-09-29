@@ -42,12 +42,13 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useRequirementsStore, mockUsers, mockProjects } from '@/lib/requirements-store';
 
-interface User {
-  id: string;
-  name: string;
-  avatar: string;
-  email: string;
-}
+// 移除重复接口定义，使用全局导入的类型
+import type { 
+  User, 
+  Attachment, 
+  EndOwnerOpinion, 
+  ScheduledReviewLevel 
+} from '@/lib/requirements-store';
 
 interface Comment {
   id: string;
@@ -74,31 +75,6 @@ interface HistoryRecord {
   newValue: string;
   timestamp: string;
   user: User;
-}
-
-interface Attachment {
-  id: string;
-  name: string;
-  size: number;
-  type: string;
-  url: string;
-}
-
-interface EndOwnerOpinion {
-  needToDo?: boolean;
-  priority?: '高' | '中' | '低';
-  opinion?: string;
-  owner?: User;
-}
-
-interface ScheduledReviewLevel {
-  id: string;
-  level: number;
-  levelName: string;
-  status: 'pending' | 'approved' | 'rejected';
-  reviewer?: User;
-  reviewedAt?: string;
-  opinion?: string;
 }
 
 interface ScheduledReviewData {

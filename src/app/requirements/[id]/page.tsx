@@ -67,7 +67,7 @@ interface HistoryRecord {
 export default function RequirementDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { getRequirementById, updateRequirement } = useRequirementsStore();
-  const [requirement, setRequirement] = useState<any>(null);
+  const [requirement, setRequirement] = useState<any>(null); // TODO: 使用正确的Requirement类型
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [newCommentFiles, setNewCommentFiles] = useState<File[]>([]);

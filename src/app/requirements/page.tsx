@@ -70,29 +70,29 @@ import type {
   FilterableColumn
 } from '@/types/issue';
 
-// 配置数据
+// 配置数据 - 修复类型匹配问题
 const requirementTypeConfig = {
-  NEW_FEATURE: { label: '新功能', color: 'bg-green-100 text-green-800' },
-  OPTIMIZATION: { label: '优化', color: 'bg-blue-100 text-blue-800' },
-  BUG: { label: 'bug', color: 'bg-red-100 text-red-800' },
-  USER_FEEDBACK: { label: '用户反馈', color: 'bg-purple-100 text-purple-800' },
-  BUSINESS_REQUIREMENT: { label: '商务需求', color: 'bg-yellow-100 text-yellow-800' }
-};
+  '新功能': { label: '新功能', color: 'bg-green-100 text-green-800' },
+  '优化': { label: '优化', color: 'bg-blue-100 text-blue-800' },
+  'BUG': { label: 'BUG', color: 'bg-red-100 text-red-800' },
+  '用户反馈': { label: '用户反馈', color: 'bg-purple-100 text-purple-800' },
+  '商务需求': { label: '商务需求', color: 'bg-yellow-100 text-yellow-800' }
+} as const;
 
 const platformConfig = {
-  WEB: { label: 'Web端' },
-  MOBILE: { label: '移动端' },
-  DESKTOP: { label: '桌面端' },
-  API: { label: 'API接口' },
-  ALL: { label: '全端' },
-};
+  'Web端': { label: 'Web端' },
+  '移动端': { label: '移动端' },
+  'PC端': { label: 'PC端' },
+  'API接口': { label: 'API接口' },
+  '全端': { label: '全端' },
+} as const;
 
 const priorityConfig = {
-  LOW: { label: '低', className: 'bg-green-100 text-green-800' },
-  MEDIUM: { label: '中', className: 'bg-yellow-100 text-yellow-800' },
-  HIGH: { label: '高', className: 'bg-orange-100 text-orange-800' },
-  URGENT: { label: '紧急', className: 'bg-red-100 text-red-800' },
-};
+  '低': { label: '低', className: 'bg-green-100 text-green-800' },
+  '中': { label: '中', className: 'bg-yellow-100 text-yellow-800' },
+  '高': { label: '高', className: 'bg-orange-100 text-orange-800' },
+  '紧急': { label: '紧急', className: 'bg-red-100 text-red-800' },
+} as const;
 
 // 可筛选的列定义 - 移除标题，因为标题是必须显示的
 const filterableColumns: FilterableColumn[] = [
@@ -226,7 +226,7 @@ export default function RequirementsPage() {
         req.creator?.name?.toLowerCase().includes(searchLower) ||
         requirementTypeConfig[req.type]?.label.toLowerCase().includes(searchLower) ||
         priorityConfig[req.priority]?.label.toLowerCase().includes(searchLower) ||
-        (req.platforms || []).some(p => platformConfig[p]?.label.toLowerCase().includes(searchLower)) ||
+        (req.platforms || []).some(p => platformConfig[p as keyof typeof platformConfig]?.label.toLowerCase().includes(searchLower)) ||
         (req.project?.name.toLowerCase().includes(searchLower)) ||
         (req.tags?.some(tag => tag.toLowerCase().includes(searchLower)))
       );
