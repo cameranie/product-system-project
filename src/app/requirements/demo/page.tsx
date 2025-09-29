@@ -142,7 +142,7 @@ export default function RequirementsDemo() {
           </p>
           <div className="flex justify-center gap-4">
             <Button asChild size="lg">
-              <Link href="/requirements/enhanced">
+              <Link href="/requirements">
                 <Target className="h-5 w-5 mr-2" />
                 体验完整版
               </Link>
@@ -292,7 +292,7 @@ export default function RequirementsDemo() {
           <h3 className="text-xl font-semibold">准备好体验增强功能了吗？</h3>
           <div className="flex justify-center gap-4">
             <Button asChild size="lg">
-              <Link href="/requirements/enhanced">
+              <Link href="/requirements">
                 立即体验增强版
               </Link>
             </Button>

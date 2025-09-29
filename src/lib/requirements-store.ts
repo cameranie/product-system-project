@@ -93,7 +93,7 @@ export const mockProjects: Project[] = [
 // 初始模拟数据
 const initialRequirements: Requirement[] = [
   {
-    id: 'REQ-001',
+    id: '#1',
     title: '用户登录功能优化',
     type: '优化',
     status: '评审中',
@@ -146,7 +146,7 @@ const initialRequirements: Requirement[] = [
     }
   },
   {
-    id: 'REQ-002',
+    id: '#2',
     title: '移动端界面适配',
     type: '新功能',
     status: '待评审',
@@ -181,7 +181,7 @@ const initialRequirements: Requirement[] = [
     }
   },
   {
-    id: 'REQ-003',
+    id: '#3',
     title: '数据导出功能',
     type: '新功能',
     status: '开发中',
@@ -283,12 +283,12 @@ export const useRequirementsStore = create<RequirementsStore>()(
                            const now = new Date();
                  const timeString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
                  
-                 const newRequirement: Requirement = {
-                   ...requirementData,
-                   id: `REQ-${String(Date.now()).slice(-3).padStart(3, '0')}`,
-                   createdAt: timeString,
-                   updatedAt: timeString,
-                 };
+                     const newRequirement: Requirement = {
+      ...requirementData,
+      id: `#${get().requirements.length + 1}`,
+      createdAt: timeString,
+      updatedAt: timeString,
+    };
 
           set(state => ({
             requirements: [...state.requirements, newRequirement],

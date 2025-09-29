@@ -160,7 +160,7 @@ export default function RequirementDetailPage({ params }: { params: { id: string
   }
 
   const handleBack = () => {
-    router.push('/requirements/enhanced');
+    router.push('/requirements');
   };
 
   const handleEdit = () => {

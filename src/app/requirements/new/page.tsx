@@ -235,7 +235,7 @@ export default function CreateRequirementPage() {
 
   const handleBack = () => {
     if (window.confirm('确定要离开吗？未保存的内容将丢失。')) {
-      router.push('/requirements/enhanced');
+      router.push('/requirements');
     }
   };
 

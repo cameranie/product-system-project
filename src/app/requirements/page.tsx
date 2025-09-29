@@ -5,14 +5,15 @@ import { AppLayout } from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Table,
-  TableHeader as TableHeaderRaw,
-  TableBody as TableBodyRaw,
-  TableRow as TableRowRaw,
-  TableCell as TableCellRaw,
-  TableHead as TableHeadRaw,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableHead,
 } from '@/components/ui/table';
 import { 
   Select,
@@ -22,16 +23,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { 
-  Search, 
-  Plus, 
-  Eye, 
-  Calendar,
-  CheckSquare,
-  Filter,
-  ArrowUpDown,
-  MoreHorizontal
-} from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,27 +39,46 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { 
+  Search, 
+  Plus, 
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Eye,
+  Filter,
+  EyeOff,
+  X,
+  Settings,
+  RefreshCw,
+  MoreHorizontal,
+  Trash2
+} from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'sonner';
+import { useRequirementsStore, type Requirement, type User, type Project } from '@/lib/requirements-store';
 
-// 模拟需求数据 - 基于产品管理系统文档
+// 导入类型定义
 import type { 
-  Requirement, 
   RequirementStatus, 
   RequirementType, 
   ApplicationPlatform,
   Priority,
-  User 
+  SortConfig,
+  RequirementPoolStatus,
+  FilterCondition,
+  FilterableColumn
 } from '@/types/issue';
 
-// 需求类型配置
+// 配置数据
 const requirementTypeConfig = {
-  NEW_FEATURE: { label: '新功能', color: 'bg-blue-100 text-blue-800' },
-  BUG: { label: 'Bug修复', color: 'bg-red-100 text-red-800' },
-  ENHANCEMENT: { label: '功能增强', color: 'bg-green-100 text-green-800' },
-  OPTIMIZATION: { label: '优化改进', color: 'bg-purple-100 text-purple-800' },
+  NEW_FEATURE: { label: '新功能', color: 'bg-green-100 text-green-800' },
+  OPTIMIZATION: { label: '优化', color: 'bg-blue-100 text-blue-800' },
+  BUG: { label: 'bug', color: 'bg-red-100 text-red-800' },
+  USER_FEEDBACK: { label: '用户反馈', color: 'bg-purple-100 text-purple-800' },
+  BUSINESS_REQUIREMENT: { label: '商务需求', color: 'bg-yellow-100 text-yellow-800' }
 };
 
-// 应用端配置
 const platformConfig = {
   WEB: { label: 'Web端' },
   MOBILE: { label: '移动端' },
@@ -69,230 +87,285 @@ const platformConfig = {
   ALL: { label: '全端' },
 };
 
-// 优先级配置
 const priorityConfig = {
-  LOW: { label: '低', color: 'bg-gray-100 text-gray-800' },
-  MEDIUM: { label: '中', color: 'bg-yellow-100 text-yellow-800' },
-  HIGH: { label: '高', color: 'bg-orange-100 text-orange-800' },
-  URGENT: { label: '紧急', color: 'bg-red-100 text-red-800' },
+  LOW: { label: '低', className: 'bg-green-100 text-green-800' },
+  MEDIUM: { label: '中', className: 'bg-yellow-100 text-yellow-800' },
+  HIGH: { label: '高', className: 'bg-orange-100 text-orange-800' },
+  URGENT: { label: '紧急', className: 'bg-red-100 text-red-800' },
 };
 
-// 需求状态配置
-const statusConfig = {
-  PENDING: { label: '待审核', color: 'bg-gray-100 text-gray-800' },
-  APPROVED: { label: '审核通过', color: 'bg-green-100 text-green-800' },
-  REJECTED: { label: '审核不通过', color: 'bg-red-100 text-red-800' },
-  SCHEDULED: { label: '已排期', color: 'bg-blue-100 text-blue-800' },
-  IN_DEVELOPMENT: { label: '开发中', color: 'bg-purple-100 text-purple-800' },
-  COMPLETED: { label: '已完成', color: 'bg-green-100 text-green-800' },
-};
+// 可筛选的列定义 - 移除标题，因为标题是必须显示的
+const filterableColumns: FilterableColumn[] = [
+  { value: 'id', label: 'ID' },
+  { value: 'type', label: '需求类型' },
+  { value: 'platform', label: '应用端' },
+  { value: 'priority', label: '优先级' },
+  { value: 'submitter', label: '创建人' },
+  { value: 'needToDo', label: '是否要做' },
+  { value: 'createdAt', label: '创建时间' },
+  { value: 'updatedAt', label: '更新时间' }
+];
+
+// 筛选操作符
+const filterOperators = [
+  { value: 'equals', label: '等于' },
+  { value: 'not_equals', label: '不等于' },
+  { value: 'contains', label: '包含' },
+  { value: 'not_contains', label: '不包含' },
+  { value: 'is_empty', label: '为空' },
+  { value: 'is_not_empty', label: '不为空' }
+];
 
 export default function RequirementsPage() {
-  const [requirements, setRequirements] = useState<Requirement[]>([]);
+  // 使用全局状态
+  const { requirements, updateRequirement } = useRequirementsStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedRequirements, setSelectedRequirements] = useState<string[]>([]);
-  const [viewMode, setViewMode] = useState<'unscheduled' | 'scheduled'>('unscheduled');
-  const [filterStatus, setFilterStatus] = useState<RequirementStatus | 'all'>('all');
-  const [filterType, setFilterType] = useState<RequirementType | 'all'>('all');
 
-  // 模拟数据加载
+  // 初始化数据加载状态
   useEffect(() => {
-    const loadRequirements = async () => {
-      try {
-        setLoading(true);
-        
-        // 模拟API调用延迟
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // 模拟需求数据
-        const mockRequirements: Requirement[] = [
-          {
-            id: 'req-001',
-            title: '用户头像上传功能优化',
-            description: '当前用户头像上传速度较慢，需要优化压缩算法和上传流程，提升用户体验',
-            type: 'ENHANCEMENT' as RequirementType,
-            platform: 'WEB' as ApplicationPlatform,
-            priority: 'HIGH' as Priority,
-            status: 'PENDING' as RequirementStatus,
-            submitter: {
-              id: 'user-1',
-              name: '张三',
-              email: 'zhangsan@company.com',
-              username: 'zhangsan'
-            } as User,
-            businessValue: '提升用户满意度，减少用户流失',
-            userImpact: '影响所有需要上传头像的用户',
-            technicalRisk: '中等，需要处理兼容性问题',
-            createdAt: '2024-01-15T10:30:00Z',
-            updatedAt: '2024-01-15T10:30:00Z',
-          },
-          {
-            id: 'req-002',
-            title: '移动端消息推送功能',
-            description: '为移动端用户提供实时消息推送功能，包括系统通知、任务提醒等',
-            type: 'NEW_FEATURE' as RequirementType,
-            platform: 'MOBILE' as ApplicationPlatform,
-            priority: 'MEDIUM' as Priority,
-            status: 'APPROVED' as RequirementStatus,
-            submitter: {
-              id: 'user-2',
-              name: '李四',
-              email: 'lisi@company.com',
-              username: 'lisi'
-            } as User,
-            reviewer: {
-              id: 'user-3',
-              name: '王五',
-              email: 'wangwu@company.com',
-              username: 'wangwu'
-            } as User,
-            expectedVersion: 'v2.1.0',
-            businessValue: '提高用户活跃度和留存率',
-            userImpact: '影响所有移动端用户',
-            technicalRisk: '低，使用成熟的推送服务',
-            createdAt: '2024-01-12T14:20:00Z',
-            updatedAt: '2024-01-14T09:15:00Z',
-            reviewedAt: '2024-01-14T09:15:00Z',
-          },
-          {
-            id: 'req-003',
-            title: '数据导出功能异常修复',
-            description: '用户反馈Excel导出功能在大数据量时会超时，需要修复并优化导出机制',
-            type: 'BUG' as RequirementType,
-            platform: 'WEB' as ApplicationPlatform,
-            priority: 'URGENT' as Priority,
-            status: 'SCHEDULED' as RequirementStatus,
-            submitter: {
-              id: 'user-4',
-              name: '赵六',
-              email: 'zhaoliu@company.com',
-              username: 'zhaoliu'
-            } as User,
-            assignee: {
-              id: 'user-5',
-              name: '孙七',
-              email: 'sunqi@company.com',
-              username: 'sunqi'
-            } as User,
-            expectedVersion: 'v2.0.1',
-            businessValue: '修复关键功能，避免用户投诉',
-            userImpact: '影响需要导出大量数据的企业用户',
-            technicalRisk: '中等，需要重构导出逻辑',
-            createdAt: '2024-01-10T16:45:00Z',
-            updatedAt: '2024-01-13T11:30:00Z',
-            scheduledAt: '2024-01-13T11:30:00Z',
-          },
-          {
-            id: 'req-004',
-            title: '搜索性能优化',
-            description: '全局搜索功能响应速度慢，需要优化搜索算法和建立索引',
-            type: 'OPTIMIZATION' as RequirementType,
-            platform: 'ALL' as ApplicationPlatform,
-            priority: 'MEDIUM' as Priority,
-            status: 'PENDING' as RequirementStatus,
-            submitter: {
-              id: 'user-6',
-              name: '周八',
-              email: 'zhouba@company.com',
-              username: 'zhouba'
-            } as User,
-            businessValue: '提升整体产品体验',
-            userImpact: '影响所有使用搜索功能的用户',
-            technicalRisk: '高，需要重构搜索架构',
-            createdAt: '2024-01-08T13:20:00Z',
-            updatedAt: '2024-01-08T13:20:00Z',
-          },
-          {
-            id: 'req-005',
-            title: '用户权限管理增强',
-            description: '现有权限管理功能较为简单，需要支持更细粒度的权限控制和角色管理',
-            type: 'NEW_FEATURE' as RequirementType,
-            platform: 'WEB' as ApplicationPlatform,
-            priority: 'LOW' as Priority,
-            status: 'REJECTED' as RequirementStatus,
-            submitter: {
-              id: 'user-7',
-              name: '吴九',
-              email: 'wujiu@company.com',
-              username: 'wujiu'
-            } as User,
-            reviewer: {
-              id: 'user-3',
-              name: '王五',
-              email: 'wangwu@company.com',
-              username: 'wangwu'
-            } as User,
-            businessValue: '满足企业级客户需求',
-            userImpact: '主要影响管理员用户',
-            technicalRisk: '高，涉及核心安全模块',
-            createdAt: '2024-01-05T10:10:00Z',
-            updatedAt: '2024-01-07T15:45:00Z',
-            reviewedAt: '2024-01-07T15:45:00Z',
-          }
-        ];
-        
-        setRequirements(mockRequirements);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : '加载失败');
-        console.error('Failed to load requirements:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadRequirements();
+    // 模拟数据加载完成
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, []);
+  
+  // 新增状态
+  const [selectedRequirements, setSelectedRequirements] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<RequirementPoolStatus>('开放中');
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
+  
+  // 第三阶段新增状态
+  const [hiddenColumns, setHiddenColumns] = useState<string[]>(['createdAt', 'updatedAt']);
+  const [customFilters, setCustomFilters] = useState<FilterCondition[]>([]);
+  const [batchNeedToDoValue, setBatchNeedToDoValue] = useState<string>("");
 
-  // 过滤需求
-  const getFilteredRequirements = () => {
+  // 应用自定义筛选条件
+  const applyCustomFilters = (requirement: Requirement, filters: FilterCondition[]) => {
+    return filters.every(filter => {
+      if (!filter.value && filter.operator !== 'is_empty' && filter.operator !== 'is_not_empty') {
+        return true;
+      }
+
+      let fieldValue = '';
+      switch (filter.column) {
+        case 'title':
+          fieldValue = requirement.title;
+          break;
+        case 'id':
+          fieldValue = requirement.id;
+          break;
+        case 'type':
+          fieldValue = requirementTypeConfig[requirement.type]?.label || '';
+          break;
+        case 'priority':
+          fieldValue = priorityConfig[requirement.priority]?.label || '';
+          break;
+        case 'platform':
+          fieldValue = (requirement.platforms || []).map(p => platformConfig[p as keyof typeof platformConfig]?.label).join(', ');
+          break;
+        case 'submitter':
+          fieldValue = requirement.creator?.name || '';
+          break;
+        case 'needToDo':
+          fieldValue = requirement.needToDo || '';
+          break;
+        case 'createdAt':
+          fieldValue = requirement.createdAt;
+          break;
+        case 'updatedAt':
+          fieldValue = requirement.updatedAt;
+          break;
+        default:
+          return true;
+      }
+
+      const filterValue = filter.value.toLowerCase();
+      const targetValue = fieldValue.toLowerCase();
+
+      switch (filter.operator) {
+        case 'equals':
+          return targetValue === filterValue;
+        case 'not_equals':
+          return targetValue !== filterValue;
+        case 'contains':
+          return targetValue.includes(filterValue);
+        case 'not_contains':
+          return !targetValue.includes(filterValue);
+        case 'is_empty':
+          return !fieldValue || fieldValue.trim() === '';
+        case 'is_not_empty':
+          return fieldValue && fieldValue.trim() !== '';
+        default:
+          return true;
+      }
+    });
+  };
+
+  // 过滤和排序逻辑
+  const getFilteredAndSortedRequirements = () => {
     let filtered = requirements;
 
-    // 根据视图模式过滤
-    if (viewMode === 'unscheduled') {
-      filtered = filtered.filter(req => 
-        req.status === 'PENDING' || req.status === 'APPROVED' || req.status === 'REJECTED'
-      );
-    } else {
-      filtered = filtered.filter(req => 
-        req.status === 'SCHEDULED' || req.status === 'IN_DEVELOPMENT' || req.status === 'COMPLETED'
-      );
-    }
-
     // 状态筛选
-    if (filterStatus !== 'all') {
-      filtered = filtered.filter(req => req.status === filterStatus);
+    if (statusFilter === '开放中') {
+      filtered = filtered.filter(req => req.isOpen === true);
+    } else if (statusFilter === '已关闭') {
+      filtered = filtered.filter(req => req.isOpen === false);
     }
 
-    // 类型筛选
-    if (filterType !== 'all') {
-      filtered = filtered.filter(req => req.type === filterType);
-    }
-
-    // 搜索筛选
+    // 增强搜索筛选 - 支持多字段搜索（包括ID）
     if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(req =>
-        req.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        req.description.toLowerCase().includes(searchTerm.toLowerCase())
+        req.id.toLowerCase().includes(searchLower) ||
+        req.title.toLowerCase().includes(searchLower) ||
+        req.description.toLowerCase().includes(searchLower) ||
+        req.creator?.name?.toLowerCase().includes(searchLower) ||
+        requirementTypeConfig[req.type]?.label.toLowerCase().includes(searchLower) ||
+        priorityConfig[req.priority]?.label.toLowerCase().includes(searchLower) ||
+        (req.platforms || []).some(p => platformConfig[p]?.label.toLowerCase().includes(searchLower)) ||
+        (req.project?.name.toLowerCase().includes(searchLower)) ||
+        (req.tags?.some(tag => tag.toLowerCase().includes(searchLower)))
       );
+    }
+
+    // 应用自定义筛选
+    if (customFilters.length > 0) {
+      filtered = filtered.filter(req => applyCustomFilters(req, customFilters));
+    }
+
+    // 排序
+    if (sortConfig) {
+      filtered = [...filtered].sort((a, b) => {
+        let aValue: any = '';
+        let bValue: any = '';
+
+        switch (sortConfig.column) {
+          case 'id':
+            aValue = a.id;
+            bValue = b.id;
+            break;
+          case 'title':
+            aValue = a.title;
+            bValue = b.title;
+            break;
+          case 'priority':
+            const priorityOrder = { 'URGENT': 4, 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
+            aValue = priorityOrder[a.priority as keyof typeof priorityOrder];
+            bValue = priorityOrder[b.priority as keyof typeof priorityOrder];
+            break;
+          case 'createdAt':
+            aValue = new Date(a.createdAt).getTime();
+            bValue = new Date(b.createdAt).getTime();
+            break;
+          case 'updatedAt':
+            aValue = new Date(a.updatedAt).getTime();
+            bValue = new Date(b.updatedAt).getTime();
+            break;
+          default:
+            return 0;
+        }
+
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+          if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        } else {
+          if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+          if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
     }
 
     return filtered;
   };
 
-  const filteredRequirements = getFilteredRequirements();
+  const sortedRequirements = getFilteredAndSortedRequirements();
 
-  // 全选/取消全选
+  // 添加自定义筛选条件
+  const addCustomFilter = () => {
+    const newFilter: FilterCondition = {
+      id: Date.now().toString(),
+      column: 'title',
+      operator: 'contains',
+      value: ''
+    };
+    setCustomFilters([...customFilters, newFilter]);
+  };
+
+  // 删除自定义筛选条件
+  const removeCustomFilter = (filterId: string) => {
+    setCustomFilters(customFilters.filter(f => f.id !== filterId));
+  };
+
+  // 更新自定义筛选条件
+  const updateCustomFilter = (filterId: string, field: string, value: string) => {
+    setCustomFilters(customFilters.map(f => 
+      f.id === filterId ? { ...f, [field]: value } : f
+    ));
+  };
+
+  // 清除所有筛选条件
+  const clearAllFilters = () => {
+    setCustomFilters([]);
+    setSearchTerm('');
+    toast.success('已清除所有筛选条件');
+  };
+
+  // 切换列显示/隐藏
+  const toggleColumnVisibility = (columnKey: string) => {
+    setHiddenColumns(prev => {
+      const newHidden = prev.includes(columnKey) 
+        ? prev.filter(col => col !== columnKey)
+        : [...prev, columnKey];
+      
+      const action = prev.includes(columnKey) ? '显示' : '隐藏';
+      const columnLabel = filterableColumns.find(col => col.value === columnKey)?.label || columnKey;
+      toast.success(`已${action}列: ${columnLabel}`);
+      
+      return newHidden;
+    });
+  };
+
+  // 处理排序
+  const handleColumnSort = (column: string) => {
+    setSortConfig(prev => {
+      if (prev?.column === column) {
+        if (prev.direction === 'asc') {
+          return { column, direction: 'desc' };
+        } else {
+          return null;
+        }
+      } else {
+        return { column, direction: 'asc' };
+      }
+    });
+  };
+
+  // 获取排序图标
+  const getSortIcon = (column: string) => {
+    if (sortConfig?.column !== column) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+    }
+    return sortConfig.direction === 'asc' ? 
+      <ArrowUp className="h-4 w-4 ml-1" /> : 
+      <ArrowDown className="h-4 w-4 ml-1" />;
+  };
+
+  // 选择处理
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedRequirements(filteredRequirements.map(req => req.id));
+      setSelectedRequirements(sortedRequirements.map(req => req.id));
+      toast.success(`已选择 ${sortedRequirements.length} 个需求`);
     } else {
       setSelectedRequirements([]);
+      toast.success('已取消所有选择');
     }
   };
 
-  // 单个选择
   const handleSelectRequirement = (requirementId: string, checked: boolean) => {
     if (checked) {
       setSelectedRequirements(prev => [...prev, requirementId]);
@@ -301,36 +374,46 @@ export default function RequirementsPage() {
     }
   };
 
-  // 批量排期操作
-  const handleBatchSchedule = () => {
+  // 批量更新"是否要做"
+  const handleBatchNeedToDoUpdate = (needToDo: string) => {
     if (selectedRequirements.length === 0) {
-      alert('请先选择需要排期的需求');
+      toast.error('请先选择需求');
       return;
     }
+
+    const needToDoValue = needToDo === '是' ? '是' : needToDo === '否' ? '否' : undefined;
     
-    // 这里应该调用API进行批量排期操作
-    const selectedReqs = requirements.filter(req => selectedRequirements.includes(req.id));
-    console.log('批量排期需求:', selectedReqs);
+    selectedRequirements.forEach(id => {
+      updateRequirement(id, { needToDo: needToDoValue });
+    });
     
-    // 模拟操作成功
-    setRequirements(prev => 
-      prev.map(req => 
-        selectedRequirements.includes(req.id) 
-          ? { ...req, status: 'SCHEDULED' as RequirementStatus, scheduledAt: new Date().toISOString() }
-          : req
-      )
-    );
+    const statusText = needToDoValue === undefined ? '未设置' : needToDoValue;
+    toast.success(`已批量将 ${selectedRequirements.length} 个需求的"是否要做"状态更新为: ${statusText}`);
+    setBatchNeedToDoValue(needToDo);
     setSelectedRequirements([]);
-    alert(`成功将 ${selectedRequirements.length} 个需求加入排期`);
+  };
+
+  // 处理优先级变更
+  const handlePriorityChange = (requirementId: string, newPriority: Priority) => {
+    updateRequirement(requirementId, { priority: newPriority });
+    toast.success(`已更新优先级为: ${priorityConfig[newPriority].label}`);
+  };
+
+  // 处理是否要做变更
+  const handleNeedToDoChange = (requirementId: string, value: '是' | '否' | undefined) => {
+    updateRequirement(requirementId, { needToDo: value });
+    const statusText = value === undefined ? '未设置' : value;
+    toast.success(`已将需求"是否要做"状态更新为: ${statusText}`);
   };
 
   // 统计数据
   const stats = {
     total: requirements.length,
-    pending: requirements.filter(req => req.status === 'PENDING').length,
-    approved: requirements.filter(req => req.status === 'APPROVED').length,
-    scheduled: requirements.filter(req => req.status === 'SCHEDULED').length,
-    rejected: requirements.filter(req => req.status === 'REJECTED').length,
+    open: requirements.filter(req => req.isOpen === true).length,
+    closed: requirements.filter(req => req.isOpen === false).length,
+    needToDo: requirements.filter(req => req.needToDo === '是').length,
+    notToDo: requirements.filter(req => req.needToDo === '否').length,
+    filtered: sortedRequirements.length
   };
 
   if (loading) {
@@ -362,246 +445,479 @@ export default function RequirementsPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        {/* 统计卡片 */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="bg-card p-4 rounded-lg border">
-            <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-            <div className="text-sm text-muted-foreground">总需求数</div>
-          </div>
-          <div className="bg-card p-4 rounded-lg border">
-            <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
-            <div className="text-sm text-muted-foreground">待审核</div>
-          </div>
-          <div className="bg-card p-4 rounded-lg border">
-            <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
-            <div className="text-sm text-muted-foreground">审核通过</div>
-          </div>
-          <div className="bg-card p-4 rounded-lg border">
-            <div className="text-2xl font-bold text-blue-600">{stats.scheduled}</div>
-            <div className="text-sm text-muted-foreground">已排期</div>
-          </div>
-          <div className="bg-card p-4 rounded-lg border">
-            <div className="text-2xl font-bold text-red-600">{stats.rejected}</div>
-            <div className="text-sm text-muted-foreground">审核不通过</div>
-          </div>
-        </div>
-
-        {/* 顶部操作栏 */}
-        <div className="flex items-center gap-4 flex-wrap">
-          {/* 搜索框 */}
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="搜索需求..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
+        {/* 筛选和搜索区域 - 去掉外框 */}
+        <div className="space-y-4">
+          {/* 搜索框和操作按钮 - 重新布局 */}
+          <div className="flex items-center gap-4">
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="搜索需求ID、标题、创建人、应用端、类型等..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
             </div>
-          </div>
+            
+            {/* 筛选设置 - 改为下拉菜单 */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="outline"
+                  className={customFilters.length > 0 ? 'bg-blue-100 text-blue-700 border-blue-200' : ''}
+                >
+                  <Filter className="h-4 w-4 mr-2" />
+                  {customFilters.length > 0 ? `${customFilters.length} 筛选设置` : '筛选设置'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[600px]">
+                <DropdownMenuSeparator />
+                
+                {customFilters.length === 0 && (
+                  <div className="p-4 text-center text-muted-foreground text-sm">
+                    暂无筛选条件
+                  </div>
+                )}
+                
+                {customFilters.map((filter, index) => (
+                  <div key={filter.id} className="p-2">
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={filter.column}
+                        onValueChange={(value) => updateCustomFilter(filter.id, 'column', value)}
+                      >
+                        <SelectTrigger className="h-8 w-[120px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filterableColumns.map((col) => (
+                            <SelectItem key={col.value} value={col.value}>
+                              {col.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      
+                      <Select
+                        value={filter.operator}
+                        onValueChange={(value) => updateCustomFilter(filter.id, 'operator', value)}
+                      >
+                        <SelectTrigger className="h-8 w-[100px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filterOperators.map((op) => (
+                            <SelectItem key={op.value} value={op.value}>
+                              {op.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      
+                      <Input
+                        placeholder="筛选值"
+                        value={filter.value}
+                        onChange={(e) => updateCustomFilter(filter.id, 'value', e.target.value)}
+                        className="h-8 flex-1 min-w-[120px]"
+                        style={{ minWidth: '120px' }}
+                        disabled={filter.operator === 'is_empty' || filter.operator === 'is_not_empty'}
+                      />
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeCustomFilter(filter.id)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                
+                <DropdownMenuSeparator />
+                <div className="p-2 flex gap-2">
+                  <Button onClick={addCustomFilter} variant="outline" size="sm" className="flex-1">
+                    <Plus className="h-3 w-3 mr-1" />
+                    添加条件
+                  </Button>
+                  {customFilters.length > 0 && (
+                    <Button onClick={clearAllFilters} variant="outline" size="sm" className="flex-1">
+                      <X className="h-3 w-3 mr-1" />
+                      清空条件
+                    </Button>
+                  )}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          {/* 筛选器 */}
-          <Select value={filterStatus} onValueChange={(value) => setFilterStatus(value as RequirementStatus | 'all')}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="状态" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部状态</SelectItem>
-              <SelectItem value="PENDING">待审核</SelectItem>
-              <SelectItem value="APPROVED">审核通过</SelectItem>
-              <SelectItem value="REJECTED">审核不通过</SelectItem>
-              <SelectItem value="SCHEDULED">已排期</SelectItem>
-            </SelectContent>
-          </Select>
+            {/* 列隐藏控制 */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="outline"
+                  className={hiddenColumns.length > 0 ? 'bg-blue-100 text-blue-700 border-blue-200' : ''}
+                >
+                  <EyeOff className="h-4 w-4 mr-2" />
+                  {hiddenColumns.length > 0 ? `${hiddenColumns.length} 列隐藏` : '列隐藏'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>显示/隐藏列</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {filterableColumns.map((col) => (
+                  <DropdownMenuItem
+                    key={col.value}
+                    onClick={() => toggleColumnVisibility(col.value)}
+                    className="flex items-center gap-2"
+                  >
+                    <Checkbox
+                      checked={!hiddenColumns.includes(col.value)}
+                      className="pointer-events-none"
+                    />
+                    <span className="flex-1">{col.label}</span>
+                    {!hiddenColumns.includes(col.value) ? (
+                      <Eye className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    setHiddenColumns([]);
+                    toast.success('已显示所有列');
+                  }}
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  显示所有列
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          <Select value={filterType} onValueChange={(value) => setFilterType(value as RequirementType | 'all')}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="类型" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部类型</SelectItem>
-              <SelectItem value="NEW_FEATURE">新功能</SelectItem>
-              <SelectItem value="BUG">Bug修复</SelectItem>
-              <SelectItem value="ENHANCEMENT">功能增强</SelectItem>
-              <SelectItem value="OPTIMIZATION">优化改进</SelectItem>
-            </SelectContent>
-          </Select>
+            {/* 使用 flex-1 来推送右侧元素到最右边 */}
+            <div className="flex-1"></div>
 
-          {/* 视图切换开关 */}
-          <div className="flex bg-background border border-border rounded-md p-1">
-            <button
-              onClick={() => setViewMode('unscheduled')}
-              className={`px-3 py-1.5 text-sm font-medium rounded-sm transition-colors ${
-                viewMode === 'unscheduled' 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              未排期
-            </button>
-            <button
-              onClick={() => setViewMode('scheduled')}
-              className={`px-3 py-1.5 text-sm font-medium rounded-sm transition-colors ${
-                viewMode === 'scheduled' 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              已排期
-            </button>
-          </div>
+            {/* 状态筛选 - 参照列隐藏样式 */}
+            <div className="flex">
+              {/* 开放中 */}
+              <Button
+                variant="outline"
+                onClick={() => setStatusFilter('开放中')}
+                className={`rounded-r-none border-r-0 ${
+                  statusFilter === '开放中' ? 'bg-blue-100 text-blue-700 border-blue-200' : ''
+                }`}
+              >
+                开放中 {stats.open}
+              </Button>
+              {/* 已关闭 */}
+              <Button
+                variant="outline"
+                onClick={() => setStatusFilter('已关闭')}
+                className={`rounded-none border-r-0 ${
+                  statusFilter === '已关闭' ? 'bg-blue-100 text-blue-700 border-blue-200' : ''
+                }`}
+              >
+                已关闭 {stats.closed}
+              </Button>
+              {/* 全部 */}
+              <Button
+                variant="outline"
+                onClick={() => setStatusFilter('全部')}
+                className={`rounded-l-none ${
+                  statusFilter === '全部' ? 'bg-blue-100 text-blue-700 border-blue-200' : ''
+                }`}
+              >
+                全部 {stats.total}
+              </Button>
+            </div>
 
-          {/* 批量操作 */}
-          {viewMode === 'unscheduled' && selectedRequirements.length > 0 && (
-            <Button onClick={handleBatchSchedule} variant="default">
-              <Calendar className="h-4 w-4 mr-2" />
-              批量排期 ({selectedRequirements.length})
+            {/* 新建需求按钮 - 移到最右侧 */}
+            <Button asChild>
+              <Link href="/requirements/new">
+                <Plus className="h-4 w-4 mr-2" />
+                新建需求
+              </Link>
             </Button>
-          )}
-
-          {/* 创建需求按钮 */}
-          <Button asChild>
-            <Link href="/requirements/new">
-              <Plus className="h-4 w-4 mr-2" />
-              提交需求
-            </Link>
-          </Button>
+          </div>
         </div>
+
+        {/* 批量操作栏 */}
+        {selectedRequirements.length > 0 && (
+          <Card className="border-blue-200 bg-blue-50">
+            <CardContent className="py-1.5 px-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <span className="text-sm font-medium text-blue-700">
+                    已选择 {selectedRequirements.length} 个需求
+                  </span>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setSelectedRequirements([])}
+                  >
+                    取消选择
+                  </Button>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-blue-700">批量操作:</span>
+                  <Select value={batchNeedToDoValue} onValueChange={handleBatchNeedToDoUpdate}>
+                    <SelectTrigger className={`w-28 h-8 ${
+                      batchNeedToDoValue === '是' ? 'bg-green-50 text-green-700 border-green-200' :
+                      batchNeedToDoValue === '否' ? 'bg-red-50 text-red-700 border-red-200' :
+                      batchNeedToDoValue === 'unset' ? 'bg-gray-50 text-gray-600 border-gray-200' :
+                      ''
+                    }`}>
+                      <SelectValue placeholder="是否要做" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unset" className="bg-gray-50 text-gray-600">
+                        <span className="font-medium">设为：未设置</span>
+                      </SelectItem>
+                      <SelectItem value="是" className="bg-green-50 text-green-700">
+                        <span className="font-medium">设为：是</span>
+                      </SelectItem>
+                      <SelectItem value="否" className="bg-red-50 text-red-700">
+                        <span className="font-medium">设为：否</span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* 需求表格 */}
-        <div className="rounded-md border overflow-x-auto">
-          <Table className="min-w-full">
-            <TableHeaderRaw>
-              <TableRowRaw>
-                {viewMode === 'unscheduled' && (
-                  <TableHeadRaw className="w-12">
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[8%] px-2">
                     <Checkbox
-                      checked={selectedRequirements.length === filteredRequirements.length && filteredRequirements.length > 0}
+                      checked={selectedRequirements.length === sortedRequirements.length && sortedRequirements.length > 0}
                       onCheckedChange={handleSelectAll}
                     />
-                  </TableHeadRaw>
-                )}
-                <TableHeadRaw>ID</TableHeadRaw>
-                <TableHeadRaw>需求名称</TableHeadRaw>
-                <TableHeadRaw>类型</TableHeadRaw>
-                <TableHeadRaw>应用端</TableHeadRaw>
-                <TableHeadRaw>优先级</TableHeadRaw>
-                <TableHeadRaw>状态</TableHeadRaw>
-                <TableHeadRaw>提出者</TableHeadRaw>
-                {viewMode === 'scheduled' && <TableHeadRaw>负责人</TableHeadRaw>}
-                <TableHeadRaw>创建时间</TableHeadRaw>
-                <TableHeadRaw>操作</TableHeadRaw>
-              </TableRowRaw>
-            </TableHeaderRaw>
-            <TableBodyRaw>
-              {filteredRequirements.length > 0 ? (
-                filteredRequirements.map((requirement) => (
-                  <TableRowRaw key={requirement.id}>
-                    {viewMode === 'unscheduled' && (
-                      <TableCellRaw>
+                  </TableHead>
+                  {!hiddenColumns.includes('id') && (
+                    <TableHead className="w-[8%] px-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 font-medium"
+                        onClick={() => handleColumnSort('id')}
+                      >
+                        ID
+                        {getSortIcon('id')}
+                      </Button>
+                    </TableHead>
+                  )}
+                  <TableHead className="w-[35%] px-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 font-medium"
+                      onClick={() => handleColumnSort('title')}
+                    >
+                      标题
+                      {getSortIcon('title')}
+                    </Button>
+                  </TableHead>
+                  {!hiddenColumns.includes('type') && (
+                    <TableHead className="w-[10%] px-2">需求类型</TableHead>
+                  )}
+                  {!hiddenColumns.includes('platform') && (
+                    <TableHead className="w-[10%] px-2">应用端</TableHead>
+                  )}
+                  {!hiddenColumns.includes('needToDo') && (
+                    <TableHead className="w-[8%] px-2">是否要做</TableHead>
+                  )}
+                  {!hiddenColumns.includes('priority') && (
+                    <TableHead className="w-[8%] px-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 font-medium"
+                        onClick={() => handleColumnSort('priority')}
+                      >
+                        优先级
+                        {getSortIcon('priority')}
+                      </Button>
+                    </TableHead>
+                  )}
+                  {!hiddenColumns.includes('submitter') && (
+                    <TableHead className="w-[8%] px-2">创建人</TableHead>
+                  )}
+                  {!hiddenColumns.includes('createdAt') && (
+                    <TableHead className="w-[10%] px-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 font-medium"
+                        onClick={() => handleColumnSort('createdAt')}
+                      >
+                        创建时间
+                        {getSortIcon('createdAt')}
+                      </Button>
+                    </TableHead>
+                  )}
+                  {!hiddenColumns.includes('updatedAt') && (
+                    <TableHead className="w-[10%] px-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 font-medium"
+                        onClick={() => handleColumnSort('updatedAt')}
+                      >
+                        更新时间
+                        {getSortIcon('updatedAt')}
+                      </Button>
+                    </TableHead>
+                  )}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedRequirements.length > 0 ? (
+                  sortedRequirements.map((requirement) => (
+                    <TableRow key={requirement.id} className="hover:bg-muted/50">
+                      <TableCell className="px-2">
                         <Checkbox
                           checked={selectedRequirements.includes(requirement.id)}
                           onCheckedChange={(checked) => handleSelectRequirement(requirement.id, checked as boolean)}
                         />
-                      </TableCellRaw>
-                    )}
-                    <TableCellRaw className="font-mono text-sm">{requirement.id}</TableCellRaw>
-                    <TableCellRaw>
-                      <div className="max-w-md">
-                        <div className="font-medium">{requirement.title}</div>
-                        <div className="text-sm text-muted-foreground truncate mt-1">
-                          {requirement.description}
+                      </TableCell>
+                      {!hiddenColumns.includes('id') && (
+                        <TableCell className="px-2 font-mono text-xs text-muted-foreground">
+                          {requirement.id}
+                        </TableCell>
+                      )}
+                      <TableCell className="px-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Link 
+                              href={`/requirements/${requirement.id}`}
+                              className="font-medium hover:text-blue-600 cursor-pointer line-clamp-2"
+                            >
+                              {requirement.title}
+                            </Link>
+                            <Badge variant={requirement.isOpen ? "default" : "secondary"} className="text-xs">
+                              {requirement.isOpen ? 'Open' : 'Closed'}
+                            </Badge>
+                          </div>
                         </div>
-                      </div>
-                    </TableCellRaw>
-                    <TableCellRaw>
-                      <Badge variant="outline" className={requirementTypeConfig[requirement.type]?.color}>
-                        {requirementTypeConfig[requirement.type]?.label}
-                      </Badge>
-                    </TableCellRaw>
-                    <TableCellRaw>
-                      <Badge variant="outline">
-                        {platformConfig[requirement.platform]?.label}
-                      </Badge>
-                    </TableCellRaw>
-                    <TableCellRaw>
-                      <Badge variant="outline" className={priorityConfig[requirement.priority]?.color}>
-                        {priorityConfig[requirement.priority]?.label}
-                      </Badge>
-                    </TableCellRaw>
-                    <TableCellRaw>
-                      <Badge variant="outline" className={statusConfig[requirement.status].color}>
-                        {statusConfig[requirement.status].label}
-                      </Badge>
-                    </TableCellRaw>
-                    <TableCellRaw>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          <AvatarImage src={`https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${requirement.submitter.username}`} />
-                          <AvatarFallback>{requirement.submitter.name[0]}</AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm">{requirement.submitter.name}</span>
-                      </div>
-                    </TableCellRaw>
-                    {viewMode === 'scheduled' && (
-                      <TableCellRaw>
-                        {requirement.assignee ? (
+                      </TableCell>
+                      {!hiddenColumns.includes('type') && (
+                        <TableCell className="px-2">
+                          <span className="text-sm">
+                            {requirementTypeConfig[requirement.type]?.label || requirement.type}
+                          </span>
+                        </TableCell>
+                      )}
+                      {!hiddenColumns.includes('platform') && (
+                        <TableCell className="px-2">
+                          <div className="flex flex-wrap gap-1">
+                            {(requirement.platforms || []).map((p, index) => (
+                              <Badge key={index} variant="secondary" className="text-xs">
+                                {platformConfig[p as keyof typeof platformConfig]?.label || p}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                      )}
+                      {!hiddenColumns.includes('needToDo') && (
+                        <TableCell className="px-2">
+                          <Select
+                            value={requirement.needToDo || "unset"}
+                            onValueChange={(value) => handleNeedToDoChange(requirement.id, value === "unset" ? undefined : value as '是' | '否')}
+                          >
+                            <SelectTrigger className={`h-8 text-sm w-20 ${
+                              requirement.needToDo === '是' ? 'bg-green-50 text-green-700 border-green-200' :
+                              requirement.needToDo === '否' ? 'bg-red-50 text-red-700 border-red-200' :
+                              'bg-gray-50 text-gray-600 border-gray-200'
+                            }`}>
+                              <SelectValue placeholder="请选择" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unset" className="bg-gray-50 text-gray-600">
+                                <span className="font-medium">未设置</span>
+                              </SelectItem>
+                              <SelectItem value="是" className="bg-green-50 text-green-700">
+                                <span className="font-medium">是</span>
+                              </SelectItem>
+                              <SelectItem value="否" className="bg-red-50 text-red-700">
+                                <span className="font-medium">否</span>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      )}
+                      {!hiddenColumns.includes('priority') && (
+                        <TableCell className="px-2">
+                          <Select
+                            value={requirement.priority}
+                            onValueChange={(value) => handlePriorityChange(requirement.id, value as Priority)}
+                          >
+                            <SelectTrigger className={`h-8 text-sm w-16 ${priorityConfig[requirement.priority]?.className.replace('text-', 'bg-').replace('-800', '-50')} ${priorityConfig[requirement.priority]?.className.replace('-800', '-700')} border-${priorityConfig[requirement.priority]?.className.split('-')[1]}-200`}>
+                              <SelectValue placeholder="请选择" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(priorityConfig).map(([key, value]) => (
+                                <SelectItem 
+                                  key={key} 
+                                  value={key}
+                                  className={`${value.className.replace('text-', 'bg-').replace('-800', '-50')} ${value.className}`}
+                                >
+                                  <span className="font-medium">{value.label}</span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      )}
+                      {!hiddenColumns.includes('submitter') && (
+                        <TableCell className="px-2">
                           <div className="flex items-center gap-2">
                             <Avatar className="h-6 w-6">
-                              <AvatarImage src={`https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${requirement.assignee.username}`} />
-                              <AvatarFallback>{requirement.assignee.name[0]}</AvatarFallback>
+                              <AvatarImage src={requirement.creator?.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${requirement.creator?.name}`} />
+                              <AvatarFallback className="text-xs">
+                                {requirement.creator?.name?.slice(0, 2) || 'U'}
+                              </AvatarFallback>
                             </Avatar>
-                            <span className="text-sm">{requirement.assignee.name}</span>
+                            <span className="text-sm">{requirement.creator?.name || '未知用户'}</span>
                           </div>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">未分配</span>
-                        )}
-                      </TableCellRaw>
-                    )}
-                    <TableCellRaw className="text-sm">
-                      {new Date(requirement.createdAt).toLocaleDateString('zh-CN')}
-                    </TableCellRaw>
-                    <TableCellRaw>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>操作</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem asChild>
-                            <Link href={`/requirements/${requirement.id}`}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              查看详情
-                            </Link>
-                          </DropdownMenuItem>
-                          {viewMode === 'unscheduled' && requirement.status === 'APPROVED' && (
-                            <DropdownMenuItem onClick={() => handleBatchSchedule()}>
-                              <Calendar className="h-4 w-4 mr-2" />
-                              加入排期
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCellRaw>
-                  </TableRowRaw>
-                ))
-              ) : (
-                <TableRowRaw>
-                  <TableCellRaw 
-                    colSpan={viewMode === 'unscheduled' ? 10 : 9} 
-                    className="h-24 text-center"
-                  >
-                    {viewMode === 'unscheduled' ? '暂无未排期需求' : '暂无已排期需求'}
-                  </TableCellRaw>
-                </TableRowRaw>
-              )}
-            </TableBodyRaw>
-          </Table>
-        </div>
+                        </TableCell>
+                      )}
+                      {!hiddenColumns.includes('createdAt') && (
+                        <TableCell className="px-2 text-sm">
+                          {requirement.createdAt}
+                        </TableCell>
+                      )}
+                      {!hiddenColumns.includes('updatedAt') && (
+                        <TableCell className="px-2 text-sm">
+                          {requirement.updatedAt}
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                      {searchTerm || customFilters.length > 0 || statusFilter !== '全部' 
+                        ? '没有找到符合条件的需求' 
+                        : '暂无需求数据'
+                      }
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </div>
     </AppLayout>
   );
