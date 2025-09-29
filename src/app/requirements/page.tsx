@@ -1,20 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { AppLayout } from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableCell,
-  TableHead,
-} from '@/components/ui/table';
 import { 
   Select,
   SelectContent,
@@ -22,41 +11,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { 
-  Search, 
-  Plus, 
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  Eye,
-  Filter,
-  EyeOff,
-  X,
-  Settings,
-  RefreshCw,
-  MoreHorizontal,
-  Trash2
-} from 'lucide-react';
-import Link from 'next/link';
+import { MoreHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
-import { useRequirementsStore, type Requirement, type User, type Project } from '@/lib/requirements-store';
+import { useRouter } from 'next/navigation';
+import { useRequirementsStore, type Requirement } from '@/lib/requirements-store';
+import { RequirementTable } from '@/components/requirements/RequirementTable';
+import { FilterPanel } from '@/components/requirements/FilterPanel';
+import { useRequirementFilters } from '@/hooks/useRequirementFilters';
+import { 
+  FILTERABLE_COLUMNS, 
+  NEED_TO_DO_CONFIG,
+  PRIORITY_CONFIG 
+} from '@/config/requirements';
 
 // 导入类型定义
 import type { 

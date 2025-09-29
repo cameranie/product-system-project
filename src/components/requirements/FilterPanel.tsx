@@ -1,0 +1,254 @@
+'use client';
+
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Search, Plus, EyeOff, Settings, Trash2 } from 'lucide-react';
+
+interface FilterCondition {
+  id: string;
+  column: string;
+  operator: string;
+  value: string;
+}
+
+interface FilterableColumn {
+  value: string;
+  label: string;
+}
+
+interface FilterPanelProps {
+  searchTerm: string;
+  statusFilter: string;
+  customFilters: FilterCondition[];
+  hiddenColumns: string[];
+  stats: {
+    total: number;
+    open: number;
+    closed: number;
+  };
+  filterableColumns: FilterableColumn[];
+  onSearchChange: (value: string) => void;
+  onStatusFilterChange: (status: string) => void;
+  onCustomFilterAdd: () => void;
+  onCustomFilterUpdate: (id: string, field: string, value: string) => void;
+  onCustomFilterRemove: (id: string) => void;
+  onCustomFiltersReset: () => void;
+  onColumnToggle: (column: string) => void;
+  onCreateNew: () => void;
+}
+
+const filterOperators = [
+  { value: 'contains', label: '包含' },
+  { value: 'equals', label: '等于' },
+  { value: 'not_equals', label: '不等于' },
+  { value: 'starts_with', label: '开始于' },
+  { value: 'ends_with', label: '结束于' },
+  { value: 'is_empty', label: '为空' },
+  { value: 'is_not_empty', label: '不为空' }
+];
+
+export function FilterPanel({
+  searchTerm,
+  statusFilter,
+  customFilters,
+  hiddenColumns,
+  stats,
+  filterableColumns,
+  onSearchChange,
+  onStatusFilterChange,
+  onCustomFilterAdd,
+  onCustomFilterUpdate,
+  onCustomFilterRemove,
+  onCustomFiltersReset,
+  onColumnToggle,
+  onCreateNew
+}: FilterPanelProps) {
+  return (
+    <div className="space-y-4">
+      {/* 搜索和操作栏 */}
+      <div className="flex items-center gap-4">
+        {/* 搜索框 */}
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Input
+            placeholder="搜索标题、创建人、ID、应用端..."
+            value={searchTerm}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
+        <div className="flex-1"></div>
+
+        {/* 状态筛选 */}
+        <div className="flex">
+          <Button
+            variant="outline"
+            onClick={() => onStatusFilterChange('开放中')}
+            className={`rounded-r-none border-r-0 ${
+              statusFilter === '开放中' ? 'bg-blue-100 text-blue-700 border-blue-200' : ''
+            }`}
+          >
+            开放中 {stats.open}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => onStatusFilterChange('已关闭')}
+            className={`rounded-none border-r-0 ${
+              statusFilter === '已关闭' ? 'bg-blue-100 text-blue-700 border-blue-200' : ''
+            }`}
+          >
+            已关闭 {stats.closed}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => onStatusFilterChange('全部')}
+            className={`rounded-l-none ${
+              statusFilter === '全部' ? 'bg-blue-100 text-blue-700 border-blue-200' : ''
+            }`}
+          >
+            全部 {stats.total}
+          </Button>
+        </div>
+
+        {/* 新建需求按钮 */}
+        <Button onClick={onCreateNew}>
+          <Plus className="h-4 w-4 mr-2" />
+          新建需求
+        </Button>
+      </div>
+
+      {/* 筛选控制栏 */}
+      <div className="flex items-center gap-2">
+        {/* 筛选设置 */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              variant="outline"
+              className={customFilters.length > 0 ? 'bg-blue-100 text-blue-700 border-blue-200' : ''}
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              {customFilters.length > 0 ? `${customFilters.length} 筛选设置` : '筛选设置'}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-[600px]">
+            <DropdownMenuSeparator />
+            {customFilters.map((filter) => (
+              <div key={filter.id} className="p-2">
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={filter.column}
+                    onValueChange={(value) => onCustomFilterUpdate(filter.id, 'column', value)}
+                  >
+                    <SelectTrigger className="h-8 w-[120px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filterableColumns.map((col) => (
+                        <SelectItem key={col.value} value={col.value}>
+                          {col.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select
+                    value={filter.operator}
+                    onValueChange={(value) => onCustomFilterUpdate(filter.id, 'operator', value)}
+                  >
+                    <SelectTrigger className="h-8 w-[100px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filterOperators.map((op) => (
+                        <SelectItem key={op.value} value={op.value}>
+                          {op.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  <Input
+                    placeholder="筛选值"
+                    value={filter.value}
+                    onChange={(e) => onCustomFilterUpdate(filter.id, 'value', e.target.value)}
+                    className="h-8 flex-1 min-w-[120px]"
+                    style={{ minWidth: '120px' }}
+                    disabled={filter.operator === 'is_empty' || filter.operator === 'is_not_empty'}
+                  />
+                  
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onCustomFilterRemove(filter.id)}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+            
+            <DropdownMenuSeparator />
+            <div className="p-2 flex gap-2">
+              <Button onClick={onCustomFilterAdd} variant="outline" size="sm" className="flex-1">
+                <Plus className="h-3 w-3 mr-1" />
+                添加条件
+              </Button>
+              {customFilters.length > 0 && (
+                <Button onClick={onCustomFiltersReset} variant="outline" size="sm" className="flex-1">
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  清空条件
+                </Button>
+              )}
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* 列隐藏控制 */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              variant="outline"
+              className={hiddenColumns.length > 0 ? 'bg-blue-100 text-blue-700 border-blue-200' : ''}
+            >
+              <EyeOff className="h-4 w-4 mr-2" />
+              {hiddenColumns.length > 0 ? `${hiddenColumns.length} 列隐藏` : '列隐藏'}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>显示/隐藏列</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {filterableColumns.map((col) => (
+              <DropdownMenuItem key={col.value} className="flex items-center space-x-2">
+                <Checkbox
+                  checked={!hiddenColumns.includes(col.value)}
+                  onCheckedChange={() => onColumnToggle(col.value)}
+                  className="pointer-events-none"
+                />
+                <span>{col.label}</span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+} 
