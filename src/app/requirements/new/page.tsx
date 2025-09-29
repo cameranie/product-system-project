@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { AppLayout } from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { FormField, FormFieldGroup } from '@/components/ui/form-field';
-import { WysiwygEditor } from '@/components/ui/wysiwyg-editor';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Select,
   SelectContent,
@@ -15,152 +17,198 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { 
-  ArrowLeft, 
+  ArrowLeft,
   Save,
-  Send,
+  X,
   Upload,
-  X
+  Paperclip,
+  Plus,
+  Trash2,
+  BarChart3,
+  FileText,
+  MousePointer,
+  Palette,
+  Bug
 } from 'lucide-react';
-import { userApi } from '@/lib/api';
-import type { 
-  RequirementType, 
-  ApplicationPlatform, 
-  Priority,
-  CreateRequirementInput,
-  User
-} from '@/types/issue';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+import { useRequirementsStore, mockUsers, mockProjects, type User, type Project, type Requirement } from '@/lib/requirements-store';
 
-// 需求类型配置
-const requirementTypeConfig = {
-  NEW_FEATURE: { label: '新功能', description: '全新的功能特性' },
-  ENHANCEMENT: { label: '功能增强', description: '现有功能的改进优化' },
-  BUG: { label: 'Bug修复', description: '系统缺陷和问题修复' },
-  OPTIMIZATION: { label: '优化改进', description: '性能优化和体验提升' },
-};
+// 模拟版本数据
+const mockVersions = [
+  { id: '1', name: 'v1.0.0', status: '规划中' },
+  { id: '2', name: 'v1.1.0', status: '开发中' },
+  { id: '3', name: 'v1.2.0', status: '规划中' },
+  { id: '4', name: 'v2.0.0', status: '规划中' },
+];
 
-// 应用端配置
-const platformConfig = {
-  WEB: { label: 'Web端', description: '网页版应用' },
-  MOBILE: { label: '移动端', description: 'iOS/Android应用' },
-  DESKTOP: { label: '桌面端', description: '桌面客户端应用' },
-  API: { label: 'API接口', description: '后端接口和服务' },
-  ALL: { label: '全端', description: '涉及多个平台' },
-};
+// 预定义标签
+const predefinedTags = ['UI优化', '性能', '安全', '用户体验', '移动端', '数据分析'];
 
-// 优先级配置
-const priorityConfig = {
-  LOW: { label: '低', description: '可以延后处理', color: '#6B7280' },
-  MEDIUM: { label: '中', description: '正常优先级', color: '#F59E0B' },
-  HIGH: { label: '高', description: '需要尽快处理', color: '#EF4444' },
-  URGENT: { label: '紧急', description: '立即处理', color: '#DC2626' },
-};
+const requirementTypes = ['新功能', '优化', 'BUG', '用户反馈', '商务需求'];
+const platformOptions = ['Web端', 'PC端', '移动端'];
 
 interface RequirementFormData {
   title: string;
+  type: '新功能' | '优化' | 'BUG' | '用户反馈' | '商务需求';
   description: string;
-  type: RequirementType;
-  platform: ApplicationPlatform;
-  priority: Priority;
-  businessValue: string;
-  userImpact: string;
-  technicalRisk: string;
-  attachments: string[];
+  tags: string[];
+  attachments: File[];
+  platforms: string[];
+  endOwnerOpinion: {
+    needToDo?: boolean;
+    priority?: '高' | '中' | '低';
+    opinion?: string;
+    owner?: User;
+  };
+  scheduledReview: {
+    reviewLevels: Array<{
+      id: string;
+      level: number;
+      levelName: string;
+      status: 'pending' | 'approved' | 'rejected';
+      reviewer?: User;
+      opinion?: string;
+    }>;
+  };
 }
 
 export default function CreateRequirementPage() {
+  const router = useRouter();
+  const { createRequirement, loading } = useRequirementsStore();
+  
   const [formData, setFormData] = useState<RequirementFormData>({
     title: '',
+    type: '新功能',
     description: '',
-    type: 'NEW_FEATURE' as RequirementType,
-    platform: 'WEB' as ApplicationPlatform,
-    priority: 'MEDIUM' as Priority,
-    businessValue: '',
-    userImpact: '',
-    technicalRisk: '',
+    tags: [],
     attachments: [],
+    platforms: [],
+    endOwnerOpinion: {
+      needToDo: undefined,
+      priority: undefined,
+      opinion: '',
+      owner: undefined
+    },
+    scheduledReview: {
+      reviewLevels: [
+        {
+          id: '1',
+          level: 1,
+          levelName: '一级评审',
+          status: 'pending'
+        },
+        {
+          id: '2',
+          level: 2,
+          levelName: '二级评审',
+          status: 'pending'
+        }
+      ]
+    }
   });
 
-  const [saving, setSaving] = useState(false);
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [newTag, setNewTag] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 加载用户数据
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        const usersResponse = await userApi.getUsers();
-        setUsers(usersResponse.users.users);
-      } catch (error) {
-        console.error('Failed to load data:', error);
-        alert('加载数据失败，请刷新重试');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, []);
-
-  const handleBack = () => {
-    if (window.confirm('确定要离开吗？未保存的内容将丢失。')) {
-      window.history.back();
-    }
+  const handleInputChange = (field: keyof RequirementFormData, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
-  const handleSave = async (isDraft = false) => {
-    if (!formData.title || !formData.description) {
-      alert('请填写需求名称和描述');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      // 这里应该调用API创建需求
-      const requirementData: CreateRequirementInput = {
-        title: formData.title,
-        description: formData.description,
-        type: formData.type,
-        platform: formData.platform,
-        priority: formData.priority,
-        businessValue: formData.businessValue || undefined,
-        userImpact: formData.userImpact || undefined,
-        technicalRisk: formData.technicalRisk || undefined,
-        attachments: formData.attachments.length > 0 ? formData.attachments : undefined,
-      };
-
-      console.log('创建需求:', requirementData);
-      
-      // 模拟API调用
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      if (isDraft) {
-        alert('需求草稿保存成功！');
+  const handlePlatformChange = (platform: string, checked: boolean) => {
+    setFormData(prev => {
+      const currentPlatforms = prev.platforms || [];
+      if (checked) {
+        if (!currentPlatforms.includes(platform)) {
+          return {
+            ...prev,
+            platforms: [...currentPlatforms, platform]
+          };
+        }
       } else {
-        alert('需求提交成功！将转至需求池页面。');
-        // 跳转到需求池页面
-        window.location.href = '/requirements';
+        return {
+          ...prev,
+          platforms: currentPlatforms.filter(p => p !== platform)
+        };
       }
-    } catch (error) {
-      console.error('保存失败:', error);
-      alert('保存失败，请重试');
-    } finally {
-      setSaving(false);
-    }
+      return prev;
+    });
   };
 
-  // 添加附件
-  const handleAddAttachment = () => {
-    const url = prompt('请输入附件链接:');
-    if (url && url.trim()) {
-      setFormData(prev => ({
+  const handleEndOwnerOpinionChange = (field: string, value: string | boolean | User | undefined) => {
+    setFormData(prev => ({
+      ...prev,
+      endOwnerOpinion: {
+        ...prev.endOwnerOpinion,
+        [field]: value
+      }
+    }));
+  };
+
+  // 添加评审级别
+  const addReviewLevel = () => {
+    const newLevel = formData.scheduledReview.reviewLevels.length + 1;
+    const newReviewLevel = {
+      id: Date.now().toString(),
+      level: newLevel,
+      levelName: `${newLevel}级评审`,
+      status: 'pending' as const
+    };
+    
+    setFormData(prev => ({
+      ...prev,
+      scheduledReview: {
+        ...prev.scheduledReview,
+        reviewLevels: [...prev.scheduledReview.reviewLevels, newReviewLevel]
+      }
+    }));
+  };
+
+  // 删除评审级别
+  const removeReviewLevel = (levelId: string) => {
+    setFormData(prev => {
+      const updatedLevels = prev.scheduledReview.reviewLevels
+        .filter(level => level.id !== levelId)
+        .map((level, index) => ({
+          ...level,
+          level: index + 1,
+          levelName: `${index + 1}级评审`
+        }));
+      
+      return {
         ...prev,
-        attachments: [...prev.attachments, url.trim()]
-      }));
-    }
+        scheduledReview: {
+          ...prev.scheduledReview,
+          reviewLevels: updatedLevels
+        }
+      };
+    });
   };
 
-  // 删除附件
+  // 更新评审级别信息
+  const updateReviewLevel = (levelId: string, field: string, value: string | User | undefined) => {
+    setFormData(prev => ({
+      ...prev,
+      scheduledReview: {
+        ...prev.scheduledReview,
+        reviewLevels: prev.scheduledReview.reviewLevels.map(level =>
+          level.id === levelId ? { ...level, [field]: value } : level
+        )
+      }
+    }));
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setFormData(prev => ({
+      ...prev,
+      attachments: [...prev.attachments, ...files]
+    }));
+  };
+
   const handleRemoveAttachment = (index: number) => {
     setFormData(prev => ({
       ...prev,
@@ -168,261 +216,595 @@ export default function CreateRequirementPage() {
     }));
   };
 
-  if (loading) {
-    return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="text-lg">加载中...</div>
-            <div className="text-sm text-muted-foreground mt-2">正在加载数据</div>
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
+  const addTag = (tag: string) => {
+    if (tag && !formData.tags.includes(tag)) {
+      setFormData(prev => ({
+        ...prev,
+        tags: [...prev.tags, tag]
+      }));
+    }
+    setNewTag('');
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      tags: prev.tags.filter(tag => tag !== tagToRemove)
+    }));
+  };
+
+  const handleBack = () => {
+    if (window.confirm('确定要离开吗？未保存的内容将丢失。')) {
+      router.push('/requirements/enhanced');
+    }
+  };
+
+  const handleSave = async () => {
+    if (!formData.title.trim()) {
+      toast.error('请输入需求标题');
+      return;
+    }
+    if (!formData.description.trim()) {
+      toast.error('请输入需求描述');
+      return;
+    }
+
+    try {
+      // 转换文件为附件格式
+      const attachments = formData.attachments.map(file => ({
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        url: URL.createObjectURL(file)
+      }));
+
+      const requirementData: Omit<Requirement, 'id' | 'createdAt' | 'updatedAt'> = {
+        title: formData.title,
+        type: formData.type,
+        status: '待评审',
+        priority: '中',
+        creator: mockUsers[0], // 当前用户
+        project: mockProjects[0], // 默认项目
+        description: formData.description,
+        tags: formData.tags,
+        platforms: formData.platforms,
+        plannedVersion: 'v1.2.0',
+        isOpen: true,
+        needToDo: formData.endOwnerOpinion.needToDo ? '是' : formData.endOwnerOpinion.needToDo === false ? '否' : undefined,
+        reviewStatus: 'pending',
+        reviewer1Status: 'pending',
+        reviewer2Status: 'pending',
+        attachments,
+        endOwnerOpinion: formData.endOwnerOpinion,
+        scheduledReview: formData.scheduledReview
+      };
+      
+      const newRequirement = await createRequirement(requirementData);
+      toast.success('需求创建成功！');
+      
+      // 跳转到需求详情页
+      router.push(`/requirements/${newRequirement.id}`);
+    } catch (error) {
+      console.error('保存失败:', error);
+      toast.error('保存失败，请重试');
+    }
+  };
+
+  // 快捷操作处理函数
+  const handleNavigateToPRD = () => {
+    if (!formData.title.trim()) {
+      toast.error('请先输入需求标题再创建PRD');
+      return;
+    }
+    toast.info('PRD功能开发中，敬请期待！');
+  };
+
+  const handleNavigateToPrototype = () => {
+    if (!formData.title.trim()) {
+      toast.error('请先输入需求标题再创建原型');
+      return;
+    }
+    toast.info('交互原型功能开发中，敬请期待！');
+  };
+
+  const handleNavigateToDesign = () => {
+    if (!formData.title.trim()) {
+      toast.error('请先输入需求标题再创建设计稿');
+      return;
+    }
+    toast.info('UI设计稿功能开发中，敬请期待！');
+  };
+
+  const handleNavigateToBugs = () => {
+    if (!formData.title.trim()) {
+      toast.error('请先输入需求标题再提交问题');
+      return;
+    }
+    toast.info('问题追踪功能开发中，敬请期待！');
+  };
 
   return (
     <AppLayout>
       <div className="space-y-6">
-        {/* 顶部导航 */}
+        {/* 顶部操作栏 */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={handleBack}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
+            <Button variant="ghost" size="sm" onClick={handleBack}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
               返回
             </Button>
             <div>
-              <h1 className="text-xl font-semibold">提交需求</h1>
+              <h1 className="text-xl font-semibold">新建需求</h1>
               <p className="text-sm text-muted-foreground">
-                详细描述您的需求，帮助我们更好地理解和评估
+                填写需求的基本信息，创建后将通知相关处理人员
               </p>
             </div>
           </div>
-          
-          {/* 操作按钮 */}
-          <div className="flex items-center gap-3">
-            <Button 
-              onClick={() => handleSave(true)}
-              disabled={saving}
-              variant="outline"
-              size="sm"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              保存草稿
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleBack}>
+              取消
             </Button>
-            
-            <Button 
-              onClick={() => handleSave(false)}
-              disabled={saving || !formData.title || !formData.description}
-              size="sm"
-            >
-              <Send className="h-4 w-4 mr-2" />
-              {saving ? '提交中...' : '提交需求'}
+            <Button onClick={handleSave} disabled={loading}>
+              <Save className="h-4 w-4 mr-2" />
+              {loading ? '保存中...' : '提交'}
             </Button>
           </div>
         </div>
 
-        <div className="max-w-6xl mx-auto">
-          {/* 主要内容区域 */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* 左侧主要信息 - 占2列 */}
-            <div className="lg:col-span-2">
-              <FormFieldGroup>
-                {/* 需求名称 */}
-                <FormField label="需求名称" required>
-                  <Input
-                    placeholder="简洁明确地描述需求"
-                    value={formData.title}
-                    onChange={(e) => setFormData({...formData, title: e.target.value})}
-                  />
-                </FormField>
+        {/* 布局 - 左右分栏 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* 主要内容 - 左侧 2/3 */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* 需求描述 */}
+            <Card>
+              <CardHeader>
+                <CardTitle>需求描述</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="title">需求标题 *</Label>
+                    <Input
+                      id="title"
+                      value={formData.title}
+                      onChange={(e) => handleInputChange('title', e.target.value)}
+                      placeholder="请输入需求标题"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="description">需求描述 *</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => handleInputChange('description', e.target.value)}
+                      placeholder="请详细描述需求内容、背景、目标等..."
+                      className="mt-1 min-h-[200px]"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-                {/* 第一行：需求类型、应用端 */}
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField label="需求类型" required>
-                    <Select 
-                      value={formData.type} 
-                      onValueChange={(value) => setFormData({...formData, type: value as RequirementType})}
+            {/* 附件 */}
+            <Card>
+              <CardHeader>
+                <CardTitle>附件</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => fileInputRef.current?.click()}
                     >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(requirementTypeConfig).map(([key, config]) => (
-                          <SelectItem key={key} value={key}>
-                            <div className="flex flex-col">
-                              <span>{config.label}</span>
-                              <span className="text-xs text-muted-foreground">{config.description}</span>
+                      <Upload className="h-4 w-4 mr-2" />
+                      上传文件
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={handleFileUpload}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      支持多种文件格式，单个文件不超过10MB
+                    </span>
+                  </div>
+                  
+                  {formData.attachments && formData.attachments.length > 0 && (
+                    <div className="space-y-2">
+                      {formData.attachments.map((file, index) => (
+                        <div key={index} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50">
+                          <Paperclip className="h-4 w-4 text-muted-foreground" />
+                          <div className="flex-1">
+                            <div className="text-sm font-medium">{file.name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {(file.size / 1024).toFixed(1)} KB
                             </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormField>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleRemoveAttachment(index)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-                  <FormField label="应用端" required>
-                    <Select 
-                      value={formData.platform} 
-                      onValueChange={(value) => setFormData({...formData, platform: value as ApplicationPlatform})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(platformConfig).map(([key, config]) => (
-                          <SelectItem key={key} value={key}>
-                            <div className="flex flex-col">
-                              <span>{config.label}</span>
-                              <span className="text-xs text-muted-foreground">{config.description}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormField>
+          {/* 侧边信息 - 右侧 1/3 */}
+          <div className="space-y-6">
+            {/* 基本信息 */}
+            <Card>
+              <CardHeader>
+                <CardTitle>基本信息</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">需求类型</Label>
+                  <div className="mt-2 flex flex-wrap gap-4">
+                    {requirementTypes.map(type => (
+                      <div key={type} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`type-${type}`}
+                          checked={formData.type === type}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              handleInputChange('type', type);
+                            }
+                          }}
+                        />
+                        <Label 
+                          htmlFor={`type-${type}`} 
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          {type}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                {/* 需求描述 */}
-                <FormField label="需求描述" required>
-                  <WysiwygEditor
-                    value={formData.description}
-                    onChange={(value) => setFormData({...formData, description: value})}
-                    placeholder="详细描述您的需求，包括：
+                <div>
+                  <Label className="text-xs text-muted-foreground">应用端</Label>
+                  <div className="mt-2 flex flex-wrap gap-4">
+                    {platformOptions.map(platform => (
+                      <div key={platform} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`platform-${platform}`}
+                          checked={formData.platforms?.includes(platform) || false}
+                          onCheckedChange={(checked) => handlePlatformChange(platform, checked as boolean)}
+                        />
+                        <Label 
+                          htmlFor={`platform-${platform}`} 
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          {platform}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-• 需求背景：为什么需要这个功能？
-• 目标用户：主要面向哪些用户？
-• 功能描述：期望实现什么功能？
-• 使用场景：在什么情况下使用？
-• 期望效果：希望达到什么效果？
+            {/* 端负责人意见 */}
+            <Card>
+              <CardHeader>
+                <CardTitle>端负责人意见</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* 端负责人选择 */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">端负责人</Label>
+                  <Select 
+                    value={formData.endOwnerOpinion?.owner?.id || ''} 
+                    onValueChange={(value) => {
+                      const selectedUser = mockUsers.find(user => user.id === value);
+                      handleEndOwnerOpinionChange('owner', selectedUser);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="选择端负责人" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mockUsers.map(user => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-您也可以附上截图、原型图或参考链接。"
-                    minHeight="300px"
-                    showHelpText={false}
+                {/* 是否要做 */}
+                <div className="space-y-3">
+                  <Label className="text-xs text-muted-foreground">是否要做</Label>
+                  <div className="flex gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="needToDo-yes"
+                        checked={formData.endOwnerOpinion?.needToDo === true}
+                        onCheckedChange={(checked) => 
+                          handleEndOwnerOpinionChange('needToDo', checked ? true : undefined)
+                        }
+                      />
+                      <Label htmlFor="needToDo-yes" className="text-sm font-normal cursor-pointer">
+                        是
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="needToDo-no"
+                        checked={formData.endOwnerOpinion?.needToDo === false}
+                        onCheckedChange={(checked) => 
+                          handleEndOwnerOpinionChange('needToDo', checked ? false : undefined)
+                        }
+                      />
+                      <Label htmlFor="needToDo-no" className="text-sm font-normal cursor-pointer">
+                        否
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 优先级 */}
+                <div className="space-y-3">
+                  <Label className="text-xs text-muted-foreground">优先级</Label>
+                  <div className="flex gap-4">
+                    {['高', '中', '低'].map(priority => (
+                      <div key={priority} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`priority-${priority}`}
+                          checked={formData.endOwnerOpinion?.priority === priority}
+                          onCheckedChange={(checked) => 
+                            handleEndOwnerOpinionChange('priority', checked ? priority : undefined)
+                          }
+                        />
+                        <Label htmlFor={`priority-${priority}`} className="text-sm font-normal cursor-pointer">
+                          {priority}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 意见 */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">意见</Label>
+                  <Textarea
+                    value={formData.endOwnerOpinion?.opinion || ''}
+                    onChange={(e) => handleEndOwnerOpinionChange('opinion', e.target.value)}
+                    placeholder="请输入端负责人意见..."
+                    className="min-h-[80px]"
                   />
-                </FormField>
+                </div>
+              </CardContent>
+            </Card>
 
-                {/* 商业价值 */}
-                <FormField label="商业价值">
-                  <WysiwygEditor
-                    value={formData.businessValue}
-                    onChange={(value) => setFormData({...formData, businessValue: value})}
-                    placeholder="例如：提升用户满意度、增加收入、降低成本、提高效率等"
-                    minHeight="150px"
-                    showHelpText={false}
-                  />
-                </FormField>
+            {/* 预排期评审管理 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div>
+                    预排期评审管理
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addReviewLevel}
+                    className="h-7 px-2"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    添加级别
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {formData.scheduledReview.reviewLevels.map((level, index) => (
+                  <div key={level.id} className="space-y-3 p-4 border rounded-lg bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{level.levelName}</span>
+                      {formData.scheduledReview.reviewLevels.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeReviewLevel(level.id)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
 
-                {/* 用户影响 */}
-                <FormField label="用户影响">
-                  <WysiwygEditor
-                    value={formData.userImpact}
-                    onChange={(value) => setFormData({...formData, userImpact: value})}
-                    placeholder="例如：影响所有用户、仅影响VIP用户、影响管理员等"
-                    minHeight="150px"
-                    showHelpText={false}
-                  />
-                </FormField>
-
-                {/* 技术风险 */}
-                <FormField label="技术风险评估">
-                  <WysiwygEditor
-                    value={formData.technicalRisk}
-                    onChange={(value) => setFormData({...formData, technicalRisk: value})}
-                    placeholder="例如：涉及第三方系统集成、需要大量数据迁移、可能影响系统性能等"
-                    minHeight="150px"
-                    showHelpText={false}
-                  />
-                </FormField>
-              </FormFieldGroup>
-            </div>
-
-            {/* 右侧信息卡片 - 占1列 */}
-            <div className="lg:col-span-1">
-              <Card className="border border-border shadow-none py-0">
-                <CardContent className="p-6">
-                  <FormFieldGroup>
-                    {/* 优先级 */}
-                    <FormField label="优先级" required>
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">评审人</Label>
                       <Select 
-                        value={formData.priority} 
-                        onValueChange={(value) => setFormData({...formData, priority: value as Priority})}
+                        value={level.reviewer?.id || ''} 
+                        onValueChange={(value) => {
+                          const selectedUser = mockUsers.find(user => user.id === value);
+                          updateReviewLevel(level.id, 'reviewer', selectedUser);
+                        }}
                       >
-                        <SelectTrigger className="h-9">
-                          <SelectValue />
+                        <SelectTrigger className="h-8">
+                          <SelectValue placeholder="选择评审人员" />
                         </SelectTrigger>
                         <SelectContent>
-                          {Object.entries(priorityConfig).map(([key, config]) => (
-                            <SelectItem key={key} value={key}>
-                              <div className="flex items-center gap-2">
-                                <div 
-                                  className="w-3 h-3 rounded-full" 
-                                  style={{ backgroundColor: config.color }}
-                                />
-                                <div className="flex flex-col">
-                                  <span>{config.label}</span>
-                                  <span className="text-xs text-muted-foreground">{config.description}</span>
-                                </div>
-                              </div>
+                          {mockUsers.map(user => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                    </FormField>
+                    </div>
 
-                    {/* 附件上传 */}
-                    <FormField label="附件链接">
-                      <div className="space-y-2">
-                        <Button 
-                          type="button"
-                          variant="outline" 
-                          size="sm"
-                          onClick={handleAddAttachment}
-                          className="w-full"
-                        >
-                          <Upload className="h-4 w-4 mr-2" />
-                          添加附件链接
-                        </Button>
-                        
-                        {formData.attachments.length > 0 && (
-                          <div className="space-y-2">
-                            {formData.attachments.map((attachment, index) => (
-                              <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded">
-                                <span className="text-sm flex-1 truncate">{attachment}</span>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleRemoveAttachment(index)}
-                                  className="h-6 w-6 p-0"
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </FormField>
-
-                    {/* 提示信息 */}
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
-                      <h4 className="font-medium text-blue-900 mb-2">💡 提交提示</h4>
-                      <div className="text-sm text-blue-800 space-y-1">
-                        <p>• 需求将提交至需求池等待审核</p>
-                        <p>• 审核通过后会进入排期流程</p>
-                        <p>• 您可以随时查看需求处理进度</p>
-                        <p>• 如有疑问可联系产品经理</p>
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">评审状态</Label>
+                      <div className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`review-approved-${level.id}`}
+                            checked={level.status === 'approved'}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                updateReviewLevel(level.id, 'status', 'approved');
+                              } else {
+                                updateReviewLevel(level.id, 'status', 'pending');
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`review-approved-${level.id}`} className="text-sm font-normal cursor-pointer">
+                            评审通过
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`review-rejected-${level.id}`}
+                            checked={level.status === 'rejected'}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                updateReviewLevel(level.id, 'status', 'rejected');
+                              } else {
+                                updateReviewLevel(level.id, 'status', 'pending');
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`review-rejected-${level.id}`} className="text-sm font-normal cursor-pointer">
+                            评审不通过
+                          </Label>
+                        </div>
                       </div>
                     </div>
-                  </FormFieldGroup>
-                </CardContent>
-              </Card>
-            </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">评审意见</Label>
+                      <Textarea
+                        value={level.opinion || ''}
+                        onChange={(e) => updateReviewLevel(level.id, 'opinion', e.target.value)}
+                        placeholder="请输入评审意见（可不填）..."
+                        className="min-h-[60px] text-sm"
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                {formData.scheduledReview.reviewLevels.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p className="text-sm">暂无评审级别，点击"添加级别"开始配置</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 快捷操作卡片 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  快捷操作
+                </CardTitle>
+                <div className="text-xs text-muted-foreground">
+                  保存需求后可使用快捷操作
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {/* PRD快捷操作 */}
+                <div className="p-3 border rounded-lg hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-blue-500" />
+                      <span className="text-sm font-medium">产品需求文档</span>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleNavigateToPRD}
+                      disabled={!formData.title.trim()}
+                    >
+                      创建PRD
+                    </Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    为该需求创建详细的产品需求文档
+                  </div>
+                </div>
+
+                {/* 交互原型快捷操作 */}
+                <div className="p-3 border rounded-lg hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <MousePointer className="h-4 w-4 text-purple-500" />
+                      <span className="text-sm font-medium">交互原型</span>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleNavigateToPrototype}
+                      disabled={!formData.title.trim()}
+                    >
+                      创建原型
+                    </Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    创建可点击的交互原型和逻辑流程
+                  </div>
+                </div>
+
+                {/* UI设计稿快捷操作 */}
+                <div className="p-3 border rounded-lg hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Palette className="h-4 w-4 text-green-500" />
+                      <span className="text-sm font-medium">UI设计稿</span>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleNavigateToDesign}
+                      disabled={!formData.title.trim()}
+                    >
+                      创建设计稿
+                    </Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    创建精美的UI设计稿和视觉规范
+                  </div>
+                </div>
+
+                {/* Bug追踪快捷操作 */}
+                <div className="p-3 border rounded-lg hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Bug className="h-4 w-4 text-red-500" />
+                      <span className="text-sm font-medium">问题追踪</span>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleNavigateToBugs}
+                      disabled={!formData.title.trim()}
+                    >
+                      提交问题
+                    </Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    为该需求提交问题反馈
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>

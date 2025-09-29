@@ -1,554 +1,362 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import React, { useState, useEffect, useRef } from 'react';
 import { AppLayout } from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { 
-  ArrowLeft, 
-  Calendar,
+  ArrowLeft,
+  Edit,
+  FileText,
+  BarChart3,
+  Bug,
+  Link,
+  Paperclip,
+  GitBranch,
   CheckCircle,
   XCircle,
   Clock,
-  MessageSquare,
-  ExternalLink,
-  Edit,
-  Send
-} from 'lucide-react';
-import { 
-  RequirementStatus
-} from '@/types/issue';
-import type { 
-  Requirement, 
-  RequirementType, 
-  ApplicationPlatform,
-  Priority,
   User,
-  RequirementComment
-} from '@/types/issue';
+  AlertCircle,
+  MousePointer,
+  Palette,
+  Send,
+  Reply,
+  Upload,
+  X
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+import { useRequirementsStore, mockUsers, type User, type Project, type Attachment } from '@/lib/requirements-store';
 
-// 配置对象（复用之前的配置）
-const requirementTypeConfig = {
-  NEW_FEATURE: { label: '新功能', color: 'bg-blue-100 text-blue-800' },
-  BUG: { label: 'Bug修复', color: 'bg-red-100 text-red-800' },
-  ENHANCEMENT: { label: '功能增强', color: 'bg-green-100 text-green-800' },
-  OPTIMIZATION: { label: '优化改进', color: 'bg-purple-100 text-purple-800' },
-};
+interface Comment {
+  id: string;
+  content: string;
+  author: User;
+  createdAt: string;
+  attachments: Attachment[];
+  replies: Reply[];
+}
 
-const platformConfig = {
-  WEB: { label: 'Web端' },
-  MOBILE: { label: '移动端' },
-  DESKTOP: { label: '桌面端' },
-  API: { label: 'API接口' },
-  ALL: { label: '全端' },
-};
+interface Reply {
+  id: string;
+  content: string;
+  author: User;
+  createdAt: string;
+  attachments: Attachment[];
+}
 
-const priorityConfig = {
-  LOW: { label: '低', color: 'bg-gray-100 text-gray-800' },
-  MEDIUM: { label: '中', color: 'bg-yellow-100 text-yellow-800' },
-  HIGH: { label: '高', color: 'bg-orange-100 text-orange-800' },
-  URGENT: { label: '紧急', color: 'bg-red-100 text-red-800' },
-};
+interface HistoryRecord {
+  id: string;
+  action: string;
+  field: string;
+  oldValue: string;
+  newValue: string;
+  user: User;
+  timestamp: string;
+}
 
-const statusConfig = {
-  PENDING: { label: '待审核', color: 'bg-gray-100 text-gray-800', icon: Clock },
-  APPROVED: { label: '审核通过', color: 'bg-green-100 text-green-800', icon: CheckCircle },
-  REJECTED: { label: '审核不通过', color: 'bg-red-100 text-red-800', icon: XCircle },
-  SCHEDULED: { label: '已排期', color: 'bg-blue-100 text-blue-800', icon: Calendar },
-  IN_DEVELOPMENT: { label: '开发中', color: 'bg-purple-100 text-purple-800', icon: Clock },
-  COMPLETED: { label: '已完成', color: 'bg-green-100 text-green-800', icon: CheckCircle },
-};
-
-export default function RequirementDetailPage() {
-  const params = useParams();
-  const requirementId = params.id as string;
-  
-  const [requirement, setRequirement] = useState<Requirement | null>(null);
-  const [comments, setComments] = useState<RequirementComment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export default function RequirementDetailPage({ params }: { params: { id: string } }) {
+  const router = useRouter();
+  const { getRequirementById, updateRequirement } = useRequirementsStore();
+  const [requirement, setRequirement] = useState<any>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
-  const [isCommenting, setIsCommenting] = useState(false);
+  const [newCommentFiles, setNewCommentFiles] = useState<File[]>([]);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyContent, setReplyContent] = useState('');
+  const [replyFiles, setReplyFiles] = useState<File[]>([]);
+  const commentFileRef = useRef<HTMLInputElement>(null);
+  const replyFileRef = useRef<HTMLInputElement>(null);
 
-  // 模拟数据加载
-  useEffect(() => {
-    const loadRequirement = async () => {
-      try {
-        setLoading(true);
-        
-        // 模拟API调用延迟
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        // 模拟需求详情数据
-        const mockRequirement: Requirement = {
-          id: requirementId,
-          title: '用户头像上传功能优化',
-          description: `
-            <h3>需求背景</h3>
-            <p>当前用户头像上传功能存在以下问题：</p>
-            <ul>
-              <li>上传速度较慢，用户等待时间长</li>
-              <li>不支持图片预览和裁剪</li>
-              <li>文件大小限制不够明确</li>
-              <li>上传失败后没有明确的错误提示</li>
-            </ul>
-            
-            <h3>目标用户</h3>
-            <p>所有需要设置个人头像的用户，特别是新注册用户和需要更新头像的活跃用户。</p>
-            
-            <h3>功能需求</h3>
-            <ol>
-              <li><strong>图片压缩优化</strong>：前端自动压缩图片，减少上传时间</li>
-              <li><strong>实时预览</strong>：支持上传前预览和简单裁剪</li>
-              <li><strong>进度显示</strong>：显示上传进度条</li>
-              <li><strong>错误处理</strong>：明确的错误提示和重试机制</li>
-              <li><strong>多格式支持</strong>：支持 JPG、PNG、WebP 格式</li>
-            </ol>
-            
-            <h3>期望效果</h3>
-            <ul>
-              <li>上传时间缩短 50% 以上</li>
-              <li>用户体验评分提升</li>
-              <li>减少客服关于头像上传的咨询</li>
-            </ul>
-          `,
-          type: 'ENHANCEMENT' as RequirementType,
-          platform: 'WEB' as ApplicationPlatform,
-          priority: 'HIGH' as Priority,
-          status: 'APPROVED' as RequirementStatus,
-          submitter: {
-            id: 'user-1',
-            name: '张三',
-            email: 'zhangsan@company.com',
-            username: 'zhangsan'
-          } as User,
-          reviewer: {
-            id: 'user-3',
-            name: '王五',
-            email: 'wangwu@company.com',
-            username: 'wangwu'
-          } as User,
-          assignee: {
-            id: 'user-5',
-            name: '孙七',
-            email: 'sunqi@company.com',
-            username: 'sunqi'
-          } as User,
-          expectedVersion: 'v2.1.0',
-          businessValue: '提升用户满意度，减少用户流失率，特别是新用户的首次使用体验。预计可以提升用户留存率 3-5%。',
-          userImpact: '影响所有需要上传头像的用户，预计每日约 500-800 次上传操作将受益。',
-          technicalRisk: '风险较低。主要涉及前端图片处理和后端接口优化，不涉及核心业务逻辑变更。需要注意不同浏览器的兼容性。',
-          attachments: [
-            'https://example.com/prototype-v1.figma',
-            'https://example.com/user-feedback-analysis.pdf'
-          ],
-          relatedRequirements: ['req-007', 'req-012'],
-          createdAt: '2024-01-15T10:30:00Z',
-          updatedAt: '2024-01-16T14:20:00Z',
-          submittedAt: '2024-01-15T10:35:00Z',
-          reviewedAt: '2024-01-16T14:20:00Z',
-          scheduledAt: '2024-01-16T14:25:00Z',
-        };
-        
-        // 模拟评论数据
-        const mockComments: RequirementComment[] = [
-          {
-            id: 'comment-1',
-            content: '这个需求很有价值，用户反馈确实比较多。建议优先处理图片压缩功能。',
-            createdAt: '2024-01-15T15:30:00Z',
-            author: {
-              id: 'user-3',
-              name: '王五',
-              email: 'wangwu@company.com',
-              username: 'wangwu'
-            } as User,
-            requirementId: requirementId,
-          },
-          {
-            id: 'comment-2',
-            content: '技术实现上建议使用 Canvas API 进行图片压缩，WebP 格式可以考虑渐进式支持。',
-            createdAt: '2024-01-16T09:15:00Z',
-            author: {
-              id: 'user-5',
-              name: '孙七',
-              email: 'sunqi@company.com',
-              username: 'sunqi'
-            } as User,
-            requirementId: requirementId,
-          },
-        ];
-        
-        setRequirement(mockRequirement);
-        setComments(mockComments);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : '加载失败');
-        console.error('Failed to load requirement:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (requirementId) {
-      loadRequirement();
+  // 模拟历史记录数据
+  const historyRecords: HistoryRecord[] = [
+    {
+      id: '1',
+      action: '创建',
+      field: '需求',
+      oldValue: '',
+      newValue: '创建了需求',
+      user: mockUsers[0],
+      timestamp: '2024-01-15 10:30'
+    },
+    {
+      id: '2',
+      action: '修改',
+      field: '优先级',
+      oldValue: '中',
+      newValue: '高',
+      user: mockUsers[1],
+      timestamp: '2024-01-16 14:20'
+    },
+    {
+      id: '3',
+      action: '修改',
+      field: '状态',
+      oldValue: '待评审',
+      newValue: '评审中',
+      user: mockUsers[2],
+      timestamp: '2024-01-18 09:15'
     }
-  }, [requirementId]);
+  ];
+
+  // 模拟评论数据
+  const mockComments: Comment[] = [
+    {
+      id: '1',
+      content: '这个需求很重要，建议优先处理。需要考虑用户体验的优化。',
+      author: mockUsers[1],
+      createdAt: '2024-01-16 15:30',
+      attachments: [
+        { id: '1', name: '用户调研报告.pdf', size: 2048000, type: 'application/pdf', url: '' }
+      ],
+      replies: [
+        {
+          id: '1-1',
+          content: '同意，我们可以先做一个原型来验证方案。',
+          author: mockUsers[2],
+          createdAt: '2024-01-16 16:45',
+          attachments: []
+        }
+      ]
+    },
+    {
+      id: '2',
+      content: '技术实现上需要注意性能问题，建议分阶段实现。',
+      author: mockUsers[3],
+      createdAt: '2024-01-17 10:20',
+      attachments: [],
+      replies: []
+    }
+  ];
+
+  useEffect(() => {
+    const req = getRequirementById(params.id);
+    if (req) {
+      setRequirement(req);
+      setComments(mockComments);
+    }
+  }, [params.id, getRequirementById]);
+
+  if (!requirement) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <h2 className="text-lg font-semibold">需求不存在</h2>
+            <p className="text-muted-foreground">找不到指定的需求信息</p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   const handleBack = () => {
-    window.history.back();
+    router.push('/requirements/enhanced');
   };
 
-  const handleAddComment = async () => {
-    if (!newComment.trim()) return;
-
-    setIsCommenting(true);
-    try {
-      // 模拟API调用
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const comment: RequirementComment = {
-        id: `comment-${Date.now()}`,
-        content: newComment,
-        createdAt: new Date().toISOString(),
-        author: {
-          id: 'current-user',
-          name: '当前用户',
-          email: 'current@company.com',
-          username: 'current'
-        } as User,
-        requirementId: requirementId,
-      };
-      
-      setComments(prev => [...prev, comment]);
-      setNewComment('');
-    } catch (error) {
-      console.error('Failed to add comment:', error);
-      alert('添加评论失败，请重试');
-    } finally {
-      setIsCommenting(false);
-    }
+  const handleEdit = () => {
+    router.push(`/requirements/${params.id}/edit`);
   };
 
-  const handleStatusChange = async (newStatus: RequirementStatus) => {
+  const handleToggleStatus = async () => {
     if (!requirement) return;
-
+    
     try {
-      // 这里应该调用API更新状态
-      console.log('更新需求状态:', newStatus);
+      const newStatus = requirement.isOpen ? false : true;
+      await updateRequirement(requirement.id, { isOpen: newStatus });
       
-      setRequirement(prev => prev ? {
-        ...prev,
-        status: newStatus,
-        updatedAt: new Date().toISOString(),
-        ...(newStatus === 'APPROVED' && { reviewedAt: new Date().toISOString() }),
-        ...(newStatus === 'SCHEDULED' && { scheduledAt: new Date().toISOString() }),
-      } : null);
+      // 重新获取需求数据以更新UI
+      const updatedRequirement = getRequirementById(params.id);
+      if (updatedRequirement) {
+        setRequirement(updatedRequirement);
+      }
       
-      alert('状态更新成功');
+      toast.success(newStatus ? '需求已重启' : '需求已关闭');
     } catch (error) {
-      console.error('Failed to update status:', error);
-      alert('状态更新失败，请重试');
+      toast.error('操作失败，请重试');
     }
   };
 
-  if (loading) {
-    return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">加载需求详情中...</p>
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
+  // 处理评论提交
+  const handleSubmitComment = () => {
+    if (!newComment.trim()) {
+      toast.error('请输入评论内容');
+      return;
+    }
 
-  if (error || !requirement) {
-    return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-red-500 mb-4">加载失败: {error || '需求不存在'}</p>
-            <Button onClick={() => window.location.reload()}>重试</Button>
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
+    const now = new Date();
+    const timeString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    
+    const comment: Comment = {
+      id: Date.now().toString(),
+      content: newComment,
+      author: mockUsers[0], // 当前用户
+      createdAt: timeString,
+      attachments: newCommentFiles.map(file => ({
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        url: URL.createObjectURL(file)
+      })),
+      replies: []
+    };
 
-  const StatusIcon = statusConfig[requirement.status].icon;
+    setComments(prev => [...prev, comment]);
+    setNewComment('');
+    setNewCommentFiles([]);
+    toast.success('评论已发布');
+  };
+
+  // 处理回复提交
+  const handleSubmitReply = (commentId: string) => {
+    if (!replyContent.trim()) {
+      toast.error('请输入回复内容');
+      return;
+    }
+
+    const now = new Date();
+    const timeString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    
+    const reply: Reply = {
+      id: Date.now().toString(),
+      content: replyContent,
+      author: mockUsers[0], // 当前用户
+      createdAt: timeString,
+      attachments: replyFiles.map(file => ({
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        url: URL.createObjectURL(file)
+      }))
+    };
+
+    setComments(prev => prev.map(comment => 
+      comment.id === commentId 
+        ? { ...comment, replies: [...comment.replies, reply] }
+        : comment
+    ));
+
+    setReplyContent('');
+    setReplyFiles([]);
+    setReplyingTo(null);
+    toast.success('回复已发布');
+  };
+
+  // 处理文件上传
+  const handleCommentFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setNewCommentFiles(prev => [...prev, ...files]);
+  };
+
+  const handleReplyFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setReplyFiles(prev => [...prev, ...files]);
+  };
+
+  // 移除文件
+  const removeCommentFile = (index: number) => {
+    setNewCommentFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeReplyFile = (index: number) => {
+    setReplyFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // 快捷操作处理函数
+  const handleNavigateToPRD = () => {
+    toast.info('PRD功能开发中，敬请期待！');
+  };
+
+  const handleNavigateToPrototype = () => {
+    toast.info('交互原型功能开发中，敬请期待！');
+  };
+
+  const handleNavigateToDesign = () => {
+    toast.info('UI设计稿功能开发中，敬请期待！');
+  };
+
+  const handleNavigateToBugs = () => {
+    toast.info('问题追踪功能开发中，敬请期待！');
+  };
+
+  // 状态配置
+  const statusConfig = {
+    '待评审': { color: 'bg-yellow-100 text-yellow-800' },
+    '评审中': { color: 'bg-blue-100 text-blue-800' },
+    '评审通过': { color: 'bg-green-100 text-green-800' },
+    '评审不通过': { color: 'bg-red-100 text-red-800' },
+    '已关闭': { color: 'bg-gray-100 text-gray-800' },
+    '开发中': { color: 'bg-purple-100 text-purple-800' },
+    '已完成': { color: 'bg-green-100 text-green-800' },
+    '设计中': { color: 'bg-orange-100 text-orange-800' }
+  };
+
+  const priorityConfig = {
+    '低': { color: 'bg-gray-100 text-gray-800' },
+    '中': { color: 'bg-yellow-100 text-yellow-800' },
+    '高': { color: 'bg-orange-100 text-orange-800' },
+    '紧急': { color: 'bg-red-100 text-red-800' }
+  };
 
   return (
     <AppLayout>
       <div className="space-y-6">
-        {/* 顶部导航 */}
+        {/* 顶部操作栏 */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={handleBack}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
+            <Button variant="ghost" size="sm" onClick={handleBack}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
               返回
             </Button>
             <div>
-              <div className="flex items-center gap-3 mb-1">
-                <h1 className="text-xl font-semibold">{requirement.title}</h1>
-                <Badge variant="outline" className={statusConfig[requirement.status].color}>
-                  <StatusIcon className="h-3 w-3 mr-1" />
-                  {statusConfig[requirement.status].label}
+              <h1 className="text-xl font-semibold">{requirement.title}</h1>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                <Badge variant={requirement.isOpen ? "default" : "secondary"} className="text-xs">
+                  {requirement.isOpen ? 'Open' : 'Closed'}
                 </Badge>
+                <span>{requirement.createdAt}</span>
+                <span>by {requirement.creator.name}</span>
               </div>
-              <p className="text-sm text-muted-foreground">
-                需求ID: {requirement.id} • 
-                创建于 {new Date(requirement.createdAt).toLocaleDateString('zh-CN')}
-              </p>
             </div>
           </div>
-          
-          {/* 操作按钮 */}
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm">
-              <Edit className="h-4 w-4 mr-2" />
-              编辑需求
+          <div className="flex items-center gap-2">
+            <Button 
+              variant={requirement.isOpen ? "destructive" : "default"}
+              onClick={handleToggleStatus}
+            >
+              {requirement.isOpen ? '关闭需求' : '重启需求'}
             </Button>
-            
-            {/* 状态操作 */}
-            {requirement.status === 'PENDING' && (
-              <>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => handleStatusChange(RequirementStatus.REJECTED)}
-                >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  审核不通过
-                </Button>
-                <Button 
-                  size="sm"
-                  onClick={() => handleStatusChange(RequirementStatus.APPROVED)}
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  审核通过
-                </Button>
-              </>
-            )}
-            
-            {requirement.status === 'APPROVED' && (
-              <Button 
-                size="sm"
-                onClick={() => handleStatusChange(RequirementStatus.SCHEDULED)}
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                加入排期
-              </Button>
-            )}
+            <Button onClick={handleEdit}>
+              <Edit className="h-4 w-4 mr-2" />
+              编辑
+            </Button>
           </div>
         </div>
 
+        {/* 布局 - 左右分栏 */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* 左侧主要内容 - 占2列 */}
+          {/* 主要内容 - 左侧 2/3 */}
           <div className="lg:col-span-2 space-y-6">
-            {/* 需求详情 */}
+            {/* 需求描述 */}
             <Card>
               <CardHeader>
-                <CardTitle>需求详情</CardTitle>
+                <CardTitle>需求描述</CardTitle>
               </CardHeader>
               <CardContent>
-                <div 
-                  className="prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{ __html: requirement.description }}
-                />
-              </CardContent>
-            </Card>
-
-            {/* 商业价值 */}
-            {requirement.businessValue && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>商业价值</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm">{requirement.businessValue}</p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* 用户影响 */}
-            {requirement.userImpact && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>用户影响</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm">{requirement.userImpact}</p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* 技术风险 */}
-            {requirement.technicalRisk && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>技术风险评估</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm">{requirement.technicalRisk}</p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* 评论区 */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5" />
-                  讨论与评论 ({comments.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* 现有评论 */}
-                {comments.map((comment) => (
-                  <div key={comment.id} className="border-l-2 border-muted pl-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={`https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${comment.author.username}`} />
-                        <AvatarFallback>{comment.author.name[0]}</AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm font-medium">{comment.author.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(comment.createdAt).toLocaleString('zh-CN')}
-                      </span>
-                    </div>
-                    <p className="text-sm">{comment.content}</p>
-                  </div>
-                ))}
-
-                {/* 添加评论 */}
-                <div className="border-t pt-4">
-                  <div className="space-y-3">
-                    <Textarea
-                      placeholder="添加评论..."
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      className="min-h-[80px]"
-                    />
-                    <div className="flex justify-end">
-                      <Button 
-                        size="sm" 
-                        onClick={handleAddComment}
-                        disabled={!newComment.trim() || isCommenting}
-                      >
-                        <Send className="h-4 w-4 mr-2" />
-                        {isCommenting ? '发送中...' : '发送评论'}
-                      </Button>
-                    </div>
-                  </div>
+                <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                  {requirement.description}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* 右侧信息面板 - 占1列 */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* 基本信息 */}
-            <Card>
-              <CardHeader>
-                <CardTitle>基本信息</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">需求类型</label>
-                  <div className="mt-1">
-                    <Badge variant="outline" className={requirementTypeConfig[requirement.type].color}>
-                      {requirementTypeConfig[requirement.type].label}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">应用端</label>
-                  <div className="mt-1">
-                    <Badge variant="outline">
-                      {platformConfig[requirement.platform].label}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">优先级</label>
-                  <div className="mt-1">
-                    <Badge variant="outline" className={priorityConfig[requirement.priority].color}>
-                      {priorityConfig[requirement.priority].label}
-                    </Badge>
-                  </div>
-                </div>
-
-                {requirement.expectedVersion && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">预期版本</label>
-                    <div className="mt-1 text-sm">{requirement.expectedVersion}</div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* 相关人员 */}
-            <Card>
-              <CardHeader>
-                <CardTitle>相关人员</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">需求提出者</label>
-                  <div className="mt-1 flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
-                      <AvatarImage src={`https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${requirement.submitter.username}`} />
-                      <AvatarFallback>{requirement.submitter.name[0]}</AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm">{requirement.submitter.name}</span>
-                  </div>
-                </div>
-
-                {requirement.reviewer && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">审核人</label>
-                    <div className="mt-1 flex items-center gap-2">
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={`https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${requirement.reviewer.username}`} />
-                        <AvatarFallback>{requirement.reviewer.name[0]}</AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm">{requirement.reviewer.name}</span>
-                    </div>
-                  </div>
-                )}
-
-                {requirement.assignee && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">负责人</label>
-                    <div className="mt-1 flex items-center gap-2">
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={`https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${requirement.assignee.username}`} />
-                        <AvatarFallback>{requirement.assignee.name[0]}</AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm">{requirement.assignee.name}</span>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
@@ -556,80 +364,583 @@ export default function RequirementDetailPage() {
             {requirement.attachments && requirement.attachments.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>附件资料</CardTitle>
+                  <CardTitle>附件</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2">
-                  {requirement.attachments.map((attachment, index) => (
-                    <a
-                      key={index}
-                      href={attachment}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 break-all"
-                    >
-                      <ExternalLink className="h-4 w-4 flex-shrink-0" />
-                      <span className="truncate">{attachment}</span>
-                    </a>
-                  ))}
+                <CardContent>
+                  <div className="space-y-2">
+                    {requirement.attachments.map((attachment: Attachment) => (
+                      <div key={attachment.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50">
+                        <Paperclip className="h-4 w-4 text-muted-foreground" />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium">{attachment.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {(attachment.size / 1024).toFixed(1)} KB
+                          </div>
+                        </div>
+                        <Button variant="outline" size="sm">
+                          下载
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             )}
 
-            {/* 时间线 */}
+            {/* 评论区 */}
             <Card>
               <CardHeader>
-                <CardTitle>处理时间线</CardTitle>
+                <CardTitle>评论 ({comments.length})</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* 评论列表 */}
+                {comments.map((comment) => (
+                  <div key={comment.id} className="space-y-3">
+                    <div className="flex gap-3">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="text-xs">{comment.author.name[0]}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{comment.author.name}</span>
+                          <span className="text-xs text-muted-foreground">{comment.createdAt}</span>
+                        </div>
+                        <div className="text-sm leading-relaxed">{comment.content}</div>
+                        
+                        {/* 评论附件 */}
+                        {comment.attachments.length > 0 && (
+                          <div className="space-y-1">
+                            {comment.attachments.map((attachment) => (
+                              <div key={attachment.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Paperclip className="h-3 w-3" />
+                                <span>{attachment.name}</span>
+                                <span>({(attachment.size / 1024).toFixed(1)} KB)</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => setReplyingTo(comment.id)}
+                          className="h-6 px-2 text-xs"
+                        >
+                          <Reply className="h-3 w-3 mr-1" />
+                          回复
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* 回复列表 */}
+                    {comment.replies.length > 0 && (
+                      <div className="ml-11 space-y-3 border-l-2 border-muted pl-4">
+                        {comment.replies.map((reply) => (
+                          <div key={reply.id} className="flex gap-3">
+                            <Avatar className="h-6 w-6">
+                              <AvatarFallback className="text-xs">{reply.author.name[0]}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium">{reply.author.name}</span>
+                                <span className="text-xs text-muted-foreground">{reply.createdAt}</span>
+                              </div>
+                              <div className="text-xs leading-relaxed">{reply.content}</div>
+                              
+                              {/* 回复附件 */}
+                              {reply.attachments.length > 0 && (
+                                <div className="space-y-1">
+                                  {reply.attachments.map((attachment) => (
+                                    <div key={attachment.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                                      <Paperclip className="h-3 w-3" />
+                                      <span>{attachment.name}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 回复输入框 */}
+                    {replyingTo === comment.id && (
+                      <div className="ml-11 space-y-3 border-l-2 border-blue-200 pl-4">
+                        <Textarea
+                          placeholder="输入回复内容..."
+                          value={replyContent}
+                          onChange={(e) => setReplyContent(e.target.value)}
+                          className="min-h-[80px]"
+                        />
+                        
+                        {/* 回复附件 */}
+                        {replyFiles.length > 0 && (
+                          <div className="space-y-2">
+                            {replyFiles.map((file, index) => (
+                              <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded">
+                                <Paperclip className="h-3 w-3" />
+                                <span className="text-xs flex-1">{file.name}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeReplyFile(index)}
+                                  className="h-6 w-6 p-0"
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => replyFileRef.current?.click()}
+                          >
+                            <Upload className="h-3 w-3 mr-1" />
+                            附件
+                          </Button>
+                          <input
+                            ref={replyFileRef}
+                            type="file"
+                            multiple
+                            className="hidden"
+                            onChange={handleReplyFileUpload}
+                          />
+                          <Button size="sm" onClick={() => handleSubmitReply(comment.id)}>
+                            <Send className="h-3 w-3 mr-1" />
+                            回复
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => setReplyingTo(null)}
+                          >
+                            取消
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    <Separator />
+                  </div>
+                ))}
+
+                {/* 新评论输入 */}
+                <div className="space-y-3 pt-4 border-t">
+                  <Textarea
+                    placeholder="添加评论..."
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    className="min-h-[100px]"
+                  />
+                  
+                  {/* 评论附件 */}
+                  {newCommentFiles.length > 0 && (
+                    <div className="space-y-2">
+                      {newCommentFiles.map((file, index) => (
+                        <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded">
+                          <Paperclip className="h-3 w-3" />
+                          <span className="text-sm flex-1">{file.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {(file.size / 1024).toFixed(1)} KB
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeCommentFile(index)}
+                            className="h-6 w-6 p-0"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => commentFileRef.current?.click()}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      添加附件
+                    </Button>
+                    <input
+                      ref={commentFileRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={handleCommentFileUpload}
+                    />
+                    <Button onClick={handleSubmitComment}>
+                      <Send className="h-4 w-4 mr-2" />
+                      发布评论
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 修改记录 */}
+            <Card>
+              <CardHeader>
+                <CardTitle>修改记录</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {historyRecords.map((record) => (
+                    <div key={record.id} className="flex items-center gap-3 py-2 text-sm">
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-xs">{record.user.name[0]}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <span className="font-medium">{record.user.name}</span>
+                        <span className="text-muted-foreground ml-2">
+                          {record.action}了{record.field}
+                          {record.oldValue && record.newValue && (
+                            <>：从 "{record.oldValue}" 改为 "{record.newValue}"</>
+                          )}
+                        </span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{record.timestamp}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 侧边信息 - 右侧 1/3 */}
+          <div className="space-y-6">
+            {/* 基本信息 */}
+            <Card>
+              <CardHeader>
+                <CardTitle>基本信息</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex items-center gap-3 text-sm">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                  <div>
-                    <div className="font-medium">需求创建</div>
-                    <div className="text-muted-foreground">
-                      {new Date(requirement.createdAt).toLocaleString('zh-CN')}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">需求类型</span>
+                  <span className="text-sm">{requirement.type}</span>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">优先级</span>
+                  <Badge className={`text-xs ${priorityConfig[requirement.priority]?.color || 'bg-gray-100 text-gray-800'}`}>
+                    {requirement.priority}
+                  </Badge>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">应用端</span>
+                  <div className="flex flex-wrap gap-1">
+                    {requirement.platforms.map((platform: string) => (
+                      <Badge key={platform} variant="secondary" className="text-xs">
+                        {platform}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 端负责人意见 */}
+            <Card>
+              <CardHeader>
+                <CardTitle>端负责人意见</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* 端负责人选择 */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">端负责人</Label>
+                  <Select 
+                    value={requirement.endOwnerOpinion?.owner?.id || ''} 
+                    onValueChange={(value) => {
+                      const selectedUser = mockUsers.find(user => user.id === value);
+                      // 这里应该调用更新接口
+                      toast.info('端负责人更新功能开发中');
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="选择端负责人" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mockUsers.map(user => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* 是否要做 */}
+                <div className="space-y-3">
+                  <Label className="text-xs text-muted-foreground">是否要做</Label>
+                  <div className="flex gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="needToDo-yes"
+                        checked={requirement.endOwnerOpinion?.needToDo === true}
+                        onCheckedChange={(checked) => {
+                          const currentUser = mockUsers[0];
+                          if (currentUser.id === requirement.endOwnerOpinion?.owner?.id) {
+                            // 这里应该调用更新接口
+                            toast.info('是否要做更新功能开发中');
+                          } else {
+                            toast.error('只有端负责人才能修改此信息');
+                          }
+                        }}
+                        disabled={mockUsers[0].id !== requirement.endOwnerOpinion?.owner?.id}
+                      />
+                      <Label htmlFor="needToDo-yes" className="text-sm font-normal cursor-pointer">
+                        是
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="needToDo-no"
+                        checked={requirement.endOwnerOpinion?.needToDo === false}
+                        onCheckedChange={(checked) => {
+                          const currentUser = mockUsers[0];
+                          if (currentUser.id === requirement.endOwnerOpinion?.owner?.id) {
+                            // 这里应该调用更新接口
+                            toast.info('是否要做更新功能开发中');
+                          } else {
+                            toast.error('只有端负责人才能修改此信息');
+                          }
+                        }}
+                        disabled={mockUsers[0].id !== requirement.endOwnerOpinion?.owner?.id}
+                      />
+                      <Label htmlFor="needToDo-no" className="text-sm font-normal cursor-pointer">
+                        否
+                      </Label>
                     </div>
                   </div>
                 </div>
 
-                {requirement.submittedAt && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                    <div>
-                      <div className="font-medium">提交审核</div>
-                      <div className="text-muted-foreground">
-                        {new Date(requirement.submittedAt).toLocaleString('zh-CN')}
+                {/* 优先级 */}
+                <div className="space-y-3">
+                  <Label className="text-xs text-muted-foreground">优先级</Label>
+                  <div className="flex gap-4">
+                    {['高', '中', '低'].map(priority => (
+                      <div key={priority} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`priority-${priority}`}
+                          checked={requirement.endOwnerOpinion?.priority === priority}
+                          onCheckedChange={(checked) => {
+                            const currentUser = mockUsers[0];
+                            if (currentUser.id === requirement.endOwnerOpinion?.owner?.id) {
+                              // 这里应该调用更新接口
+                              toast.info('优先级更新功能开发中');
+                            } else {
+                              toast.error('只有端负责人才能修改此信息');
+                            }
+                          }}
+                          disabled={mockUsers[0].id !== requirement.endOwnerOpinion?.owner?.id}
+                        />
+                        <Label htmlFor={`priority-${priority}`} className="text-sm font-normal cursor-pointer">
+                          {priority}
+                        </Label>
                       </div>
-                    </div>
+                    ))}
                   </div>
-                )}
+                </div>
 
-                {requirement.reviewedAt && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <div className={`w-2 h-2 rounded-full ${
-                      requirement.status === 'APPROVED' ? 'bg-green-400' : 'bg-red-400'
-                    }`}></div>
-                    <div>
-                      <div className="font-medium">
-                        {requirement.status === 'APPROVED' ? '审核通过' : '审核不通过'}
-                      </div>
-                      <div className="text-muted-foreground">
-                        {new Date(requirement.reviewedAt).toLocaleString('zh-CN')}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {/* 意见 */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">意见</Label>
+                  <Textarea
+                    value={requirement.endOwnerOpinion?.opinion || ''}
+                    onChange={(e) => {
+                      const currentUser = mockUsers[0];
+                      if (currentUser.id === requirement.endOwnerOpinion?.owner?.id) {
+                        // 这里应该调用更新接口
+                        toast.info('意见更新功能开发中');
+                      } else {
+                        toast.error('只有端负责人才能修改此信息');
+                      }
+                    }}
+                    placeholder="请输入端负责人意见..."
+                    className="min-h-[80px]"
+                    disabled={mockUsers[0].id !== requirement.endOwnerOpinion?.owner?.id}
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
-                {requirement.scheduledAt && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
-                    <div>
-                      <div className="font-medium">加入排期</div>
-                      <div className="text-muted-foreground">
-                        {new Date(requirement.scheduledAt).toLocaleString('zh-CN')}
+            {/* 预排期评审 */}
+            <Card>
+              <CardHeader>
+                <CardTitle>预排期评审</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {requirement.scheduledReview?.reviewLevels?.map((level, index) => (
+                  <div key={level.id} className="space-y-3 p-4 border rounded-lg bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{level.levelName}</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">评审人</Label>
+                      <Select 
+                        value={level.reviewer?.id || ''} 
+                        onValueChange={(value) => {
+                          const selectedUser = mockUsers.find(user => user.id === value);
+                          // 这里应该调用更新接口
+                          toast.info('评审人更新功能开发中');
+                        }}
+                      >
+                        <SelectTrigger className="h-8">
+                          <SelectValue placeholder="选择评审人员" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {mockUsers.map(user => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">评审状态</Label>
+                      <div className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`review-approved-${level.id}`}
+                            checked={level.status === 'approved'}
+                            onCheckedChange={(checked) => {
+                              const currentUser = mockUsers[0];
+                              if (currentUser.id === level.reviewer?.id) {
+                                // 这里应该调用更新接口
+                                toast.info('评审状态更新功能开发中');
+                              } else {
+                                toast.error('只有评审人员才能修改评审状态');
+                              }
+                            }}
+                            disabled={mockUsers[0].id !== level.reviewer?.id}
+                          />
+                          <Label htmlFor={`review-approved-${level.id}`} className="text-sm font-normal cursor-pointer">
+                            评审通过
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`review-rejected-${level.id}`}
+                            checked={level.status === 'rejected'}
+                            onCheckedChange={(checked) => {
+                              const currentUser = mockUsers[0];
+                              if (currentUser.id === level.reviewer?.id) {
+                                // 这里应该调用更新接口
+                                toast.info('评审状态更新功能开发中');
+                              } else {
+                                toast.error('只有评审人员才能修改评审状态');
+                              }
+                            }}
+                            disabled={mockUsers[0].id !== level.reviewer?.id}
+                          />
+                          <Label htmlFor={`review-rejected-${level.id}`} className="text-sm font-normal cursor-pointer">
+                            评审不通过
+                          </Label>
+                        </div>
                       </div>
                     </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">评审意见</Label>
+                      <Textarea
+                        value={level.opinion || ''}
+                        onChange={(e) => {
+                          const currentUser = mockUsers[0];
+                          if (currentUser.id === level.reviewer?.id) {
+                            // 这里应该调用更新接口
+                            toast.info('评审意见更新功能开发中');
+                          } else {
+                            toast.error('只有评审人员才能填写评审意见');
+                          }
+                        }}
+                        placeholder="请输入评审意见..."
+                        className="min-h-[60px] text-sm"
+                        disabled={mockUsers[0].id !== level.reviewer?.id}
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                {(!requirement.scheduledReview?.reviewLevels || requirement.scheduledReview.reviewLevels.length === 0) && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p className="text-sm">暂无评审级别配置</p>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* 快捷操作 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  快捷操作
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {/* PRD快捷操作 */}
+                <div className="p-3 border rounded-lg hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-blue-500" />
+                      <span className="text-sm font-medium">产品需求文档</span>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={handleNavigateToPRD}>
+                      查看PRD
+                    </Button>
+                  </div>
+                </div>
+
+                {/* 交互原型快捷操作 */}
+                <div className="p-3 border rounded-lg hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <MousePointer className="h-4 w-4 text-purple-500" />
+                      <span className="text-sm font-medium">交互原型</span>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={handleNavigateToPrototype}>
+                      查看原型
+                    </Button>
+                  </div>
+                </div>
+
+                {/* UI设计稿快捷操作 */}
+                <div className="p-3 border rounded-lg hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Palette className="h-4 w-4 text-green-500" />
+                      <span className="text-sm font-medium">UI设计稿</span>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={handleNavigateToDesign}>
+                      查看设计稿
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Bug追踪快捷操作 */}
+                <div className="p-3 border rounded-lg hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Bug className="h-4 w-4 text-red-500" />
+                      <span className="text-sm font-medium">问题追踪</span>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={handleNavigateToBugs}>
+                      查看问题
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>

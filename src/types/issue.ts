@@ -165,10 +165,11 @@ export enum RequirementStatus {
 }
 
 export enum RequirementType {
-  NEW_FEATURE = 'NEW_FEATURE',   // 新功能
-  BUG = 'BUG',                   // Bug修复
-  ENHANCEMENT = 'ENHANCEMENT',    // 功能增强
-  OPTIMIZATION = 'OPTIMIZATION'   // 优化改进
+  NEW_FEATURE = 'NEW_FEATURE',           // 新功能
+  OPTIMIZATION = 'OPTIMIZATION',         // 优化
+  BUG = 'BUG',                          // bug
+  USER_FEEDBACK = 'USER_FEEDBACK',       // 用户反馈
+  BUSINESS_REQUIREMENT = 'BUSINESS_REQUIREMENT'  // 商务需求
 }
 
 export enum ApplicationPlatform {
@@ -184,7 +185,7 @@ export interface Requirement {
   title: string;                 // 需求名称
   description: string;           // 需求描述
   type: RequirementType;         // 需求类型
-  platform: ApplicationPlatform; // 应用端
+  platform: ApplicationPlatform[]; // 应用端 - 改为数组支持多平台
   priority: Priority;            // 优先级
   status: RequirementStatus;     // 状态
   submitter: User;               // 需求提出者
@@ -202,6 +203,11 @@ export interface Requirement {
   reviewedAt?: string;          // 审核时间
   scheduledAt?: string;         // 排期时间
   dueDate?: string;             // 预期完成时间
+  // 新增字段
+  needToDo?: '是' | '否';        // 是否要做 - 产品评估决策
+  isOpen?: boolean;             // 需求是否开放
+  project?: Project;            // 关联项目信息
+  tags?: string[];              // 标签
 }
 
 export interface RequirementComment {
@@ -252,5 +258,35 @@ export interface RequirementStats {
   byType: Array<{ type: RequirementType; count: number }>;
   byPlatform: Array<{ platform: ApplicationPlatform; count: number }>;
   byPriority: Array<{ priority: Priority; count: number }>;
+}
+
+// 高级筛选条件
+export interface FilterCondition {
+  id: string;
+  column: string;
+  operator: 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'is_empty' | 'is_not_empty';
+  value: string;
+}
+
+// 排序配置
+export interface SortConfig {
+  column: string;
+  direction: 'asc' | 'desc';
+}
+
+// 可筛选的列配置
+export interface FilterableColumn {
+  value: string;
+  label: string;
+}
+
+// 需求池页面状态
+export type RequirementPoolStatus = '全部' | '开放中' | '已关闭';
+
+// 需求池扩展筛选条件
+export interface RequirementPoolFilters extends RequirementFilters {
+  needToDo?: ('是' | '否' | undefined)[];
+  isOpen?: boolean;
+  customFilters?: FilterCondition[];
 }
 

@@ -1,0 +1,512 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { 
+  Search, 
+  Filter, 
+  BarChart3, 
+  FolderOpen, 
+  Upload, 
+  Plus,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Flame,
+  Zap,
+  Bug,
+  Lightbulb,
+  Settings,
+  Users,
+  Calendar,
+  User,
+  FileText,
+  ArrowRight,
+  ArrowLeft,
+  Tag,
+  Paperclip,
+  Link,
+  CheckCircle,
+  AlertCircle,
+  AlertTriangle,
+  XCircle,
+  Clock,
+  Edit,
+  X,
+  EyeOff,
+  MoreHorizontal,
+  GitBranch,
+  ChevronRight,
+  ChevronDown
+} from 'lucide-react';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
+import { Badge } from './ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Checkbox } from './ui/checkbox';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from './ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from './ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { Separator } from './ui/separator';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
+
+interface Requirement {
+  id: string;
+  title: string;
+  type: '功能需求' | '技术需求' | 'Bug' | '产品建议' | '安全需求';
+  status: '待评审' | '评审中' | '评审通过' | '评审不通过' | '已关闭' | '开发中' | '已完成' | '设计中';
+  priority: '低' | '中' | '高' | '紧急';
+  creator: User;
+  project: Project;
+  description: string;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+  attachments?: Attachment[];
+  platform?: string;
+  plannedVersion?: string;
+  isOpen: boolean;
+  reviewer1?: User;
+  reviewer2?: User;
+  reviewer1Status?: 'pending' | 'approved' | 'rejected';
+  reviewer2Status?: 'pending' | 'approved' | 'rejected';
+  reviewStatus?: 'pending' | 'first_review' | 'second_review' | 'approved' | 'rejected';
+  prototypeId?: string;
+  assignee?: User;
+}
+
+interface User {
+  id: string;
+  name: string;
+  avatar: string;
+  email: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
+  color: string;
+}
+
+interface Attachment {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  url: string;
+}
+
+const mockUsers: User[] = [
+  { id: '1', name: '张三', avatar: '/avatars/user1.jpg', email: 'zhangsan@company.com' },
+  { id: '2', name: '李四', avatar: '/avatars/user2.jpg', email: 'lisi@company.com' },
+  { id: '3', name: '王五', avatar: '/avatars/user3.jpg', email: 'wangwu@company.com' },
+  { id: '4', name: '赵六', avatar: '/avatars/user4.jpg', email: 'zhaoliu@company.com' },
+  { id: '5', name: '孙七', avatar: '/avatars/user5.jpg', email: 'sunqi@company.com' }
+];
+
+const mockProjects: Project[] = [
+  { id: '1', name: 'K线', color: '#3b82f6' },
+  { id: '2', name: '行情', color: '#10b981' },
+  { id: '3', name: '聊天室', color: '#f59e0b' },
+  { id: '4', name: '系统', color: '#ef4444' },
+  { id: '5', name: '交易', color: '#8b5cf6' }
+];
+
+// 可选的版本列表
+const availableVersions = [
+  'v1.8.0', 'v2.0.0', 'v2.1.0', 'v2.2.0', 'v2.3.0', 'v2.4.0', 'v2.5.0', 'v3.0.0'
+];
+
+// 可选的需求类型
+const requirementTypes = [
+  '功能需求', '技术需求', 'Bug', '产品建议', '安全需求'
+];
+
+// 可选的优先级
+const priorities = [
+  '低', '中', '高', '紧急'
+];
+
+// 可选的评审状态
+const reviewStatuses = [
+  { value: 'pending', label: '待评审' },
+  { value: 'approved', label: '评审通过' },
+  { value: 'rejected', label: '评审不通过' }
+];
+
+// 可选的项目
+const projects = mockProjects;
+
+// 可选的应用端
+const platforms = [
+  'Web端', '移动端', '全平台', 'PC端', '小程序'
+];
+
+// 预排期需求数据
+const mockScheduledRequirements: Requirement[] = [
+  {
+    id: '1',
+    title: '用户注册流程优化',
+    type: '功能需求',
+    status: '待评审',
+    priority: '高',
+    creator: mockUsers[1],
+    project: mockProjects[0],
+    description: '优化用户注册流程，减少用户流失率，提高转化率。包括简化注册步骤、增加第三方登录选项等。',
+    tags: ['用户体验', 'UI优化'],
+    createdAt: '2024-01-15 14:30',
+    updatedAt: '2024-01-20 16:45',
+    platform: 'Web端',
+    plannedVersion: 'v2.1.0',
+    isOpen: true,
+    reviewer1: mockUsers[2],
+    reviewer2: mockUsers[3],
+    reviewer1Status: 'approved',
+    reviewer2Status: 'approved',
+    reviewStatus: 'approved',
+    assignee: mockUsers[0],
+    attachments: [
+      { id: '1', name: '注册流程图.png', size: 2048, type: 'image/png', url: '/files/flow.png' }
+    ]
+  },
+  {
+    id: '2',
+    title: '支付功能集成',
+    type: '功能需求',
+    status: '评审通过',
+    priority: '高',
+    creator: mockUsers[0],
+    project: mockProjects[2],
+    description: '集成多种支付方式，包括支付宝、微信支付、银行卡支付等，提供安全可靠的支付体验。',
+    tags: ['支付', '功能'],
+    createdAt: '2024-01-10 09:15',
+    updatedAt: '2024-01-18 11:20',
+    platform: '全平台',
+    plannedVersion: 'v2.0.0',
+    isOpen: true,
+    reviewer1: mockUsers[2],
+    reviewer2: mockUsers[4],
+    reviewer1Status: 'approved',
+    reviewer2Status: 'approved',
+    reviewStatus: 'approved',
+    assignee: mockUsers[1]
+  }
+  // ... 其他需求数据
+];
+
+interface ScheduledRequirementsPageProps {
+  onNavigate?: (page: string, context?: any) => void;
+  context?: any;
+}
+
+export function ScheduledRequirementsPageVersionGrouped({ onNavigate, context }: ScheduledRequirementsPageProps) {
+  const [requirements, setRequirements] = useState<Requirement[]>(mockScheduledRequirements);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterPriority, setFilterPriority] = useState('all');
+  const [filterProject, setFilterProject] = useState('all');
+  const [filterVersion, setFilterVersion] = useState('all');
+  const [expandedVersions, setExpandedVersions] = useState<Record<string, boolean>>(() => {
+    // 默认展开所有版本
+    const initialExpanded: Record<string, boolean> = {};
+    const uniqueVersions = [...new Set(mockScheduledRequirements.map(r => r.plannedVersion || '未分配版本'))];
+    uniqueVersions.forEach(version => {
+      initialExpanded[version] = true;
+    });
+    return initialExpanded;
+  });
+  const [showMessage, setShowMessage] = useState(false);
+  const [highlightRequirementId, setHighlightRequirementId] = useState<string>('');
+
+  // 处理应用端修改
+  const handlePlatformChange = (requirementId: string, platform: string) => {
+    const updatedRequirements = requirements.map(r => 
+      r.id === requirementId 
+        ? { ...r, platform, updatedAt: new Date().toISOString().replace('T', ' ').split('.')[0] }
+        : r
+    );
+    setRequirements(updatedRequirements);
+  };
+
+  const handleRequirementClick = (requirement: Requirement) => {
+    if (onNavigate) {
+      onNavigate('requirement-detail', {
+        requirementId: requirement.id,
+        source: 'scheduled-requirements'
+      });
+    }
+  };
+
+  // 筛选逻辑
+  const filteredRequirements = requirements.filter(req => {
+    const matchesSearch = req.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         req.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = filterType === 'all' || req.type === filterType;
+    const matchesStatus = filterStatus === 'all' || req.status === filterStatus;
+    const matchesPriority = filterPriority === 'all' || req.priority === filterPriority;
+    const matchesProject = filterProject === 'all' || req.project.id === filterProject;
+    const matchesVersion = filterVersion === 'all' || req.plannedVersion === filterVersion;
+    
+    return matchesSearch && matchesType && matchesStatus && matchesPriority && matchesProject && matchesVersion;
+  });
+
+  // 按预排期版本分组
+  const groupedByVersion = filteredRequirements.reduce((groups, requirement) => {
+    const version = requirement.plannedVersion || '未分配版本';
+    
+    if (!groups[version]) {
+      groups[version] = [];
+    }
+    groups[version].push(requirement);
+    return groups;
+  }, {} as Record<string, Requirement[]>);
+
+  // 版本排序
+  const sortedVersions = Object.keys(groupedByVersion).sort((a, b) => {
+    if (a === '未分配版本') return -1;
+    if (b === '未分配版本') return 1;
+    return b.localeCompare(a);
+  });
+
+  const toggleVersionExpanded = (version: string) => {
+    setExpandedVersions(prev => ({
+      ...prev,
+      [version]: !prev[version]
+    }));
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* 页面头部 */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-medium">预排期需求管理</h1>
+          <p className="text-muted-foreground mt-1">
+            按版本分组管理已分配版本的需求，包括评审状态跟踪和开发排期安排
+          </p>
+        </div>
+      </div>
+
+      {/* 筛选和操作栏 */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4 flex-1">
+              {/* 搜索 */}
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="搜索需求..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
+              {/* 快速筛选 */}
+              <div className="flex items-center gap-2">
+                <Select value={filterType} onValueChange={setFilterType}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="需求类型" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">所有类型</SelectItem>
+                    {requirementTypes.map(type => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                共 {filteredRequirements.length} 个需求
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 需求列表 - 按版本分组 */}
+      {sortedVersions.length === 0 ? (
+        <Card>
+          <CardContent className="p-12">
+            <div className="text-center">
+              <FolderOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">暂无预排期需求</h3>
+              <p className="text-muted-foreground mb-4 max-w-sm mx-auto">
+                还没有任何预排期需求，请先在需求池中评审通过需求并分配版本。
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              {/* 固定表头 */}
+              <TableHeader className="sticky top-0 bg-background z-10">
+                <TableRow>
+                  <TableHead>标题</TableHead>
+                  <TableHead>类型</TableHead>
+                  <TableHead>优先级</TableHead>
+                  <TableHead>创建人</TableHead>
+                  <TableHead>项目</TableHead>
+                  <TableHead>应用端</TableHead>
+                  <TableHead>评审状态</TableHead>
+                  <TableHead>更新时间</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedVersions.map((version) => {
+                  const versionRequirements = groupedByVersion[version];
+                  const isExpanded = expandedVersions[version];
+                  
+                  return (
+                    <React.Fragment key={version}>
+                      {/* 版本分组头 */}
+                      <TableRow 
+                        className="bg-muted/30 hover:bg-muted/50 cursor-pointer border-t-2 border-border"
+                        onClick={() => toggleVersionExpanded(version)}
+                      >
+                        <TableCell colSpan={8} className="py-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              )}
+                              <div className="flex items-center gap-3">
+                                {version === '未分配版本' ? (
+                                  <AlertCircle className="h-4 w-4 text-orange-500" />
+                                ) : (
+                                  <GitBranch className="h-4 w-4 text-primary" />
+                                )}
+                                <div>
+                                  <span className="font-medium">{version}</span>
+                                  <span className="text-sm text-muted-foreground ml-2">
+                                    {versionRequirements.length} 个需求
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      
+                      {/* 版本下的需求列表 */}
+                      {isExpanded && versionRequirements.map((requirement) => (
+                        <TableRow key={requirement.id} className="hover:bg-muted/50">
+                          {/* 标题 */}
+                          <TableCell onClick={() => handleRequirementClick(requirement)} className="cursor-pointer">
+                            <div>
+                              <div className="font-medium text-primary hover:underline">{requirement.title}</div>
+                              <div className="text-sm text-muted-foreground truncate max-w-[300px]">
+                                {requirement.description}
+                              </div>
+                            </div>
+                          </TableCell>
+
+                          {/* 类型 */}
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {requirement.type}
+                            </Badge>
+                          </TableCell>
+
+                          {/* 优先级 */}
+                          <TableCell>
+                            <Badge 
+                              variant={
+                                requirement.priority === '紧急' ? 'destructive' :
+                                requirement.priority === '高' ? 'default' :
+                                requirement.priority === '中' ? 'secondary' : 'outline'
+                              }
+                              className="text-xs"
+                            >
+                              {requirement.priority}
+                            </Badge>
+                          </TableCell>
+
+                          {/* 创建人 */}
+                          <TableCell onClick={() => handleRequirementClick(requirement)} className="cursor-pointer">
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-6 w-6">
+                                <AvatarImage src={requirement.creator.avatar} />
+                                <AvatarFallback>{requirement.creator.name[0]}</AvatarFallback>
+                              </Avatar>
+                              <span className="text-sm">{requirement.creator.name}</span>
+                            </div>
+                          </TableCell>
+
+                          {/* 项目 */}
+                          <TableCell>
+                            <Badge 
+                              variant="secondary" 
+                              style={{ backgroundColor: requirement.project.color + '20', color: requirement.project.color }}
+                              className="text-xs"
+                            >
+                              {requirement.project.name}
+                            </Badge>
+                          </TableCell>
+
+                          {/* 应用端 - 可编辑 */}
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Badge variant="outline" className="cursor-pointer hover:bg-muted text-xs">
+                                  {requirement.platform || '未指定'}
+                                </Badge>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start">
+                                {platforms.map((platform) => (
+                                  <DropdownMenuItem 
+                                    key={platform} 
+                                    onClick={() => handlePlatformChange(requirement.id, platform)}
+                                  >
+                                    {platform}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+
+                          {/* 评审状态 */}
+                          <TableCell onClick={() => handleRequirementClick(requirement)} className="cursor-pointer">
+                            <Badge 
+                              variant={
+                                requirement.reviewStatus === 'approved' ? 'default' : 
+                                requirement.reviewStatus === 'rejected' ? 'destructive' : 
+                                'secondary'
+                              }
+                            >
+                              {requirement.reviewStatus === 'approved' ? '评审通过' : 
+                               requirement.reviewStatus === 'rejected' ? '评审不通过' : 
+                               requirement.reviewStatus === 'second_review' ? '二级评审中' :
+                               requirement.reviewStatus === 'first_review' ? '一级评审中' :
+                               '待评审'}
+                            </Badge>
+                          </TableCell>
+
+                          {/* 更新时间 */}
+                          <TableCell onClick={() => handleRequirementClick(requirement)} className="cursor-pointer">
+                            <span className="text-sm text-muted-foreground">{requirement.updatedAt}</span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </React.Fragment>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
