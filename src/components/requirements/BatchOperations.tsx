@@ -15,22 +15,16 @@ import { NEED_TO_DO_CONFIG, PRIORITY_CONFIG } from '@/config/requirements';
 interface BatchOperationsProps {
   selectedCount: number;
   batchNeedToDoValue: string;
-  batchPriorityValue: string;
   onBatchNeedToDoChange: (value: string) => void;
-  onBatchPriorityChange: (value: string) => void;
   onBatchNeedToDoUpdate: () => void;
-  onBatchPriorityUpdate: () => void;
   onClearSelection: () => void;
 }
 
 export const BatchOperations = memo(function BatchOperations({
   selectedCount,
   batchNeedToDoValue,
-  batchPriorityValue,
   onBatchNeedToDoChange,
-  onBatchPriorityChange,
   onBatchNeedToDoUpdate,
-  onBatchPriorityUpdate,
   onClearSelection
 }: BatchOperationsProps) {
   const handleNeedToDoUpdate = useCallback(() => {
@@ -38,12 +32,6 @@ export const BatchOperations = memo(function BatchOperations({
       onBatchNeedToDoUpdate();
     }
   }, [batchNeedToDoValue, onBatchNeedToDoUpdate]);
-
-  const handlePriorityUpdate = useCallback(() => {
-    if (batchPriorityValue) {
-      onBatchPriorityUpdate();
-    }
-  }, [batchPriorityValue, onBatchPriorityUpdate]);
 
   if (selectedCount === 0) {
     return null;
@@ -56,13 +44,6 @@ export const BatchOperations = memo(function BatchOperations({
           <span className="text-sm text-muted-foreground">
             已选择 {selectedCount} 个需求
           </span>
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={onClearSelection}
-          >
-            取消选择
-          </Button>
           
           <div className="flex items-center gap-2">
             <span className="text-sm">批量设置是否要做:</span>
@@ -89,30 +70,15 @@ export const BatchOperations = memo(function BatchOperations({
             </Button>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-sm">批量设置优先级:</span>
-            <Select value={batchPriorityValue} onValueChange={onBatchPriorityChange}>
-              <SelectTrigger className="w-20">
-                <SelectValue placeholder="选择" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(PRIORITY_CONFIG).map(([key, config]) => (
-                  <SelectItem key={key} value={key}>
-                    <div className={`px-2 py-1 rounded text-sm ${config.className}`}>
-                      {config.label}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button 
-              size="sm" 
-              onClick={handlePriorityUpdate}
-              disabled={!batchPriorityValue}
-            >
-              应用
-            </Button>
-          </div>
+          <div className="flex-1"></div>
+
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={onClearSelection}
+          >
+            取消选择
+          </Button>
         </div>
       </CardContent>
     </Card>

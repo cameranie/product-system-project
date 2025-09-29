@@ -246,11 +246,7 @@ export default function CreateRequirementPage() {
     }));
   };
 
-  const handleBack = () => {
-    if (window.confirm('确定要离开吗？未保存的内容将丢失。')) {
-      router.push('/requirements');
-    }
-  };
+
 
   const handleSave = async () => {
     if (!formData.title.trim()) {
@@ -342,22 +338,13 @@ export default function CreateRequirementPage() {
       <div className="space-y-6">
         {/* 顶部操作栏 */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={handleBack}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              返回
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold">新建需求</h1>
-              <p className="text-sm text-muted-foreground">
-                填写需求的基本信息，创建后将通知相关处理人员
-              </p>
-            </div>
+          <div>
+            <h1 className="text-xl font-semibold">新建需求</h1>
+            <p className="text-sm text-muted-foreground">
+              填写需求的基本信息，创建后将通知相关处理人员
+            </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={handleBack}>
-              取消
-            </Button>
             <Button onClick={handleSave} disabled={loading}>
               <Save className="h-4 w-4 mr-2" />
               {loading ? '保存中...' : '提交'}

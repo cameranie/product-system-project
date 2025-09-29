@@ -41,6 +41,7 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useRequirementsStore, mockUsers, mockProjects } from '@/lib/requirements-store';
+import { PRIORITY_CONFIG, getPriorityConfig } from '@/config/requirements';
 
 // 移除重复接口定义，使用全局导入的类型
 import type { 
@@ -254,7 +255,8 @@ export default function RequirementEditPage({ params }: { params: { id: string }
   useEffect(() => {
     // 从全局状态加载需求数据
     setLoading(true);
-    const requirement = getRequirementById(params.id);
+    const decodedId = decodeURIComponent(params.id);
+    const requirement = getRequirementById(decodedId);
     if (requirement) {
       setFormData({
         id: requirement.id,
@@ -564,22 +566,17 @@ export default function RequirementEditPage({ params }: { params: { id: string }
       <div className="space-y-6">
         {/* 顶部操作栏 */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={handleBack}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              返回
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold">编辑需求</h1>
-              <p className="text-sm text-muted-foreground">
-                需求ID: {formData.id} • 最后更新: {formData.updatedAt}
-              </p>
+          <div>
+            <h1 className="text-xl font-semibold">{formData.title}</h1>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+              <Badge variant={formData.isOpen ? "default" : "secondary"} className="text-xs">
+                {formData.isOpen ? 'Open' : 'Closed'}
+              </Badge>
+              <span>创建时间: {formData.createdAt}</span>
+              <span>by {formData.creator?.name}</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={handleBack}>
-              取消
-            </Button>
             <Button onClick={handleSave} disabled={saving}>
               <Save className="h-4 w-4 mr-2" />
               {saving ? '保存中...' : '保存'}

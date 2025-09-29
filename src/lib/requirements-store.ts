@@ -304,32 +304,30 @@ export const useRequirementsStore = create<RequirementsStore>()(
       },
 
       updateRequirement: async (id: string, updates) => {
-        set({ loading: true, error: null });
+        const now = new Date();
+        const timeString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
         
+        const updatedRequirement = {
+          ...get().requirements.find(req => req.id === id)!,
+          ...updates,
+          updatedAt: timeString,
+        };
+
+        // 立即更新UI，无延迟
+        set(state => ({
+          requirements: state.requirements.map(req => 
+            req.id === id ? updatedRequirement : req
+          ),
+          loading: false
+        }));
+
+        // 模拟后台API调用（不影响UI）
         try {
-          // 模拟API调用延迟
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-                           const now = new Date();
-                 const timeString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-                 
-                 const updatedRequirement = {
-                   ...get().requirements.find(req => req.id === id)!,
-                   ...updates,
-                   updatedAt: timeString,
-                 };
-
-          set(state => ({
-            requirements: state.requirements.map(req => 
-              req.id === id ? updatedRequirement : req
-            ),
-            loading: false
-          }));
-
+          await new Promise(resolve => setTimeout(resolve, 100));
           return updatedRequirement;
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : '更新失败';
-          set({ error: errorMessage, loading: false });
+          set({ error: errorMessage });
           throw error;
         }
       },
@@ -362,7 +360,19 @@ export const useRequirementsStore = create<RequirementsStore>()(
     }),
     {
       name: 'requirements-store',
+      version: 2, // 增加版本号，强制使用新数据
       partialize: (state) => ({ requirements: state.requirements }),
+      migrate: (persistedState: any, version: number) => {
+        // 如果是旧版本，返回初始数据
+        if (version < 2) {
+          return {
+            requirements: initialRequirements,
+            loading: false,
+            error: null
+          };
+        }
+        return persistedState;
+      }
     }
   )
 ); 

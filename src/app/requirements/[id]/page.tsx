@@ -36,6 +36,7 @@ import {
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useRequirementsStore, mockUsers, type User, type Project, type Attachment } from '@/lib/requirements-store';
+import { PRIORITY_CONFIG, getPriorityConfig } from '@/config/requirements';
 
 interface Comment {
   id: string;
@@ -139,7 +140,8 @@ export default function RequirementDetailPage({ params }: { params: { id: string
   ];
 
   useEffect(() => {
-    const req = getRequirementById(params.id);
+    const decodedId = decodeURIComponent(params.id);
+    const req = getRequirementById(decodedId);
     if (req) {
       setRequirement(req);
       setComments(mockComments);
@@ -159,9 +161,7 @@ export default function RequirementDetailPage({ params }: { params: { id: string
     );
   }
 
-  const handleBack = () => {
-    router.push('/requirements');
-  };
+
 
   const handleEdit = () => {
     router.push(`/requirements/${params.id}/edit`);
@@ -175,7 +175,8 @@ export default function RequirementDetailPage({ params }: { params: { id: string
       await updateRequirement(requirement.id, { isOpen: newStatus });
       
       // 重新获取需求数据以更新UI
-      const updatedRequirement = getRequirementById(params.id);
+      const decodedId = decodeURIComponent(params.id);
+      const updatedRequirement = getRequirementById(decodedId);
       if (updatedRequirement) {
         setRequirement(updatedRequirement);
       }
@@ -314,20 +315,14 @@ export default function RequirementDetailPage({ params }: { params: { id: string
       <div className="space-y-6">
         {/* 顶部操作栏 */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={handleBack}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              返回
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold">{requirement.title}</h1>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                <Badge variant={requirement.isOpen ? "default" : "secondary"} className="text-xs">
-                  {requirement.isOpen ? 'Open' : 'Closed'}
-                </Badge>
-                <span>{requirement.createdAt}</span>
-                <span>by {requirement.creator.name}</span>
-              </div>
+          <div>
+            <h1 className="text-xl font-semibold">{requirement.title}</h1>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+              <Badge variant={requirement.isOpen ? "default" : "secondary"} className="text-xs">
+                {requirement.isOpen ? 'Open' : 'Closed'}
+              </Badge>
+              <span>创建时间: {requirement.createdAt}</span>
+              <span>by {requirement.creator.name}</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -630,7 +625,7 @@ export default function RequirementDetailPage({ params }: { params: { id: string
                 
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">优先级</span>
-                  <Badge className={`text-xs ${priorityConfig[requirement.priority]?.color || 'bg-gray-100 text-gray-800'}`}>
+                  <Badge className={`text-xs ${getPriorityConfig(requirement.priority)?.className || 'bg-gray-100 text-gray-800'}`}>
                     {requirement.priority}
                   </Badge>
                 </div>

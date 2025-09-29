@@ -84,8 +84,8 @@ export function FilterPanel({
     <div className="space-y-4">
       {/* 搜索和操作栏 */}
       <div className="flex items-center gap-4">
-        {/* 搜索框 */}
-        <div className="relative flex-1">
+        {/* 搜索框 - 固定宽度 */}
+        <div className="relative w-80">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
             placeholder="搜索标题、创建人、ID、应用端..."
@@ -95,48 +95,6 @@ export function FilterPanel({
           />
         </div>
 
-        <div className="flex-1"></div>
-
-        {/* 状态筛选 */}
-        <div className="flex">
-          <Button
-            variant="outline"
-            onClick={() => onStatusFilterChange('开放中')}
-            className={`rounded-r-none border-r-0 ${
-              statusFilter === '开放中' ? 'bg-blue-100 text-blue-700 border-blue-200' : ''
-            }`}
-          >
-            开放中 {stats.open}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => onStatusFilterChange('已关闭')}
-            className={`rounded-none border-r-0 ${
-              statusFilter === '已关闭' ? 'bg-blue-100 text-blue-700 border-blue-200' : ''
-            }`}
-          >
-            已关闭 {stats.closed}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => onStatusFilterChange('全部')}
-            className={`rounded-l-none ${
-              statusFilter === '全部' ? 'bg-blue-100 text-blue-700 border-blue-200' : ''
-            }`}
-          >
-            全部 {stats.total}
-          </Button>
-        </div>
-
-        {/* 新建需求按钮 */}
-        <Button onClick={onCreateNew}>
-          <Plus className="h-4 w-4 mr-2" />
-          新建需求
-        </Button>
-      </div>
-
-      {/* 筛选控制栏 */}
-      <div className="flex items-center gap-2">
         {/* 筛选设置 */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -233,22 +191,76 @@ export function FilterPanel({
               {hiddenColumns.length > 0 ? `${hiddenColumns.length} 列隐藏` : '列隐藏'}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>显示/隐藏列</DropdownMenuLabel>
-            <DropdownMenuSeparator />
+          <DropdownMenuContent 
+            align="end" 
+            className="w-56"
+            onPointerLeave={(e) => {
+              // 防止鼠标还在下拉菜单内时关闭
+              const target = e.target as HTMLElement;
+              const relatedTarget = e.relatedTarget as HTMLElement;
+              if (relatedTarget && target.contains(relatedTarget)) {
+                e.preventDefault();
+              }
+            }}
+          >
             {filterableColumns.map((col) => (
-              <DropdownMenuItem key={col.value} className="flex items-center space-x-2">
+              <DropdownMenuItem 
+                key={col.value} 
+                className="flex items-center space-x-2 cursor-pointer"
+                onClick={() => onColumnToggle(col.value)}
+                onSelect={(e) => e.preventDefault()} // 防止选择后立即关闭
+              >
                 <Checkbox
                   checked={!hiddenColumns.includes(col.value)}
-                  onCheckedChange={() => onColumnToggle(col.value)}
-                  className="pointer-events-none"
+                  onCheckedChange={() => {}} 
                 />
                 <span>{col.label}</span>
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <div className="flex-1"></div>
+
+        {/* 状态筛选 */}
+        <div className="flex">
+          <Button
+            variant="outline"
+            onClick={() => onStatusFilterChange('开放中')}
+            className={`rounded-r-none border-r-0 ${
+              statusFilter === '开放中' ? 'bg-blue-100 text-blue-700 border-blue-200' : ''
+            }`}
+          >
+            开放中 {stats.open}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => onStatusFilterChange('已关闭')}
+            className={`rounded-none border-r-0 ${
+              statusFilter === '已关闭' ? 'bg-blue-100 text-blue-700 border-blue-200' : ''
+            }`}
+          >
+            已关闭 {stats.closed}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => onStatusFilterChange('全部')}
+            className={`rounded-l-none ${
+              statusFilter === '全部' ? 'bg-blue-100 text-blue-700 border-blue-200' : ''
+            }`}
+          >
+            全部 {stats.total}
+          </Button>
+        </div>
+
+        {/* 新建需求按钮 */}
+        <Button onClick={onCreateNew}>
+          <Plus className="h-4 w-4 mr-2" />
+          新建需求
+        </Button>
       </div>
+
+
     </div>
   );
 } 

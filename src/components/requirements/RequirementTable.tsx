@@ -6,13 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Table,
   TableHeader,
@@ -70,10 +69,12 @@ const RequirementRow = memo(({
   }, [requirement.id, onSelect]);
 
   const handleNeedToDoChange = useCallback((value: string) => {
+    // 立即更新UI反馈，优化响应速度
     onNeedToDoChange(requirement.id, value);
   }, [requirement.id, onNeedToDoChange]);
 
   const handlePriorityChange = useCallback((value: string) => {
+    // 立即更新UI反馈，优化响应速度
     onPriorityChange(requirement.id, value);
   }, [requirement.id, onPriorityChange]);
 
@@ -82,14 +83,14 @@ const RequirementRow = memo(({
 
   return (
     <TableRow>
-      <TableCell>
+      <TableCell className="px-3">
         <Checkbox
           checked={isSelected}
           onCheckedChange={handleSelectChange}
         />
       </TableCell>
       {isColumnVisible('id') && (
-        <TableCell className="px-2 font-mono text-sm">
+        <TableCell className="px-3 font-mono text-sm">
           {requirement.id}
         </TableCell>
       )}
@@ -97,73 +98,81 @@ const RequirementRow = memo(({
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Link
-              href={`/requirements/${requirement.id}`}
-              className="font-medium hover:underline line-clamp-2"
+              href={`/requirements/${encodeURIComponent(requirement.id)}`}
+              className="font-medium hover:underline line-clamp-2 min-w-0 flex-1"
             >
               {requirement.title}
             </Link>
-            <Badge 
-              variant={requirement.isOpen ? "default" : "secondary"} 
-              className="text-xs"
-            >
-              {requirement.isOpen ? 'Open' : 'Closed'}
-            </Badge>
           </div>
         </div>
       </TableCell>
       {isColumnVisible('type') && (
-        <TableCell className="px-2">
+        <TableCell className="px-3">
           <span className="text-sm">
             {typeConfig?.label || requirement.type}
           </span>
         </TableCell>
       )}
       {isColumnVisible('needToDo') && (
-        <TableCell className="px-2">
-          <Select
-            value={requirement.needToDo || '待定'}
-            onValueChange={handleNeedToDoChange}
-          >
-            <SelectTrigger className="w-20 h-8">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
+        <TableCell className="px-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`h-6 px-2 py-1 text-xs rounded-md border-0 ${getNeedToDoConfig(requirement.needToDo || '待定')?.className || 'bg-gray-100 text-gray-800'} hover:opacity-80 transition-opacity duration-150`}
+              >
+                {getNeedToDoConfig(requirement.needToDo || '待定')?.label || '待定'}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-20">
               {Object.entries(NEED_TO_DO_CONFIG).map(([key, config]) => (
-                <SelectItem key={key} value={key}>
-                  <div className={`px-2 py-1 rounded text-sm ${config.color} ${config.bgColor}`}>
+                <DropdownMenuItem
+                  key={key}
+                  onClick={() => handleNeedToDoChange(key)}
+                  className="cursor-pointer"
+                >
+                  <div className={`px-2 py-1 rounded text-sm ${config.color} ${config.bgColor} w-full text-center`}>
                     {config.label}
                   </div>
-                </SelectItem>
+                </DropdownMenuItem>
               ))}
-            </SelectContent>
-          </Select>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </TableCell>
       )}
       {isColumnVisible('priority') && (
-        <TableCell className="px-2">
-          <Select
-            value={requirement.priority}
-            onValueChange={handlePriorityChange}
-          >
-            <SelectTrigger className="w-16 h-8">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
+        <TableCell className="px-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`h-6 px-2 py-1 text-xs rounded-md border-0 ${getPriorityConfig(requirement.priority)?.className || 'bg-gray-100 text-gray-800'} hover:opacity-80 transition-opacity duration-150`}
+              >
+{requirement.priority}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-16">
               {Object.entries(PRIORITY_CONFIG).map(([key, config]) => (
-                <SelectItem key={key} value={key}>
-                  <div className={`px-2 py-1 rounded text-sm ${config.className}`}>
+                <DropdownMenuItem
+                  key={key}
+                  onClick={() => handlePriorityChange(key)}
+                  className="cursor-pointer"
+                >
+                  <div className={`px-2 py-1 rounded text-sm ${config.className} w-full text-center`}>
                     {config.label}
                   </div>
-                </SelectItem>
+                </DropdownMenuItem>
               ))}
-            </SelectContent>
-          </Select>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </TableCell>
       )}
       {isColumnVisible('creator') && (
-        <TableCell className="px-2">
+        <TableCell className="px-3">
           <div className="flex items-center gap-2">
-            <Avatar className="h-6 w-6">
+            <Avatar className="h-6 w-6 flex-shrink-0">
               <AvatarImage 
                 src={requirement.creator?.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${requirement.creator?.name}`} 
               />
@@ -171,17 +180,17 @@ const RequirementRow = memo(({
                 {requirement.creator?.name?.slice(0, 2) || 'U'}
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm">{requirement.creator?.name || '未知用户'}</span>
+            <span className="text-sm truncate min-w-0">{requirement.creator?.name || '未知用户'}</span>
           </div>
         </TableCell>
       )}
       {isColumnVisible('createdAt') && (
-        <TableCell className="px-2 text-sm text-muted-foreground">
+        <TableCell className="px-3 text-sm text-muted-foreground">
           {requirement.createdAt}
         </TableCell>
       )}
       {isColumnVisible('updatedAt') && (
-        <TableCell className="px-2 text-sm text-muted-foreground">
+        <TableCell className="px-3 text-sm text-muted-foreground">
           {requirement.updatedAt}
         </TableCell>
       )}
@@ -234,34 +243,34 @@ export const RequirementTable = memo(function RequirementTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-12">
+            <TableHead className="w-12 px-3">
               <Checkbox
                 checked={isAllSelected}
                 onCheckedChange={handleSelectAll}
               />
             </TableHead>
             {isColumnVisible('id') && (
-              <TableHead className="w-[8%] px-2">
+              <TableHead className="w-20 px-3">
                 <div className="flex items-center">
                   ID
                   {renderSortButton('id')}
                 </div>
               </TableHead>
             )}
-            <TableHead className="w-[35%] px-3">
+            <TableHead className="px-3 min-w-0">
               <div className="flex items-center">
                 标题
                 {renderSortButton('title')}
               </div>
             </TableHead>
             {isColumnVisible('type') && (
-              <TableHead className="w-[10%] px-2">需求类型</TableHead>
+              <TableHead className="w-24 px-3">需求类型</TableHead>
             )}
             {isColumnVisible('needToDo') && (
-              <TableHead className="w-[10%] px-2">是否要做</TableHead>
+              <TableHead className="w-24 px-3">是否要做</TableHead>
             )}
             {isColumnVisible('priority') && (
-              <TableHead className="w-[8%] px-2">
+              <TableHead className="w-20 px-3">
                 <div className="flex items-center">
                   优先级
                   {renderSortButton('priority')}
@@ -269,7 +278,7 @@ export const RequirementTable = memo(function RequirementTable({
               </TableHead>
             )}
             {isColumnVisible('creator') && (
-              <TableHead className="w-[10%] px-2">
+              <TableHead className="w-32 px-3">
                 <div className="flex items-center">
                   创建人
                   {renderSortButton('creator')}
@@ -277,7 +286,7 @@ export const RequirementTable = memo(function RequirementTable({
               </TableHead>
             )}
             {isColumnVisible('createdAt') && (
-              <TableHead className="w-[12%] px-2">
+              <TableHead className="w-36 px-3">
                 <div className="flex items-center">
                   创建时间
                   {renderSortButton('createdAt')}
@@ -285,7 +294,7 @@ export const RequirementTable = memo(function RequirementTable({
               </TableHead>
             )}
             {isColumnVisible('updatedAt') && (
-              <TableHead className="w-[12%] px-2">
+              <TableHead className="w-36 px-3">
                 <div className="flex items-center">
                   更新时间
                   {renderSortButton('updatedAt')}

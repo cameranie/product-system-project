@@ -39,3 +39,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 临时文件和不需要提交的文件
+figma-export-temp/
+yarn.lock
+
+# 临时调试文件
+temp_*.txt
+temp_*.js
+temp-*.js
+*temp_debug*
+*temp-search*
+*temp-highlight*
+*temp-platform*
+*temp-batch*

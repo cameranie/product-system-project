@@ -58,7 +58,9 @@ function generateBreadcrumbs(pathname: string): BreadcrumbItem[] {
     }
     
     segments.forEach((segment, index) => {
-      const title = pageMap[segment] || segment
+      // 解码URL段，特别是处理需求ID
+      const decodedSegment = decodeURIComponent(segment)
+      const title = pageMap[segment] || decodedSegment
       const href = index === segments.length - 1 ? undefined : '/' + segments.slice(0, index + 1).join('/')
       breadcrumbs.push({ title, href })
     })
