@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, memo } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,14 @@ import {
 } from '@/components/ui/table';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import { Requirement } from '@/lib/requirements-store';
+import { 
+  REQUIREMENT_TYPE_CONFIG, 
+  PRIORITY_CONFIG, 
+  NEED_TO_DO_CONFIG,
+  getRequirementTypeConfig,
+  getPriorityConfig,
+  getNeedToDoConfig
+} from '@/config/requirements';
 
 interface RequirementTableProps {
   requirements: Requirement[];
@@ -39,29 +47,151 @@ interface RequirementTableProps {
   onColumnSort: (field: string) => void;
 }
 
-// 配置数据
-const requirementTypeConfig = {
-  '新功能': { label: '新功能', color: 'bg-green-100 text-green-800' },
-  '优化': { label: '优化', color: 'bg-blue-100 text-blue-800' },
-  'BUG': { label: 'BUG', color: 'bg-red-100 text-red-800' },
-  '用户反馈': { label: '用户反馈', color: 'bg-purple-100 text-purple-800' },
-  '商务需求': { label: '商务需求', color: 'bg-yellow-100 text-yellow-800' }
-} as const;
+// 优化：使用memo包装单个需求行组件
+const RequirementRow = memo(({ 
+  requirement, 
+  isSelected, 
+  hiddenColumns, 
+  onSelect, 
+  onNeedToDoChange, 
+  onPriorityChange 
+}: {
+  requirement: Requirement;
+  isSelected: boolean;
+  hiddenColumns: string[];
+  onSelect: (id: string, checked: boolean) => void;
+  onNeedToDoChange: (id: string, value: string) => void;
+  onPriorityChange: (id: string, value: string) => void;
+}) => {
+  const isColumnVisible = useCallback((column: string) => !hiddenColumns.includes(column), [hiddenColumns]);
 
-const priorityConfig = {
-  '低': { label: '低', className: 'bg-green-100 text-green-800' },
-  '中': { label: '中', className: 'bg-yellow-100 text-yellow-800' },
-  '高': { label: '高', className: 'bg-orange-100 text-orange-800' },
-  '紧急': { label: '紧急', className: 'bg-red-100 text-red-800' },
-} as const;
+  const handleSelectChange = useCallback((checked: boolean) => {
+    onSelect(requirement.id, checked);
+  }, [requirement.id, onSelect]);
 
-const needToDoConfig = {
-  '是': { label: '是', color: 'text-green-700', bgColor: 'bg-green-50' },
-  '否': { label: '否', color: 'text-red-700', bgColor: 'bg-red-50' },
-  '待定': { label: '待定', color: 'text-gray-700', bgColor: 'bg-gray-50' }
-};
+  const handleNeedToDoChange = useCallback((value: string) => {
+    onNeedToDoChange(requirement.id, value);
+  }, [requirement.id, onNeedToDoChange]);
 
-export function RequirementTable({
+  const handlePriorityChange = useCallback((value: string) => {
+    onPriorityChange(requirement.id, value);
+  }, [requirement.id, onPriorityChange]);
+
+  const typeConfig = getRequirementTypeConfig(requirement.type);
+  const priorityConfig = getPriorityConfig(requirement.priority);
+
+  return (
+    <TableRow>
+      <TableCell>
+        <Checkbox
+          checked={isSelected}
+          onCheckedChange={handleSelectChange}
+        />
+      </TableCell>
+      {isColumnVisible('id') && (
+        <TableCell className="px-2 font-mono text-sm">
+          {requirement.id}
+        </TableCell>
+      )}
+      <TableCell className="px-3">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/requirements/${requirement.id}`}
+              className="font-medium hover:underline line-clamp-2"
+            >
+              {requirement.title}
+            </Link>
+            <Badge 
+              variant={requirement.isOpen ? "default" : "secondary"} 
+              className="text-xs"
+            >
+              {requirement.isOpen ? 'Open' : 'Closed'}
+            </Badge>
+          </div>
+        </div>
+      </TableCell>
+      {isColumnVisible('type') && (
+        <TableCell className="px-2">
+          <span className="text-sm">
+            {typeConfig?.label || requirement.type}
+          </span>
+        </TableCell>
+      )}
+      {isColumnVisible('needToDo') && (
+        <TableCell className="px-2">
+          <Select
+            value={requirement.needToDo || '待定'}
+            onValueChange={handleNeedToDoChange}
+          >
+            <SelectTrigger className="w-20 h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(NEED_TO_DO_CONFIG).map(([key, config]) => (
+                <SelectItem key={key} value={key}>
+                  <div className={`px-2 py-1 rounded text-sm ${config.color} ${config.bgColor}`}>
+                    {config.label}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </TableCell>
+      )}
+      {isColumnVisible('priority') && (
+        <TableCell className="px-2">
+          <Select
+            value={requirement.priority}
+            onValueChange={handlePriorityChange}
+          >
+            <SelectTrigger className="w-16 h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(PRIORITY_CONFIG).map(([key, config]) => (
+                <SelectItem key={key} value={key}>
+                  <div className={`px-2 py-1 rounded text-sm ${config.className}`}>
+                    {config.label}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </TableCell>
+      )}
+      {isColumnVisible('creator') && (
+        <TableCell className="px-2">
+          <div className="flex items-center gap-2">
+            <Avatar className="h-6 w-6">
+              <AvatarImage 
+                src={requirement.creator?.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${requirement.creator?.name}`} 
+              />
+              <AvatarFallback className="text-xs">
+                {requirement.creator?.name?.slice(0, 2) || 'U'}
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-sm">{requirement.creator?.name || '未知用户'}</span>
+          </div>
+        </TableCell>
+      )}
+      {isColumnVisible('createdAt') && (
+        <TableCell className="px-2 text-sm text-muted-foreground">
+          {requirement.createdAt}
+        </TableCell>
+      )}
+      {isColumnVisible('updatedAt') && (
+        <TableCell className="px-2 text-sm text-muted-foreground">
+          {requirement.updatedAt}
+        </TableCell>
+      )}
+    </TableRow>
+  );
+});
+
+RequirementRow.displayName = 'RequirementRow';
+
+export const RequirementTable = memo(function RequirementTable({
   requirements,
   selectedRequirements,
   hiddenColumns,
@@ -72,9 +202,9 @@ export function RequirementTable({
   onPriorityChange,
   onColumnSort
 }: RequirementTableProps) {
-  const isColumnVisible = (column: string) => !hiddenColumns.includes(column);
+  const isColumnVisible = useCallback((column: string) => !hiddenColumns.includes(column), [hiddenColumns]);
 
-  const renderSortButton = (field: string) => (
+  const renderSortButton = useCallback((field: string) => (
     <Button
       variant="ghost"
       size="sm"
@@ -91,7 +221,13 @@ export function RequirementTable({
         <ArrowUp className="h-3 w-3 opacity-50" />
       )}
     </Button>
-  );
+  ), [sortConfig, onColumnSort]);
+
+  const handleSelectAll = useCallback((checked: boolean) => {
+    onSelectAll(checked);
+  }, [onSelectAll]);
+
+  const isAllSelected = requirements.length > 0 && selectedRequirements.length === requirements.length;
 
   return (
     <div className="rounded-md border">
@@ -100,8 +236,8 @@ export function RequirementTable({
           <TableRow>
             <TableHead className="w-12">
               <Checkbox
-                checked={selectedRequirements.length === requirements.length}
-                onCheckedChange={onSelectAll}
+                checked={isAllSelected}
+                onCheckedChange={handleSelectAll}
               />
             </TableHead>
             {isColumnVisible('id') && (
@@ -160,116 +296,18 @@ export function RequirementTable({
         </TableHeader>
         <TableBody>
           {requirements.map((requirement) => (
-            <TableRow key={requirement.id}>
-              <TableCell>
-                <Checkbox
-                  checked={selectedRequirements.includes(requirement.id)}
-                  onCheckedChange={(checked) => 
-                    onRequirementSelect(requirement.id, checked as boolean)
-                  }
-                />
-              </TableCell>
-              {isColumnVisible('id') && (
-                <TableCell className="px-2 font-mono text-sm">
-                  {requirement.id}
-                </TableCell>
-              )}
-              <TableCell className="px-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={`/requirements/${requirement.id}`}
-                      className="font-medium hover:underline line-clamp-2"
-                    >
-                      {requirement.title}
-                    </Link>
-                    <Badge 
-                      variant={requirement.isOpen ? "default" : "secondary"} 
-                      className="text-xs"
-                    >
-                      {requirement.isOpen ? 'Open' : 'Closed'}
-                    </Badge>
-                  </div>
-                </div>
-              </TableCell>
-              {isColumnVisible('type') && (
-                <TableCell className="px-2">
-                  <span className="text-sm">
-                    {requirementTypeConfig[requirement.type]?.label || requirement.type}
-                  </span>
-                </TableCell>
-              )}
-              {isColumnVisible('needToDo') && (
-                <TableCell className="px-2">
-                  <Select
-                    value={requirement.needToDo || '待定'}
-                    onValueChange={(value) => onNeedToDoChange(requirement.id, value)}
-                  >
-                    <SelectTrigger className="w-20 h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(needToDoConfig).map(([key, config]) => (
-                        <SelectItem key={key} value={key}>
-                          <div className={`px-2 py-1 rounded text-sm ${config.color} ${config.bgColor}`}>
-                            {config.label}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-              )}
-              {isColumnVisible('priority') && (
-                <TableCell className="px-2">
-                  <Select
-                    value={requirement.priority}
-                    onValueChange={(value) => onPriorityChange(requirement.id, value)}
-                  >
-                    <SelectTrigger className="w-16 h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(priorityConfig).map(([key, config]) => (
-                        <SelectItem key={key} value={key}>
-                          <div className={`px-2 py-1 rounded text-sm ${config.className}`}>
-                            {config.label}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-              )}
-              {isColumnVisible('creator') && (
-                <TableCell className="px-2">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
-                      <AvatarImage 
-                        src={requirement.creator?.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${requirement.creator?.name}`} 
-                      />
-                      <AvatarFallback className="text-xs">
-                        {requirement.creator?.name?.slice(0, 2) || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm">{requirement.creator?.name || '未知用户'}</span>
-                  </div>
-                </TableCell>
-              )}
-              {isColumnVisible('createdAt') && (
-                <TableCell className="px-2 text-sm text-muted-foreground">
-                  {requirement.createdAt}
-                </TableCell>
-              )}
-              {isColumnVisible('updatedAt') && (
-                <TableCell className="px-2 text-sm text-muted-foreground">
-                  {requirement.updatedAt}
-                </TableCell>
-              )}
-            </TableRow>
+            <RequirementRow
+              key={requirement.id}
+              requirement={requirement}
+              isSelected={selectedRequirements.includes(requirement.id)}
+              hiddenColumns={hiddenColumns}
+              onSelect={onRequirementSelect}
+              onNeedToDoChange={onNeedToDoChange}
+              onPriorityChange={onPriorityChange}
+            />
           ))}
         </TableBody>
       </Table>
     </div>
   );
-} 
+}); 
