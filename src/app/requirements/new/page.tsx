@@ -309,8 +309,8 @@ export default function CreateRequirementPage() {
       const newRequirement = await createRequirement(requirementData);
       toast.success('需求创建成功！');
       
-      // 跳转到需求详情页
-      router.push(`/requirements/${newRequirement.id}`);
+      // 跳转到需求详情页 - 对 ID 进行 URL 编码以处理 # 等特殊字符
+      router.push(`/requirements/${encodeURIComponent(newRequirement.id)}`);
     } catch (error) {
       console.error('保存失败:', error);
       toast.error('保存失败，请重试');

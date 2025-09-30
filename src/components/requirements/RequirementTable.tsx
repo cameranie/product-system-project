@@ -109,7 +109,7 @@ export const RequirementTable = memo(function RequirementTable({
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <Link
-                href={`/requirements/${requirement.id}`}
+                href={`/requirements/${encodeURIComponent(requirement.id)}`}
                 className="font-medium hover:underline line-clamp-2 min-w-0 flex-1 break-words overflow-hidden"
                 title={requirement.title}
               >

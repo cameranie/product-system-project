@@ -412,6 +412,7 @@ export default function RequirementEditPage({ params }: { params: { id: string }
 
   const handleBack = () => {
     if (window.confirm('确定要离开吗？未保存的修改将丢失。')) {
+      // 使用已经编码的 params.id（从 URL 来的已经是编码状态）
       router.push(`/requirements/${params.id}`);
     }
   };
@@ -440,7 +441,7 @@ export default function RequirementEditPage({ params }: { params: { id: string }
       
       toast.success('需求更新成功！');
       
-      // 跳转到需求详情页
+      // 跳转到需求详情页 - 使用已经编码的 params.id
       router.push(`/requirements/${params.id}`);
     } catch (error) {
       console.error('保存失败:', error);

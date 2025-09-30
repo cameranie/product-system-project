@@ -165,6 +165,7 @@ export default function RequirementDetailPage({ params }: { params: { id: string
 
 
   const handleEdit = () => {
+    // 使用已经编码的 params.id（从 URL 来的已经是编码状态）
     router.push(`/requirements/${params.id}/edit`);
   };
 
