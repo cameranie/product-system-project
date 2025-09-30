@@ -7,8 +7,13 @@ export { BatchOperations } from './BatchOperations';
 export { CommentSection } from './CommentSection';
 export { ScheduledReviewCard } from './ScheduledReviewCard';
 export { EndOwnerOpinionCard } from './EndOwnerOpinionCard';
+export { AttachmentsSection } from './AttachmentsSection';
+export { HistorySection } from './HistorySection';
+export { QuickActionsCard } from './QuickActionsCard';
 
 // 类型导出
 export type { Comment, Reply } from '@/hooks/requirements/useComments';
 export type { ScheduledReviewLevel } from '@/hooks/requirements/useScheduledReview';
-export type { EndOwnerOpinionData } from './EndOwnerOpinionCard'; 
+export type { EndOwnerOpinionData } from './EndOwnerOpinionCard';
+export type { HistoryRecord } from './HistorySection';
+export type { QuickActionsData } from './QuickActionsCard'; 
