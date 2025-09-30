@@ -278,8 +278,9 @@ export const useRequirementsStore = create<RequirementsStore>()(
         set({ loading: true, error: null });
         
         try {
-          // 模拟API调用延迟
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // 模拟API调用延迟（毫秒）
+          const MOCK_API_DELAY_MS = 1000;
+          await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY_MS));
           
           const { formatDateTime, generateSecureId } = await import('@/lib/file-upload-utils');
           const timeString = formatDateTime();
@@ -331,7 +332,8 @@ export const useRequirementsStore = create<RequirementsStore>()(
 
         // 模拟后台API调用（不影响UI）
         try {
-          await new Promise(resolve => setTimeout(resolve, 100));
+          const BACKGROUND_UPDATE_DELAY_MS = 100;
+          await new Promise(resolve => setTimeout(resolve, BACKGROUND_UPDATE_DELAY_MS));
           return updatedRequirement;
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : '更新失败';
@@ -344,8 +346,9 @@ export const useRequirementsStore = create<RequirementsStore>()(
         set({ loading: true, error: null });
         
         try {
-          // 模拟API调用延迟
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // 模拟API调用延迟（毫秒）
+          const DELETE_API_DELAY_MS = 500;
+          await new Promise(resolve => setTimeout(resolve, DELETE_API_DELAY_MS));
           
           set(state => ({
             requirements: state.requirements.filter(req => req.id !== id),

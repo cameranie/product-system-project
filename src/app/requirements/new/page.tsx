@@ -34,6 +34,7 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useRequirementsStore, mockUsers, mockProjects, type User, type Project, type Requirement } from '@/lib/requirements-store';
 import { validateFiles } from '@/lib/file-upload-utils';
+import { REQUIREMENT_TYPE_CONFIG } from '@/config/requirements';
 
 // 模拟版本数据
 const mockVersions = [
@@ -46,8 +47,9 @@ const mockVersions = [
 // 预定义标签
 const predefinedTags = ['UI优化', '性能', '安全', '用户体验', '移动端', '数据分析'];
 
-const requirementTypes = ['新功能', '优化', 'BUG', '用户反馈', '商务需求'];
-const platformOptions = ['Web端', 'PC端', '移动端'];
+// 需求类型从配置中获取
+const requirementTypes = Object.keys(REQUIREMENT_TYPE_CONFIG) as Array<keyof typeof REQUIREMENT_TYPE_CONFIG>;
+const platformOptions = ['Web端', 'PC端', '移动端']; // 使用项目特定的平台选项
 
 interface RequirementFormData {
   title: string;

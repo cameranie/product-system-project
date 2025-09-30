@@ -41,7 +41,7 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useRequirementsStore, mockUsers, mockProjects } from '@/lib/requirements-store';
-import { PRIORITY_CONFIG, getPriorityConfig } from '@/config/requirements';
+import { PRIORITY_CONFIG, getPriorityConfig, REQUIREMENT_TYPE_CONFIG } from '@/config/requirements';
 
 // 移除重复接口定义，使用全局导入的类型
 import type { 
@@ -113,7 +113,8 @@ interface RequirementFormData {
 
 // 使用全局的 mockUsers 数据
 
-const requirementTypes = ['新功能', '优化', 'BUG', '用户反馈', '商务需求'];
+// 从配置中获取需求类型
+const requirementTypes = Object.keys(REQUIREMENT_TYPE_CONFIG) as Array<keyof typeof REQUIREMENT_TYPE_CONFIG>;
 const platformOptions = ['Web端', 'PC端', '移动端'];
 
 // 模拟现有需求数据
