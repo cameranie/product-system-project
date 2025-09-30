@@ -82,24 +82,24 @@ const RequirementRow = memo(({
   const priorityConfig = getPriorityConfig(requirement.priority);
 
   return (
-    <TableRow>
-      <TableCell className="px-3">
+    <TableRow className="hover:bg-muted/50">
+      <TableCell className="px-2 py-3">
         <Checkbox
           checked={isSelected}
           onCheckedChange={handleSelectChange}
         />
       </TableCell>
       {isColumnVisible('id') && (
-        <TableCell className="px-3 font-mono text-sm">
+        <TableCell className="px-2 py-3 font-mono text-sm">
           {requirement.id}
         </TableCell>
       )}
-      <TableCell className="px-3">
+      <TableCell className="px-3 py-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Link
               href={`/requirements/${encodeURIComponent(requirement.id)}`}
-              className="font-medium hover:underline line-clamp-2 min-w-0 flex-1"
+              className="font-medium hover:underline line-clamp-2 min-w-0 flex-1 break-words"
             >
               {requirement.title}
             </Link>
@@ -107,20 +107,20 @@ const RequirementRow = memo(({
         </div>
       </TableCell>
       {isColumnVisible('type') && (
-        <TableCell className="px-3">
-          <span className="text-sm">
+        <TableCell className="px-3 py-3">
+          <span className="text-sm whitespace-nowrap">
             {typeConfig?.label || requirement.type}
           </span>
         </TableCell>
       )}
       {isColumnVisible('needToDo') && (
-        <TableCell className="px-3">
+        <TableCell className="px-3 py-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className={`h-6 px-2 py-1 text-xs rounded-md border-0 ${getNeedToDoConfig(requirement.needToDo || '待定')?.className || 'bg-gray-100 text-gray-800'} hover:opacity-80 transition-opacity duration-150`}
+                className={`h-6 px-2 py-1 text-xs rounded-md border-0 ${getNeedToDoConfig(requirement.needToDo || '待定')?.className || 'bg-gray-100 text-gray-800'} hover:opacity-80 transition-opacity duration-150 whitespace-nowrap`}
               >
                 {getNeedToDoConfig(requirement.needToDo || '待定')?.label || '待定'}
               </Button>
@@ -142,13 +142,13 @@ const RequirementRow = memo(({
         </TableCell>
       )}
       {isColumnVisible('priority') && (
-        <TableCell className="px-3">
+        <TableCell className="px-3 py-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className={`h-6 px-2 py-1 text-xs rounded-md border-0 ${getPriorityConfig(requirement.priority)?.className || 'bg-gray-100 text-gray-800'} hover:opacity-80 transition-opacity duration-150`}
+                className={`h-6 px-2 py-1 text-xs rounded-md border-0 ${getPriorityConfig(requirement.priority)?.className || 'bg-gray-100 text-gray-800'} hover:opacity-80 transition-opacity duration-150 whitespace-nowrap`}
               >
 {requirement.priority}
               </Button>
@@ -170,7 +170,7 @@ const RequirementRow = memo(({
         </TableCell>
       )}
       {isColumnVisible('creator') && (
-        <TableCell className="px-3">
+        <TableCell className="px-3 py-3">
           <div className="flex items-center gap-2">
             <Avatar className="h-6 w-6 flex-shrink-0">
               <AvatarImage 
@@ -185,12 +185,12 @@ const RequirementRow = memo(({
         </TableCell>
       )}
       {isColumnVisible('createdAt') && (
-        <TableCell className="px-3 text-sm text-muted-foreground">
+        <TableCell className="px-3 py-3 text-sm text-muted-foreground whitespace-nowrap">
           {requirement.createdAt}
         </TableCell>
       )}
       {isColumnVisible('updatedAt') && (
-        <TableCell className="px-3 text-sm text-muted-foreground">
+        <TableCell className="px-3 py-3 text-sm text-muted-foreground whitespace-nowrap">
           {requirement.updatedAt}
         </TableCell>
       )}
@@ -239,25 +239,26 @@ export const RequirementTable = memo(function RequirementTable({
   const isAllSelected = requirements.length > 0 && selectedRequirements.length === requirements.length;
 
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
+    <div className="rounded-md border overflow-hidden">
+      <div className="overflow-x-auto">
+        <Table className="min-w-full">
+          <TableHeader>
           <TableRow>
-            <TableHead className="w-12 px-3">
+            <TableHead className="w-12 px-2">
               <Checkbox
                 checked={isAllSelected}
                 onCheckedChange={handleSelectAll}
               />
             </TableHead>
             {isColumnVisible('id') && (
-              <TableHead className="w-20 px-3">
+              <TableHead className="w-16 px-2">
                 <div className="flex items-center">
                   ID
                   {renderSortButton('id')}
                 </div>
               </TableHead>
             )}
-            <TableHead className="px-3 min-w-0">
+            <TableHead className="px-3 min-w-0 w-auto">
               <div className="flex items-center">
                 标题
                 {renderSortButton('title')}
@@ -278,7 +279,7 @@ export const RequirementTable = memo(function RequirementTable({
               </TableHead>
             )}
             {isColumnVisible('creator') && (
-              <TableHead className="w-32 px-3">
+              <TableHead className="w-28 px-3">
                 <div className="flex items-center">
                   创建人
                   {renderSortButton('creator')}
@@ -316,7 +317,8 @@ export const RequirementTable = memo(function RequirementTable({
             />
           ))}
         </TableBody>
-      </Table>
+        </Table>
+      </div>
     </div>
   );
 }); 
