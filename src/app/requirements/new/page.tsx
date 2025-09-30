@@ -33,6 +33,7 @@ import {
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useRequirementsStore, mockUsers, mockProjects, type User, type Project, type Requirement } from '@/lib/requirements-store';
+import { validateFiles } from '@/lib/file-upload-utils';
 
 // 模拟版本数据
 const mockVersions = [
@@ -76,6 +77,15 @@ interface RequirementFormData {
 export default function CreateRequirementPage() {
   const router = useRouter();
   const { createRequirement, loading } = useRequirementsStore();
+  
+  // 组件卸载时清理文件URL
+  useEffect(() => {
+    return () => {
+      import('@/lib/file-upload-utils').then(({ FileURLManager }) => {
+        FileURLManager.revokeAllURLs();
+      });
+    };
+  }, []);
   
   const [formData, setFormData] = useState<RequirementFormData>({
     title: '',
@@ -201,24 +211,30 @@ export default function CreateRequirementPage() {
     }));
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const { validateFiles } = require('@/lib/file-upload-utils');
     
-    const { validFiles, errors } = validateFiles(files, formData.attachments.length);
-    
-    if (errors.length > 0) {
-      toast.error(errors.join(', '));
-      return;
-    }
-    
-    setFormData(prev => ({
-      ...prev,
-      attachments: [...prev.attachments, ...validFiles]
-    }));
-    
-    if (validFiles.length > 0) {
-      toast.success(`成功上传 ${validFiles.length} 个文件`);
+    try {
+      // 动态导入文件验证函数
+      const { validateFiles } = await import('@/lib/file-upload-utils');
+      const { validFiles, errors } = validateFiles(files, formData.attachments.length);
+      
+      if (errors.length > 0) {
+        toast.error(errors.join(', '));
+        return;
+      }
+      
+      setFormData(prev => ({
+        ...prev,
+        attachments: [...prev.attachments, ...validFiles]
+      }));
+      
+      if (validFiles.length > 0) {
+        toast.success(`成功上传 ${validFiles.length} 个文件`);
+      }
+    } catch (error) {
+      console.error('文件验证失败:', error);
+      toast.error('文件验证失败，请重试');
     }
   };
 
@@ -260,12 +276,13 @@ export default function CreateRequirementPage() {
 
     try {
       // 转换文件为附件格式
+      const { FileURLManager, generateSecureId } = await import('@/lib/file-upload-utils');
       const attachments = formData.attachments.map(file => ({
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        id: generateSecureId(),
         name: file.name,
         size: file.size,
         type: file.type,
-        url: URL.createObjectURL(file)
+        url: FileURLManager.createObjectURL(file)
       }));
 
       const requirementData: Omit<Requirement, 'id' | 'createdAt' | 'updatedAt'> = {

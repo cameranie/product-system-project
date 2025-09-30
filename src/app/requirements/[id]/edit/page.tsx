@@ -406,7 +406,7 @@ export default function RequirementEditPage({ params }: { params: { id: string }
 
   const handleBack = () => {
     if (window.confirm('确定要离开吗？未保存的修改将丢失。')) {
-      window.location.href = `/requirements/${params.id}`;
+      router.push(`/requirements/${params.id}`);
     }
   };
 
@@ -462,7 +462,7 @@ export default function RequirementEditPage({ params }: { params: { id: string }
   };
 
   // 处理评论提交
-  const handleSubmitComment = () => {
+  const handleSubmitComment = async () => {
     if (!newComment.trim()) {
       toast.error('请输入评论内容');
       return;
@@ -476,12 +476,15 @@ export default function RequirementEditPage({ params }: { params: { id: string }
       content: newComment,
       author: mockUsers[0], // 当前用户
       createdAt: timeString,
-      attachments: newCommentFiles.map(file => ({
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        url: URL.createObjectURL(file)
+      attachments: await Promise.all(newCommentFiles.map(async (file) => {
+        const { FileURLManager, generateSecureId } = await import('@/lib/file-upload-utils');
+        return {
+          id: generateSecureId(),
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          url: FileURLManager.createObjectURL(file)
+        };
       })),
       replies: []
     };

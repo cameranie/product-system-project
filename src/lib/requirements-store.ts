@@ -280,15 +280,15 @@ export const useRequirementsStore = create<RequirementsStore>()(
           // 模拟API调用延迟
           await new Promise(resolve => setTimeout(resolve, 1000));
           
-                           const now = new Date();
-                 const timeString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-                 
-                     const newRequirement: Requirement = {
-      ...requirementData,
-      id: `#${get().requirements.length + 1}`,
-      createdAt: timeString,
-      updatedAt: timeString,
-    };
+          const { formatDateTime, generateSecureId } = await import('@/lib/file-upload-utils');
+          const timeString = formatDateTime();
+          
+          const newRequirement: Requirement = {
+            ...requirementData,
+            id: `#${get().requirements.length + 1}`,
+            createdAt: timeString,
+            updatedAt: timeString,
+          };
 
           set(state => ({
             requirements: [...state.requirements, newRequirement],
@@ -304,13 +304,20 @@ export const useRequirementsStore = create<RequirementsStore>()(
       },
 
       updateRequirement: async (id: string, updates) => {
-        const now = new Date();
-        const timeString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        const { formatDateTime } = await import('@/lib/file-upload-utils');
+        const { AppError } = await import('@/lib/error-handler');
+        
+        const existingRequirement = get().requirements.find(req => req.id === id);
+        if (!existingRequirement) {
+          const error = new AppError(`需求 ${id} 不存在`, 'REQUIREMENT_NOT_FOUND', { id });
+          set({ error: error.message });
+          throw error;
+        }
         
         const updatedRequirement = {
-          ...get().requirements.find(req => req.id === id)!,
+          ...existingRequirement,
           ...updates,
-          updatedAt: timeString,
+          updatedAt: formatDateTime(),
         };
 
         // 立即更新UI，无延迟

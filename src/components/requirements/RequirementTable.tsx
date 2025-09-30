@@ -99,7 +99,8 @@ const RequirementRow = memo(({
           <div className="flex items-center gap-2">
             <Link
               href={`/requirements/${encodeURIComponent(requirement.id)}`}
-              className="font-medium hover:underline line-clamp-2 min-w-0 flex-1 break-words"
+              className="font-medium hover:underline line-clamp-2 min-w-0 flex-1 break-words overflow-hidden"
+              title={requirement.title}
             >
               {requirement.title}
             </Link>
@@ -108,7 +109,7 @@ const RequirementRow = memo(({
       </TableCell>
       {isColumnVisible('type') && (
         <TableCell className="px-3 py-3">
-          <span className="text-sm whitespace-nowrap">
+          <span className="text-sm truncate block" title={typeConfig?.label || requirement.type}>
             {typeConfig?.label || requirement.type}
           </span>
         </TableCell>
@@ -171,7 +172,7 @@ const RequirementRow = memo(({
       )}
       {isColumnVisible('creator') && (
         <TableCell className="px-3 py-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <Avatar className="h-6 w-6 flex-shrink-0">
               <AvatarImage 
                 src={requirement.creator?.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${requirement.creator?.name}`} 
@@ -180,7 +181,9 @@ const RequirementRow = memo(({
                 {requirement.creator?.name?.slice(0, 2) || 'U'}
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm truncate min-w-0">{requirement.creator?.name || '未知用户'}</span>
+            <span className="text-sm truncate min-w-0" title={requirement.creator?.name || '未知用户'}>
+              {requirement.creator?.name || '未知用户'}
+            </span>
           </div>
         </TableCell>
       )}
@@ -241,7 +244,7 @@ export const RequirementTable = memo(function RequirementTable({
   return (
     <div className="rounded-md border overflow-hidden">
       <div className="overflow-x-auto">
-        <Table className="min-w-full">
+        <Table className="w-full table-fixed" style={{ minWidth: '1000px' }}>
           <TableHeader>
           <TableRow>
             <TableHead className="w-12 px-2">
@@ -258,20 +261,20 @@ export const RequirementTable = memo(function RequirementTable({
                 </div>
               </TableHead>
             )}
-            <TableHead className="px-3 min-w-0 w-auto">
+            <TableHead className="px-3 w-[35%] sm:w-[40%] lg:w-[35%] xl:w-[30%]">
               <div className="flex items-center">
                 标题
                 {renderSortButton('title')}
               </div>
             </TableHead>
             {isColumnVisible('type') && (
-              <TableHead className="w-24 px-3">需求类型</TableHead>
+              <TableHead className="px-3 w-[10%] sm:w-[12%] lg:w-[10%]">需求类型</TableHead>
             )}
             {isColumnVisible('needToDo') && (
-              <TableHead className="w-24 px-3">是否要做</TableHead>
+              <TableHead className="px-3 w-[10%] sm:w-[12%] lg:w-[10%]">是否要做</TableHead>
             )}
             {isColumnVisible('priority') && (
-              <TableHead className="w-20 px-3">
+              <TableHead className="px-3 w-[8%] sm:w-[10%] lg:w-[8%]">
                 <div className="flex items-center">
                   优先级
                   {renderSortButton('priority')}
@@ -279,7 +282,7 @@ export const RequirementTable = memo(function RequirementTable({
               </TableHead>
             )}
             {isColumnVisible('creator') && (
-              <TableHead className="w-28 px-3">
+              <TableHead className="px-3 w-[12%] sm:w-[14%] lg:w-[12%]">
                 <div className="flex items-center">
                   创建人
                   {renderSortButton('creator')}
@@ -287,7 +290,7 @@ export const RequirementTable = memo(function RequirementTable({
               </TableHead>
             )}
             {isColumnVisible('createdAt') && (
-              <TableHead className="w-36 px-3">
+              <TableHead className="px-3 w-[12%] sm:w-[14%] lg:w-[12%]">
                 <div className="flex items-center">
                   创建时间
                   {renderSortButton('createdAt')}
@@ -295,7 +298,7 @@ export const RequirementTable = memo(function RequirementTable({
               </TableHead>
             )}
             {isColumnVisible('updatedAt') && (
-              <TableHead className="w-36 px-3">
+              <TableHead className="px-3 w-[12%] sm:w-[14%] lg:w-[12%]">
                 <div className="flex items-center">
                   更新时间
                   {renderSortButton('updatedAt')}

@@ -49,18 +49,33 @@ export default function RequirementsPage() {
 
   // 处理需求更新 - 优化响应速度
   const handleNeedToDoChange = useCallback((requirementId: string, value: string) => {
-    updateRequirement(requirementId, { needToDo: value as any });
+    // 类型安全检查
+    if (!['是', '否'].includes(value)) {
+      console.error('Invalid needToDo value:', value);
+      return;
+    }
+    updateRequirement(requirementId, { needToDo: value as '是' | '否' });
   }, [updateRequirement]);
 
   const handlePriorityChange = useCallback((requirementId: string, value: string) => {
-    updateRequirement(requirementId, { priority: value as any });
+    // 类型安全检查
+    if (!['低', '中', '高', '紧急'].includes(value)) {
+      console.error('Invalid priority value:', value);
+      return;
+    }
+    updateRequirement(requirementId, { priority: value as '低' | '中' | '高' | '紧急' });
   }, [updateRequirement]);
 
   // 批量操作
   const handleBatchNeedToDoUpdate = useCallback(() => {
     if (batchNeedToDoValue && selectedRequirements.length > 0) {
+      // 类型安全检查
+      if (!['是', '否'].includes(batchNeedToDoValue)) {
+        console.error('Invalid batch needToDo value:', batchNeedToDoValue);
+        return;
+      }
       selectedRequirements.forEach(id => {
-        updateRequirement(id, { needToDo: batchNeedToDoValue as any });
+        updateRequirement(id, { needToDo: batchNeedToDoValue as '是' | '否' });
       });
       setBatchNeedToDoValue('');
     }
