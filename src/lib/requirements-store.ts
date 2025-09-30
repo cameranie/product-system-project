@@ -48,7 +48,7 @@ export interface Requirement {
   title: string;
   type: '新功能' | '优化' | 'BUG' | '用户反馈' | '商务需求';
   status: '待评审' | '评审中' | '评审通过' | '评审不通过' | '已关闭' | '开发中' | '已完成' | '设计中';
-  priority: '低' | '中' | '高' | '紧急';
+  priority?: '低' | '中' | '高' | '紧急';
   creator: User;
   project: Project;
   description: string;
@@ -167,7 +167,8 @@ const initialRequirements: Requirement[] = [
     endOwnerOpinion: {
       needToDo: undefined,
       priority: undefined,
-      opinion: ''
+      opinion: '',
+      owner: undefined
     },
     scheduledReview: {
       reviewLevels: [
@@ -185,7 +186,7 @@ const initialRequirements: Requirement[] = [
     title: '数据导出功能',
     type: '新功能',
     status: '开发中',
-    priority: '低',
+    priority: undefined,
     creator: mockUsers[2],
     project: mockProjects[2],
     description: '支持用户导出各种格式的数据，包括Excel、CSV、PDF等格式。',

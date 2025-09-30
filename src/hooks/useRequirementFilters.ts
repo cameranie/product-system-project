@@ -92,6 +92,9 @@ export function useRequirementFilters({ requirements }: UseRequirementFiltersPro
           case 'creator':
             fieldValue = requirement.creator?.name || '';
             break;
+          case 'endOwner':
+            fieldValue = requirement.endOwnerOpinion?.owner?.name || '';
+            break;
           case 'platforms':
             fieldValue = (requirement.platforms || []).join(', ');
             break;
@@ -149,6 +152,10 @@ export function useRequirementFilters({ requirements }: UseRequirementFiltersPro
         case 'creator':
           aValue = a.creator?.name || '';
           bValue = b.creator?.name || '';
+          break;
+        case 'endOwner':
+          aValue = a.endOwnerOpinion?.owner?.name || '';
+          bValue = b.endOwnerOpinion?.owner?.name || '';
           break;
         case 'createdAt':
         case 'updatedAt':

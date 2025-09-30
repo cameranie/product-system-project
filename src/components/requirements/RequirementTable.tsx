@@ -114,6 +114,27 @@ const RequirementRow = memo(({
           </span>
         </TableCell>
       )}
+      {isColumnVisible('endOwner') && (
+        <TableCell className="px-3 py-3">
+          {requirement.endOwnerOpinion?.owner ? (
+            <div className="flex items-center gap-2 min-w-0">
+              <Avatar className="h-6 w-6 flex-shrink-0">
+                <AvatarImage 
+                  src={requirement.endOwnerOpinion.owner.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${requirement.endOwnerOpinion.owner.name}`}
+                />
+                <AvatarFallback className="text-xs">
+                  {requirement.endOwnerOpinion.owner.name?.slice(0, 2) || 'U'}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-sm truncate min-w-0" title={requirement.endOwnerOpinion.owner.name}>
+                {requirement.endOwnerOpinion.owner.name}
+              </span>
+            </div>
+          ) : (
+            <span className="text-sm text-muted-foreground">-</span>
+          )}
+        </TableCell>
+      )}
       {isColumnVisible('needToDo') && (
         <TableCell className="px-3 py-3">
           <DropdownMenu>
@@ -121,9 +142,9 @@ const RequirementRow = memo(({
               <Button
                 variant="ghost"
                 size="sm"
-                className={`h-6 px-2 py-1 text-xs rounded-md border-0 ${getNeedToDoConfig(requirement.needToDo || '待定')?.className || 'bg-gray-100 text-gray-800'} hover:opacity-80 transition-opacity duration-150 whitespace-nowrap`}
+                className={`h-6 px-2 py-1 text-xs rounded-md border-0 ${requirement.needToDo ? (getNeedToDoConfig(requirement.needToDo)?.className || 'bg-gray-100 text-gray-800') : 'bg-gray-50 text-gray-400'} hover:opacity-80 transition-opacity duration-150 whitespace-nowrap`}
               >
-                {getNeedToDoConfig(requirement.needToDo || '待定')?.label || '待定'}
+                {requirement.needToDo ? (getNeedToDoConfig(requirement.needToDo)?.label || requirement.needToDo) : '-'}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="center" className="w-20">
@@ -142,16 +163,34 @@ const RequirementRow = memo(({
           </DropdownMenu>
         </TableCell>
       )}
+      {isColumnVisible('platforms') && (
+        <TableCell className="px-3 py-3">
+          {requirement.platforms && requirement.platforms.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {requirement.platforms.slice(0, 2).map((platform, index) => (
+                <span key={index} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                  {platform}
+                </span>
+              ))}
+              {requirement.platforms.length > 2 && (
+                <span className="text-xs text-muted-foreground">+{requirement.platforms.length - 2}</span>
+              )}
+            </div>
+          ) : (
+            <span className="text-sm text-muted-foreground">-</span>
+          )}
+        </TableCell>
+      )}
       {isColumnVisible('priority') && (
         <TableCell className="px-3 py-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
+                            <Button
                 variant="ghost"
                 size="sm"
-                className={`h-6 px-2 py-1 text-xs rounded-md border-0 ${getPriorityConfig(requirement.priority)?.className || 'bg-gray-100 text-gray-800'} hover:opacity-80 transition-opacity duration-150 whitespace-nowrap`}
+                className={`h-6 px-2 py-1 text-xs rounded-md border-0 ${requirement.priority ? (getPriorityConfig(requirement.priority)?.className || 'bg-gray-100 text-gray-800') : 'bg-gray-50 text-gray-400'} hover:opacity-80 transition-opacity duration-150 whitespace-nowrap`}
               >
-{requirement.priority}
+                {requirement.priority || '-'}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="center" className="w-16">
@@ -270,8 +309,19 @@ export const RequirementTable = memo(function RequirementTable({
             {isColumnVisible('type') && (
               <TableHead className="px-3 w-[10%] sm:w-[12%] lg:w-[10%]">需求类型</TableHead>
             )}
+            {isColumnVisible('endOwner') && (
+              <TableHead className="px-3 w-[12%] sm:w-[14%] lg:w-[12%]">
+                <div className="flex items-center">
+                  端负责人
+                  {renderSortButton('endOwner')}
+                </div>
+              </TableHead>
+            )}
             {isColumnVisible('needToDo') && (
               <TableHead className="px-3 w-[10%] sm:w-[12%] lg:w-[10%]">是否要做</TableHead>
+            )}
+            {isColumnVisible('platforms') && (
+              <TableHead className="px-3 w-[10%] sm:w-[12%] lg:w-[10%]">应用端</TableHead>
             )}
             {isColumnVisible('priority') && (
               <TableHead className="px-3 w-[8%] sm:w-[10%] lg:w-[8%]">

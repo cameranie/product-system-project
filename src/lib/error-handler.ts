@@ -71,7 +71,7 @@ export function handleFileError(error: any): ErrorInfo {
 }
 
 // 数据验证错误处理
-export function handleValidationError(field: string, value: any, expectedType?: string): ErrorInfo {
+export function handleValidationError(field: string, value: unknown, expectedType?: string): ErrorInfo {
   return {
     message: `${field}字段验证失败${expectedType ? `，期望类型：${expectedType}` : ''}`,
     code: 'VALIDATION_ERROR',
@@ -80,7 +80,7 @@ export function handleValidationError(field: string, value: any, expectedType?: 
 }
 
 // 通用错误处理函数
-export function handleError(error: any, context?: string): ErrorInfo {
+export function handleError(error: unknown, context?: string): ErrorInfo {
   console.error(`Error in ${context || 'unknown context'}:`, error);
   
   if (error instanceof AppError) {
@@ -99,8 +99,8 @@ export function handleError(error: any, context?: string): ErrorInfo {
     return handleFileError(error);
   }
   
-  if (error?.response?.status) {
-    const status = error.response.status;
+  if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'status' in error.response) {
+    const status = (error.response as { status: number }).status;
     switch (status) {
       case 400:
         return {
@@ -142,7 +142,7 @@ export function handleError(error: any, context?: string): ErrorInfo {
   }
   
   return {
-    message: error?.message || '未知错误',
+    message: (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') ? error.message : '未知错误',
     code: 'UNKNOWN_ERROR',
     details: error
   };

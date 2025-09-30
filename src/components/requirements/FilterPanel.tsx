@@ -80,6 +80,13 @@ export function FilterPanel({
   onColumnToggle,
   onCreateNew
 }: FilterPanelProps) {
+  // 验证筛选条件是否完整和有效
+  const isValidFilter = (filter: FilterCondition): boolean => {
+    return !!(filter.column && filter.operator && filter.value.trim() !== '');
+  };
+
+  // 获取有效的筛选条件
+  const validCustomFilters = customFilters.filter(isValidFilter);
   return (
     <div className="space-y-4">
       {/* 搜索和操作栏 */}
@@ -100,13 +107,13 @@ export function FilterPanel({
           <DropdownMenuTrigger asChild>
             <Button 
               variant="outline"
-              className={customFilters.length > 0 ? 'bg-blue-100 text-blue-700 border-blue-200' : ''}
+              className={validCustomFilters.length > 0 ? 'bg-blue-100 text-blue-700 border-blue-200' : ''}
             >
               <Settings className="h-4 w-4 mr-2" />
-              {customFilters.length > 0 ? `${customFilters.length} 筛选设置` : '筛选设置'}
+              {validCustomFilters.length > 0 ? `${validCustomFilters.length} 筛选设置` : '筛选设置'}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[600px]">
+          <DropdownMenuContent align="start" className="w-[600px] ml-0" sideOffset={4}>
             <DropdownMenuSeparator />
             {customFilters.map((filter) => (
               <div key={filter.id} className="p-2">
@@ -170,7 +177,7 @@ export function FilterPanel({
                 <Plus className="h-3 w-3 mr-1" />
                 添加条件
               </Button>
-              {customFilters.length > 0 && (
+              {validCustomFilters.length > 0 && (
                 <Button onClick={onCustomFiltersReset} variant="outline" size="sm" className="flex-1">
                   <Trash2 className="h-3 w-3 mr-1" />
                   清空条件

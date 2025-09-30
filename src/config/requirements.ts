@@ -156,6 +156,7 @@ export const FILTERABLE_COLUMNS = [
   { value: 'type', label: '需求类型' },
   { value: 'priority', label: '优先级' },
   { value: 'creator', label: '创建人' },
+  { value: 'endOwner', label: '端负责人' },
   { value: 'needToDo', label: '是否要做' },
   { value: 'platforms', label: '应用端' },
   { value: 'createdAt', label: '创建时间' },

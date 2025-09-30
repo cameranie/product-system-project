@@ -12,7 +12,7 @@ export interface FieldValidationResult {
 }
 
 // 基础验证函数
-export function validateRequired(value: any, fieldName: string): FieldValidationResult {
+export function validateRequired(value: unknown, fieldName: string): FieldValidationResult {
   if (value === null || value === undefined || value === '') {
     return {
       isValid: false,
