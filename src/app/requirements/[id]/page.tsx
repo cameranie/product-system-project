@@ -629,13 +629,6 @@ export default function RequirementDetailPage({ params }: { params: { id: string
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">优先级</span>
-                  <Badge className={`text-xs ${getPriorityConfig(requirement.priority)?.className || 'bg-gray-100 text-gray-800'}`}>
-                    {requirement.priority}
-                  </Badge>
-                </div>
-                
-                <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">应用端</span>
                   <div className="flex flex-wrap gap-1">
                     {requirement.platforms.map((platform: string) => (
