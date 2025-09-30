@@ -143,14 +143,11 @@ export const RequirementTable = memo(function RequirementTable({
         <TableCell className="px-3 py-3">
           {requirement.platforms && requirement.platforms.length > 0 ? (
             <div className="flex flex-wrap gap-1">
-              {requirement.platforms.slice(0, 2).map((platform, index) => (
+              {requirement.platforms.map((platform, index) => (
                 <span key={index} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
                   {platform}
                 </span>
               ))}
-              {requirement.platforms.length > 2 && (
-                <span className="text-xs text-muted-foreground">+{requirement.platforms.length - 2}</span>
-              )}
             </div>
           ) : (
             <span className="text-sm text-muted-foreground">-</span>

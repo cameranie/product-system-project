@@ -77,12 +77,6 @@ export const NEED_TO_DO_CONFIG = {
     color: 'text-red-700', 
     bgColor: 'bg-red-50',
     className: 'bg-red-100 text-red-800'
-  },
-  '待定': { 
-    label: '待定', 
-    color: 'text-gray-700', 
-    bgColor: 'bg-gray-50',
-    className: 'bg-gray-100 text-gray-800'
   }
 } as const;
 
