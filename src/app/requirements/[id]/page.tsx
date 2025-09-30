@@ -195,8 +195,8 @@ export default function RequirementDetailPage({ params }: { params: { id: string
       return;
     }
 
-    const now = new Date();
-    const timeString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const { formatDateTime } = await import('@/lib/file-upload-utils');
+    const timeString = formatDateTime();
     
     const comment: Comment = {
       id: Date.now().toString(),
@@ -223,14 +223,14 @@ export default function RequirementDetailPage({ params }: { params: { id: string
   };
 
   // 处理回复提交
-  const handleSubmitReply = (commentId: string) => {
+  const handleSubmitReply = async (commentId: string) => {
     if (!replyContent.trim()) {
       toast.error('请输入回复内容');
       return;
     }
 
-    const now = new Date();
-    const timeString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const { formatDateTime } = await import('@/lib/file-upload-utils');
+    const timeString = formatDateTime();
     
     const reply: Reply = {
       id: Date.now().toString(),
@@ -684,7 +684,7 @@ export default function RequirementDetailPage({ params }: { params: { id: string
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="needToDo-yes"
-                        checked={requirement.endOwnerOpinion?.needToDo === true}
+                        checked={requirement.endOwnerOpinion?.needToDo === '是'}
                         onCheckedChange={(checked) => {
                           const currentUser = mockUsers[0];
                           if (currentUser.id === requirement.endOwnerOpinion?.owner?.id) {
@@ -703,7 +703,7 @@ export default function RequirementDetailPage({ params }: { params: { id: string
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="needToDo-no"
-                        checked={requirement.endOwnerOpinion?.needToDo === false}
+                        checked={requirement.endOwnerOpinion?.needToDo === '否'}
                         onCheckedChange={(checked) => {
                           const currentUser = mockUsers[0];
                           if (currentUser.id === requirement.endOwnerOpinion?.owner?.id) {
@@ -725,8 +725,8 @@ export default function RequirementDetailPage({ params }: { params: { id: string
                 {/* 优先级 */}
                 <div className="space-y-3">
                   <Label className="text-xs text-muted-foreground">优先级</Label>
-                  <div className="flex gap-4">
-                    {['高', '中', '低'].map(priority => (
+                  <div className="flex gap-4 flex-wrap">
+                    {['低', '中', '高', '紧急'].map(priority => (
                       <div key={priority} className="flex items-center space-x-2">
                         <Checkbox
                           id={`priority-${priority}`}

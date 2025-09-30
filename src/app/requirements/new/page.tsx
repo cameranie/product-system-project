@@ -57,8 +57,8 @@ interface RequirementFormData {
   attachments: File[];
   platforms: string[];
   endOwnerOpinion: {
-    needToDo?: boolean;
-    priority?: '高' | '中' | '低';
+    needToDo?: '是' | '否';
+    priority?: '低' | '中' | '高' | '紧急';
     opinion?: string;
     owner?: User;
   };
@@ -297,7 +297,7 @@ export default function CreateRequirementPage() {
         platforms: formData.platforms,
         plannedVersion: 'v1.2.0',
         isOpen: true,
-        needToDo: formData.endOwnerOpinion.needToDo ? '是' : formData.endOwnerOpinion.needToDo === false ? '否' : undefined,
+        needToDo: formData.endOwnerOpinion.needToDo, // 直接使用，已经是 '是' | '否' 类型
         reviewStatus: 'pending',
         reviewer1Status: 'pending',
         reviewer2Status: 'pending',
@@ -550,9 +550,9 @@ export default function CreateRequirementPage() {
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="needToDo-yes"
-                        checked={formData.endOwnerOpinion?.needToDo === true}
+                        checked={formData.endOwnerOpinion?.needToDo === '是'}
                         onCheckedChange={(checked) => 
-                          handleEndOwnerOpinionChange('needToDo', checked ? true : undefined)
+                          handleEndOwnerOpinionChange('needToDo', checked ? '是' : undefined)
                         }
                       />
                       <Label htmlFor="needToDo-yes" className="text-sm font-normal cursor-pointer">
@@ -562,9 +562,9 @@ export default function CreateRequirementPage() {
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="needToDo-no"
-                        checked={formData.endOwnerOpinion?.needToDo === false}
+                        checked={formData.endOwnerOpinion?.needToDo === '否'}
                         onCheckedChange={(checked) => 
-                          handleEndOwnerOpinionChange('needToDo', checked ? false : undefined)
+                          handleEndOwnerOpinionChange('needToDo', checked ? '否' : undefined)
                         }
                       />
                       <Label htmlFor="needToDo-no" className="text-sm font-normal cursor-pointer">
@@ -577,8 +577,8 @@ export default function CreateRequirementPage() {
                 {/* 优先级 */}
                 <div className="space-y-3">
                   <Label className="text-xs text-muted-foreground">优先级</Label>
-                  <div className="flex gap-4">
-                    {['高', '中', '低'].map(priority => (
+                  <div className="flex gap-4 flex-wrap">
+                    {['低', '中', '高', '紧急'].map(priority => (
                       <div key={priority} className="flex items-center space-x-2">
                         <Checkbox
                           id={`priority-${priority}`}

@@ -23,8 +23,8 @@ export interface Attachment {
 }
 
 export interface EndOwnerOpinion {
-  needToDo?: boolean;
-  priority?: '高' | '中' | '低';
+  needToDo?: '是' | '否';
+  priority?: '低' | '中' | '高' | '紧急';
   opinion?: string;
   owner?: User;
 }
@@ -119,7 +119,7 @@ const initialRequirements: Requirement[] = [
       { id: '2', name: '需求文档.docx', size: 512000, type: 'application/docx', url: '' }
     ],
     endOwnerOpinion: {
-      needToDo: true,
+      needToDo: '是',
       priority: '高',
       opinion: '这个功能很重要，建议优先处理',
       owner: mockUsers[3]
@@ -204,7 +204,7 @@ const initialRequirements: Requirement[] = [
     assignee: mockUsers[0],
     attachments: [],
     endOwnerOpinion: {
-      needToDo: true,
+      needToDo: '是',
       priority: '低',
       opinion: '功能有用但不紧急',
       owner: mockUsers[4]

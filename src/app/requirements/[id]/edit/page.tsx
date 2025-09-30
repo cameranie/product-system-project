@@ -133,7 +133,7 @@ const mockExistingRequirement: RequirementFormData = {
   reviewer1: mockUsers[1],
   reviewer2: mockUsers[2],
   endOwnerOpinion: {
-    needToDo: true,
+    needToDo: '是',
     priority: '高',
     opinion: '这个功能很重要，建议优先处理',
     owner: mockUsers[3]
@@ -469,8 +469,8 @@ export default function RequirementEditPage({ params }: { params: { id: string }
       return;
     }
 
-    const now = new Date();
-    const timeString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const { formatDateTime } = await import('@/lib/file-upload-utils');
+    const timeString = formatDateTime();
     
     const comment: Comment = {
       id: Date.now().toString(),
@@ -497,14 +497,14 @@ export default function RequirementEditPage({ params }: { params: { id: string }
   };
 
   // 处理回复提交
-  const handleSubmitReply = (commentId: string) => {
+  const handleSubmitReply = async (commentId: string) => {
     if (!replyContent.trim()) {
       toast.error('请输入回复内容');
       return;
     }
 
-    const now = new Date();
-    const timeString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const { formatDateTime } = await import('@/lib/file-upload-utils');
+    const timeString = formatDateTime();
     
     const reply: Reply = {
       id: Date.now().toString(),
@@ -1003,11 +1003,11 @@ export default function RequirementEditPage({ params }: { params: { id: string }
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="needToDo-yes"
-                        checked={formData.endOwnerOpinion?.needToDo === true}
+                        checked={formData.endOwnerOpinion?.needToDo === '是'}
                         onCheckedChange={(checked) => {
                           const currentUser = mockUsers[0];
                           if (currentUser.id === formData.endOwnerOpinion?.owner?.id) {
-                            handleEndOwnerOpinionChange('needToDo', checked ? true : undefined);
+                            handleEndOwnerOpinionChange('needToDo', checked ? '是' : undefined);
                           } else {
                             toast.error('只有端负责人才能修改此信息');
                           }
@@ -1021,11 +1021,11 @@ export default function RequirementEditPage({ params }: { params: { id: string }
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="needToDo-no"
-                        checked={formData.endOwnerOpinion?.needToDo === false}
+                        checked={formData.endOwnerOpinion?.needToDo === '否'}
                         onCheckedChange={(checked) => {
                           const currentUser = mockUsers[0];
                           if (currentUser.id === formData.endOwnerOpinion?.owner?.id) {
-                            handleEndOwnerOpinionChange('needToDo', checked ? false : undefined);
+                            handleEndOwnerOpinionChange('needToDo', checked ? '否' : undefined);
                           } else {
                             toast.error('只有端负责人才能修改此信息');
                           }
@@ -1042,8 +1042,8 @@ export default function RequirementEditPage({ params }: { params: { id: string }
                 {/* 优先级 */}
                 <div className="space-y-3">
                   <Label className="text-xs text-muted-foreground">优先级</Label>
-                  <div className="flex gap-4">
-                    {['高', '中', '低'].map(priority => (
+                  <div className="flex gap-4 flex-wrap">
+                    {['低', '中', '高', '紧急'].map(priority => (
                       <div key={priority} className="flex items-center space-x-2">
                         <Checkbox
                           id={`priority-${priority}`}
