@@ -162,8 +162,8 @@ const mockExistingRequirement: RequirementFormData = {
   updatedAt: '2024-01-20 14:25'
 };
 
-export default async function RequirementEditPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default function RequirementEditPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const router = useRouter();
   const { getRequirementById, updateRequirement } = useRequirementsStore();
   const [formData, setFormData] = useState<RequirementFormData>(mockExistingRequirement);

@@ -26,7 +26,10 @@ export function useRequirementFilters({ requirements }: UseRequirementFiltersPro
     field: 'updatedAt',
     direction: 'desc'
   });
-  const [hiddenColumns, setHiddenColumns] = useState<string[]>(['createdAt', 'updatedAt']);
+  const [hiddenColumns, setHiddenColumns] = useState<string[]>(['platforms', 'creator', 'createdAt', 'updatedAt']);
+  const [columnOrder, setColumnOrder] = useState<string[]>([
+    'id', 'title', 'type', 'platforms', 'endOwner', 'needToDo', 'priority', 'creator', 'createdAt', 'updatedAt'
+  ]);
   const [selectedRequirements, setSelectedRequirements] = useState<string[]>([]);
 
   // 统计数据
@@ -132,8 +135,8 @@ export function useRequirementFilters({ requirements }: UseRequirementFiltersPro
     if (!config.field) return reqs;
 
     return [...reqs].sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
+      let aValue: string | number | Date;
+      let bValue: string | number | Date;
 
       switch (config.field) {
         case 'id':
@@ -237,6 +240,11 @@ export function useRequirementFilters({ requirements }: UseRequirementFiltersPro
     );
   }, []);
 
+  // 列排序管理
+  const handleColumnReorder = useCallback((newOrder: string[]) => {
+    setColumnOrder(newOrder);
+  }, []);
+
   // 选择管理
   const handleRequirementSelect = useCallback((id: string, checked: boolean) => {
     setSelectedRequirements(prev => 
@@ -257,6 +265,7 @@ export function useRequirementFilters({ requirements }: UseRequirementFiltersPro
     customFilters,
     sortConfig,
     hiddenColumns,
+    columnOrder,
     selectedRequirements,
     stats,
     
@@ -272,6 +281,7 @@ export function useRequirementFilters({ requirements }: UseRequirementFiltersPro
     clearAllFilters,
     handleColumnSort,
     toggleColumnVisibility,
+    handleColumnReorder,
     handleRequirementSelect,
     handleSelectAll
   };

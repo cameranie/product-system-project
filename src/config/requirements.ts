@@ -164,7 +164,7 @@ export const FILTERABLE_COLUMNS = [
 ] as const;
 
 // 默认隐藏的列
-export const DEFAULT_HIDDEN_COLUMNS = ['createdAt', 'updatedAt'];
+export const DEFAULT_HIDDEN_COLUMNS = ['platforms', 'creator', 'createdAt', 'updatedAt'];
 
 // 默认排序配置
 export const DEFAULT_SORT_CONFIG = {

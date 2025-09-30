@@ -19,13 +19,79 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Search, Plus, EyeOff, Settings, Trash2 } from 'lucide-react';
+import { Search, Plus, EyeOff, Settings, Trash2, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface FilterCondition {
   id: string;
   column: string;
   operator: string;
   value: string;
+}
+
+interface SortableColumnItemProps {
+  id: string;
+  label: string;
+  isVisible: boolean;
+  onToggle: (columnId: string) => void;
+}
+
+function SortableColumnItem({ id, label, isVisible, onToggle }: SortableColumnItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <DropdownMenuItem
+      ref={setNodeRef}
+      style={style}
+      onSelect={(e) => e.preventDefault()}
+      className="flex items-center gap-2 cursor-pointer"
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing p-1"
+      >
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
+      </div>
+      <Checkbox
+        checked={isVisible}
+        onCheckedChange={() => onToggle(id)}
+        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+      />
+      <span className="flex-1">{label}</span>
+    </DropdownMenuItem>
+  );
 }
 
 interface FilterableColumn {
@@ -38,6 +104,7 @@ interface FilterPanelProps {
   statusFilter: string;
   customFilters: FilterCondition[];
   hiddenColumns: string[];
+  columnOrder: string[];
   stats: {
     total: number;
     open: number;
@@ -51,6 +118,7 @@ interface FilterPanelProps {
   onCustomFilterRemove: (id: string) => void;
   onCustomFiltersReset: () => void;
   onColumnToggle: (column: string) => void;
+  onColumnReorder: (newOrder: string[]) => void;
   onCreateNew: () => void;
 }
 
@@ -69,6 +137,7 @@ export function FilterPanel({
   statusFilter,
   customFilters,
   hiddenColumns,
+  columnOrder,
   stats,
   filterableColumns,
   onSearchChange,
@@ -78,12 +147,38 @@ export function FilterPanel({
   onCustomFilterRemove,
   onCustomFiltersReset,
   onColumnToggle,
+  onColumnReorder,
   onCreateNew
 }: FilterPanelProps) {
   // 验证筛选条件是否完整和有效
   const isValidFilter = (filter: FilterCondition): boolean => {
     return !!(filter.column && filter.operator && filter.value.trim() !== '');
   };
+
+  // 拖拽传感器
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // 处理拖拽结束
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = columnOrder.indexOf(active.id as string);
+      const newIndex = columnOrder.indexOf(over.id as string);
+      const newOrder = arrayMove(columnOrder, oldIndex, newIndex);
+      onColumnReorder(newOrder);
+    }
+  };
+
+  // 根据排序获取有序的列
+  const orderedColumns = columnOrder
+    .map(id => filterableColumns.find(col => col.value === id))
+    .filter(Boolean) as FilterableColumn[];
 
   // 获取有效的筛选条件
   const validCustomFilters = customFilters.filter(isValidFilter);
@@ -200,7 +295,7 @@ export function FilterPanel({
           </DropdownMenuTrigger>
           <DropdownMenuContent 
             align="end" 
-            className="w-56"
+            className="w-64"
             onPointerLeave={(e) => {
               // 防止鼠标还在下拉菜单内时关闭
               const target = e.target as HTMLElement;
@@ -210,20 +305,26 @@ export function FilterPanel({
               }
             }}
           >
-            {filterableColumns.map((col) => (
-              <DropdownMenuItem 
-                key={col.value} 
-                className="flex items-center space-x-2 cursor-pointer"
-                onClick={() => onColumnToggle(col.value)}
-                onSelect={(e) => e.preventDefault()} // 防止选择后立即关闭
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={columnOrder}
+                strategy={verticalListSortingStrategy}
               >
-                <Checkbox
-                  checked={!hiddenColumns.includes(col.value)}
-                  onCheckedChange={() => {}} 
-                />
-                <span>{col.label}</span>
-              </DropdownMenuItem>
-            ))}
+                {orderedColumns.map((col) => (
+                  <SortableColumnItem
+                    key={col.value}
+                    id={col.value}
+                    label={col.label}
+                    isVisible={!hiddenColumns.includes(col.value)}
+                    onToggle={onColumnToggle}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
           </DropdownMenuContent>
         </DropdownMenu>
 

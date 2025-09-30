@@ -22,6 +22,7 @@ export default function RequirementsPage() {
     customFilters,
     sortConfig,
     hiddenColumns,
+    columnOrder,
     selectedRequirements,
     stats,
     filteredRequirements,
@@ -33,6 +34,7 @@ export default function RequirementsPage() {
     clearAllFilters,
     handleColumnSort,
     toggleColumnVisibility,
+    handleColumnReorder,
     handleRequirementSelect,
     handleSelectAll
   } = useRequirementFilters({ requirements });
@@ -113,6 +115,7 @@ export default function RequirementsPage() {
           statusFilter={statusFilter}
           customFilters={customFilters}
           hiddenColumns={hiddenColumns}
+          columnOrder={columnOrder}
           stats={stats}
           filterableColumns={FILTERABLE_COLUMNS}
           onSearchChange={setSearchTerm}
@@ -122,6 +125,7 @@ export default function RequirementsPage() {
           onCustomFilterRemove={removeCustomFilter}
           onCustomFiltersReset={clearAllFilters}
           onColumnToggle={toggleColumnVisibility}
+          onColumnReorder={handleColumnReorder}
           onCreateNew={handleCreateNew}
         />
 

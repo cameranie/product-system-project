@@ -114,6 +114,24 @@ const RequirementRow = memo(({
           </span>
         </TableCell>
       )}
+      {isColumnVisible('platforms') && (
+        <TableCell className="px-3 py-3">
+          {requirement.platforms && requirement.platforms.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {requirement.platforms.slice(0, 2).map((platform, index) => (
+                <span key={index} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                  {platform}
+                </span>
+              ))}
+              {requirement.platforms.length > 2 && (
+                <span className="text-xs text-muted-foreground">+{requirement.platforms.length - 2}</span>
+              )}
+            </div>
+          ) : (
+            <span className="text-sm text-muted-foreground">-</span>
+          )}
+        </TableCell>
+      )}
       {isColumnVisible('endOwner') && (
         <TableCell className="px-3 py-3">
           {requirement.endOwnerOpinion?.owner ? (
@@ -161,24 +179,6 @@ const RequirementRow = memo(({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-        </TableCell>
-      )}
-      {isColumnVisible('platforms') && (
-        <TableCell className="px-3 py-3">
-          {requirement.platforms && requirement.platforms.length > 0 ? (
-            <div className="flex flex-wrap gap-1">
-              {requirement.platforms.slice(0, 2).map((platform, index) => (
-                <span key={index} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                  {platform}
-                </span>
-              ))}
-              {requirement.platforms.length > 2 && (
-                <span className="text-xs text-muted-foreground">+{requirement.platforms.length - 2}</span>
-              )}
-            </div>
-          ) : (
-            <span className="text-sm text-muted-foreground">-</span>
-          )}
         </TableCell>
       )}
       {isColumnVisible('priority') && (
@@ -309,6 +309,9 @@ export const RequirementTable = memo(function RequirementTable({
             {isColumnVisible('type') && (
               <TableHead className="px-3 w-[10%] sm:w-[12%] lg:w-[10%]">需求类型</TableHead>
             )}
+            {isColumnVisible('platforms') && (
+              <TableHead className="px-3 w-[10%] sm:w-[12%] lg:w-[10%]">应用端</TableHead>
+            )}
             {isColumnVisible('endOwner') && (
               <TableHead className="px-3 w-[12%] sm:w-[14%] lg:w-[12%]">
                 <div className="flex items-center">
@@ -319,9 +322,6 @@ export const RequirementTable = memo(function RequirementTable({
             )}
             {isColumnVisible('needToDo') && (
               <TableHead className="px-3 w-[10%] sm:w-[12%] lg:w-[10%]">是否要做</TableHead>
-            )}
-            {isColumnVisible('platforms') && (
-              <TableHead className="px-3 w-[10%] sm:w-[12%] lg:w-[10%]">应用端</TableHead>
             )}
             {isColumnVisible('priority') && (
               <TableHead className="px-3 w-[8%] sm:w-[10%] lg:w-[8%]">

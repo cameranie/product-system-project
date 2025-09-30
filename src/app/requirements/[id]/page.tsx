@@ -65,8 +65,8 @@ interface HistoryRecord {
   timestamp: string;
 }
 
-export default async function RequirementDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default function RequirementDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const router = useRouter();
   const { getRequirementById, updateRequirement } = useRequirementsStore();
   const [requirement, setRequirement] = useState<any>(null); // TODO: 使用正确的Requirement类型
