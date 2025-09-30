@@ -24,7 +24,7 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  User,
+  User as UserIcon,
   AlertCircle,
   MousePointer,
   Palette,
@@ -778,7 +778,7 @@ export default function RequirementDetailPage({ params }: { params: { id: string
                 <CardTitle>预排期评审</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {requirement.scheduledReview?.reviewLevels?.map((level, index) => (
+                {requirement.scheduledReview?.reviewLevels?.map((level: any, index: number) => (
                   <div key={level.id} className="space-y-3 p-4 border rounded-lg bg-gray-50">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">{level.levelName}</span>
