@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useCallback, memo } from 'react';
+import React, { useCallback, memo, useMemo } from 'react';
 import Link from 'next/link';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -20,21 +19,21 @@ import {
   TableCell,
   TableHead,
 } from '@/components/ui/table';
-import { ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { Requirement } from '@/lib/requirements-store';
 import { 
-  REQUIREMENT_TYPE_CONFIG, 
-  PRIORITY_CONFIG, 
-  NEED_TO_DO_CONFIG,
   getRequirementTypeConfig,
   getPriorityConfig,
-  getNeedToDoConfig
+  getNeedToDoConfig,
+  NEED_TO_DO_CONFIG,
+  PRIORITY_CONFIG
 } from '@/config/requirements';
 
 interface RequirementTableProps {
   requirements: Requirement[];
   selectedRequirements: string[];
   hiddenColumns: string[];
+  columnOrder: string[];
   sortConfig: {
     field: string;
     direction: 'asc' | 'desc';
@@ -46,75 +45,101 @@ interface RequirementTableProps {
   onColumnSort: (field: string) => void;
 }
 
-// 优化：使用memo包装单个需求行组件
-const RequirementRow = memo(({ 
-  requirement, 
-  isSelected, 
-  hiddenColumns, 
-  onSelect, 
-  onNeedToDoChange, 
-  onPriorityChange 
-}: {
-  requirement: Requirement;
-  isSelected: boolean;
-  hiddenColumns: string[];
-  onSelect: (id: string, checked: boolean) => void;
-  onNeedToDoChange: (id: string, value: string) => void;
-  onPriorityChange: (id: string, value: string) => void;
-}) => {
+export const RequirementTable = memo(function RequirementTable({
+  requirements,
+  selectedRequirements,
+  hiddenColumns,
+  columnOrder,
+  sortConfig,
+  onRequirementSelect,
+  onSelectAll,
+  onNeedToDoChange,
+  onPriorityChange,
+  onColumnSort
+}: RequirementTableProps) {
   const isColumnVisible = useCallback((column: string) => !hiddenColumns.includes(column), [hiddenColumns]);
 
-  const handleSelectChange = useCallback((checked: boolean) => {
-    onSelect(requirement.id, checked);
-  }, [requirement.id, onSelect]);
+  const renderSortButton = useCallback((field: string) => (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="h-6 w-6 p-0 ml-1"
+      onClick={() => onColumnSort(field)}
+    >
+      {sortConfig.field === field ? (
+        sortConfig.direction === 'asc' ? (
+          <ArrowUp className="h-3 w-3" />
+        ) : (
+          <ArrowDown className="h-3 w-3" />
+        )
+      ) : (
+        <ArrowUpDown className="h-3 w-3" />
+      )}
+    </Button>
+  ), [sortConfig, onColumnSort]);
 
-  const handleNeedToDoChange = useCallback((value: string) => {
-    // 立即更新UI反馈，优化响应速度
-    onNeedToDoChange(requirement.id, value);
-  }, [requirement.id, onNeedToDoChange]);
-
-  const handlePriorityChange = useCallback((value: string) => {
-    // 立即更新UI反馈，优化响应速度
-    onPriorityChange(requirement.id, value);
-  }, [requirement.id, onPriorityChange]);
-
-  const typeConfig = getRequirementTypeConfig(requirement.type);
-  const priorityConfig = getPriorityConfig(requirement.priority);
-
-  return (
-    <TableRow className="hover:bg-muted/50">
-      <TableCell className="px-2 py-3">
-        <Checkbox
-          checked={isSelected}
-          onCheckedChange={handleSelectChange}
-        />
-      </TableCell>
-      {isColumnVisible('id') && (
+  // 列配置映射
+  const columnConfig = useMemo(() => ({
+    id: {
+      header: () => (
+        <TableHead className="w-16 px-2">
+          <div className="flex items-center">
+            ID
+            {renderSortButton('id')}
+          </div>
+        </TableHead>
+      ),
+      cell: (requirement: Requirement) => (
         <TableCell className="px-2 py-3 font-mono text-sm">
           {requirement.id}
         </TableCell>
-      )}
-      <TableCell className="px-3 py-3">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Link
-              href={`/requirements/${encodeURIComponent(requirement.id)}`}
-              className="font-medium hover:underline line-clamp-2 min-w-0 flex-1 break-words overflow-hidden"
-              title={requirement.title}
-            >
-              {requirement.title}
-            </Link>
+      )
+    },
+    title: {
+      header: () => (
+        <TableHead className="px-3 w-[35%] sm:w-[40%] lg:w-[35%] xl:w-[30%]">
+          <div className="flex items-center">
+            标题
+            {renderSortButton('title')}
           </div>
-        </div>
-      </TableCell>
-      {isColumnVisible('type') && (
+        </TableHead>
+      ),
+      cell: (requirement: Requirement) => (
         <TableCell className="px-3 py-3">
-          <span className="text-sm truncate block" title={typeConfig?.label || requirement.type}>
-            {typeConfig?.label || requirement.type}
-          </span>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/requirements/${requirement.id}`}
+                className="font-medium hover:underline line-clamp-2 min-w-0 flex-1 break-words overflow-hidden"
+                title={requirement.title}
+              >
+                {requirement.title}
+              </Link>
+            </div>
+          </div>
         </TableCell>
-      )}
-      {isColumnVisible('platforms') && (
+      )
+    },
+    type: {
+      header: () => (
+        <TableHead className="px-3 w-[10%] sm:w-[12%] lg:w-[10%]">需求类型</TableHead>
+      ),
+      cell: (requirement: Requirement) => {
+        const typeConfig = getRequirementTypeConfig(requirement.type);
+        return (
+          <TableCell className="px-3 py-3">
+            <span className="text-sm truncate block" title={typeConfig?.label || requirement.type}>
+              {typeConfig?.label || requirement.type}
+            </span>
+          </TableCell>
+        );
+      }
+    },
+    platforms: {
+      header: () => (
+        <TableHead className="px-3 w-[10%] sm:w-[12%] lg:w-[10%]">应用端</TableHead>
+      ),
+      cell: (requirement: Requirement) => (
         <TableCell className="px-3 py-3">
           {requirement.platforms && requirement.platforms.length > 0 ? (
             <div className="flex flex-wrap gap-1">
@@ -131,8 +156,18 @@ const RequirementRow = memo(({
             <span className="text-sm text-muted-foreground">-</span>
           )}
         </TableCell>
-      )}
-      {isColumnVisible('endOwner') && (
+      )
+    },
+    endOwner: {
+      header: () => (
+        <TableHead className="px-3 w-[12%] sm:w-[14%] lg:w-[12%]">
+          <div className="flex items-center">
+            端负责人
+            {renderSortButton('endOwner')}
+          </div>
+        </TableHead>
+      ),
+      cell: (requirement: Requirement) => (
         <TableCell className="px-3 py-3">
           {requirement.endOwnerOpinion?.owner ? (
             <div className="flex items-center gap-2 min-w-0">
@@ -152,8 +187,13 @@ const RequirementRow = memo(({
             <span className="text-sm text-muted-foreground">-</span>
           )}
         </TableCell>
-      )}
-      {isColumnVisible('needToDo') && (
+      )
+    },
+    needToDo: {
+      header: () => (
+        <TableHead className="px-3 w-[10%] sm:w-[12%] lg:w-[10%]">是否要做</TableHead>
+      ),
+      cell: (requirement: Requirement) => (
         <TableCell className="px-3 py-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -169,7 +209,7 @@ const RequirementRow = memo(({
               {Object.entries(NEED_TO_DO_CONFIG).map(([key, config]) => (
                 <DropdownMenuItem
                   key={key}
-                  onClick={() => handleNeedToDoChange(key)}
+                  onClick={() => onNeedToDoChange(requirement.id, key)}
                   className="cursor-pointer"
                 >
                   <div className={`px-2 py-1 rounded text-sm ${config.color} ${config.bgColor} w-full text-center`}>
@@ -180,12 +220,22 @@ const RequirementRow = memo(({
             </DropdownMenuContent>
           </DropdownMenu>
         </TableCell>
-      )}
-      {isColumnVisible('priority') && (
+      )
+    },
+    priority: {
+      header: () => (
+        <TableHead className="px-3 w-[8%] sm:w-[10%] lg:w-[8%]">
+          <div className="flex items-center">
+            优先级
+            {renderSortButton('priority')}
+          </div>
+        </TableHead>
+      ),
+      cell: (requirement: Requirement) => (
         <TableCell className="px-3 py-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                            <Button
+              <Button
                 variant="ghost"
                 size="sm"
                 className={`h-6 px-2 py-1 text-xs rounded-md border-0 ${requirement.priority ? (getPriorityConfig(requirement.priority)?.className || 'bg-gray-100 text-gray-800') : 'bg-gray-50 text-gray-400'} hover:opacity-80 transition-opacity duration-150 whitespace-nowrap`}
@@ -197,7 +247,7 @@ const RequirementRow = memo(({
               {Object.entries(PRIORITY_CONFIG).map(([key, config]) => (
                 <DropdownMenuItem
                   key={key}
-                  onClick={() => handlePriorityChange(key)}
+                  onClick={() => onPriorityChange(requirement.id, key)}
                   className="cursor-pointer"
                 >
                   <div className={`px-2 py-1 rounded text-sm ${config.className} w-full text-center`}>
@@ -208,8 +258,18 @@ const RequirementRow = memo(({
             </DropdownMenuContent>
           </DropdownMenu>
         </TableCell>
-      )}
-      {isColumnVisible('creator') && (
+      )
+    },
+    creator: {
+      header: () => (
+        <TableHead className="px-3 w-[12%] sm:w-[14%] lg:w-[12%]">
+          <div className="flex items-center">
+            创建人
+            {renderSortButton('creator')}
+          </div>
+        </TableHead>
+      ),
+      cell: (requirement: Requirement) => (
         <TableCell className="px-3 py-3">
           <div className="flex items-center gap-2 min-w-0">
             <Avatar className="h-6 w-6 flex-shrink-0">
@@ -225,54 +285,39 @@ const RequirementRow = memo(({
             </span>
           </div>
         </TableCell>
-      )}
-      {isColumnVisible('createdAt') && (
+      )
+    },
+    createdAt: {
+      header: () => (
+        <TableHead className="px-3 w-[12%] sm:w-[14%] lg:w-[12%]">
+          <div className="flex items-center">
+            创建时间
+            {renderSortButton('createdAt')}
+          </div>
+        </TableHead>
+      ),
+      cell: (requirement: Requirement) => (
         <TableCell className="px-3 py-3 text-sm text-muted-foreground whitespace-nowrap">
           {requirement.createdAt}
         </TableCell>
-      )}
-      {isColumnVisible('updatedAt') && (
+      )
+    },
+    updatedAt: {
+      header: () => (
+        <TableHead className="px-3 w-[12%] sm:w-[14%] lg:w-[12%]">
+          <div className="flex items-center">
+            更新时间
+            {renderSortButton('updatedAt')}
+          </div>
+        </TableHead>
+      ),
+      cell: (requirement: Requirement) => (
         <TableCell className="px-3 py-3 text-sm text-muted-foreground whitespace-nowrap">
           {requirement.updatedAt}
         </TableCell>
-      )}
-    </TableRow>
-  );
-});
-
-RequirementRow.displayName = 'RequirementRow';
-
-export const RequirementTable = memo(function RequirementTable({
-  requirements,
-  selectedRequirements,
-  hiddenColumns,
-  sortConfig,
-  onRequirementSelect,
-  onSelectAll,
-  onNeedToDoChange,
-  onPriorityChange,
-  onColumnSort
-}: RequirementTableProps) {
-  const isColumnVisible = useCallback((column: string) => !hiddenColumns.includes(column), [hiddenColumns]);
-
-  const renderSortButton = useCallback((field: string) => (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={() => onColumnSort(field)}
-      className="h-6 w-6 p-0 ml-1"
-    >
-      {sortConfig.field === field ? (
-        sortConfig.direction === 'asc' ? (
-          <ArrowUp className="h-3 w-3" />
-        ) : (
-          <ArrowDown className="h-3 w-3" />
-        )
-      ) : (
-        <ArrowUp className="h-3 w-3 opacity-50" />
-      )}
-    </Button>
-  ), [sortConfig, onColumnSort]);
+      )
+    }
+  }), [renderSortButton, onNeedToDoChange, onPriorityChange]);
 
   const handleSelectAll = useCallback((checked: boolean) => {
     onSelectAll(checked);
@@ -280,96 +325,45 @@ export const RequirementTable = memo(function RequirementTable({
 
   const isAllSelected = requirements.length > 0 && selectedRequirements.length === requirements.length;
 
+  // 根据columnOrder和hiddenColumns获取可见的有序列
+  const visibleColumns = useMemo(() => {
+    return columnOrder.filter(col => isColumnVisible(col));
+  }, [columnOrder, isColumnVisible]);
+
   return (
     <div className="rounded-md border overflow-hidden">
       <div className="overflow-x-auto">
         <Table className="w-full table-fixed" style={{ minWidth: '1000px' }}>
           <TableHeader>
-          <TableRow>
-            <TableHead className="w-12 px-2">
-              <Checkbox
-                checked={isAllSelected}
-                onCheckedChange={handleSelectAll}
-              />
-            </TableHead>
-            {isColumnVisible('id') && (
-              <TableHead className="w-16 px-2">
-                <div className="flex items-center">
-                  ID
-                  {renderSortButton('id')}
-                </div>
+            <TableRow>
+              <TableHead className="w-12 px-2">
+                <Checkbox
+                  checked={isAllSelected}
+                  onCheckedChange={handleSelectAll}
+                />
               </TableHead>
-            )}
-            <TableHead className="px-3 w-[35%] sm:w-[40%] lg:w-[35%] xl:w-[30%]">
-              <div className="flex items-center">
-                标题
-                {renderSortButton('title')}
-              </div>
-            </TableHead>
-            {isColumnVisible('type') && (
-              <TableHead className="px-3 w-[10%] sm:w-[12%] lg:w-[10%]">需求类型</TableHead>
-            )}
-            {isColumnVisible('platforms') && (
-              <TableHead className="px-3 w-[10%] sm:w-[12%] lg:w-[10%]">应用端</TableHead>
-            )}
-            {isColumnVisible('endOwner') && (
-              <TableHead className="px-3 w-[12%] sm:w-[14%] lg:w-[12%]">
-                <div className="flex items-center">
-                  端负责人
-                  {renderSortButton('endOwner')}
-                </div>
-              </TableHead>
-            )}
-            {isColumnVisible('needToDo') && (
-              <TableHead className="px-3 w-[10%] sm:w-[12%] lg:w-[10%]">是否要做</TableHead>
-            )}
-            {isColumnVisible('priority') && (
-              <TableHead className="px-3 w-[8%] sm:w-[10%] lg:w-[8%]">
-                <div className="flex items-center">
-                  优先级
-                  {renderSortButton('priority')}
-                </div>
-              </TableHead>
-            )}
-            {isColumnVisible('creator') && (
-              <TableHead className="px-3 w-[12%] sm:w-[14%] lg:w-[12%]">
-                <div className="flex items-center">
-                  创建人
-                  {renderSortButton('creator')}
-                </div>
-              </TableHead>
-            )}
-            {isColumnVisible('createdAt') && (
-              <TableHead className="px-3 w-[12%] sm:w-[14%] lg:w-[12%]">
-                <div className="flex items-center">
-                  创建时间
-                  {renderSortButton('createdAt')}
-                </div>
-              </TableHead>
-            )}
-            {isColumnVisible('updatedAt') && (
-              <TableHead className="px-3 w-[12%] sm:w-[14%] lg:w-[12%]">
-                <div className="flex items-center">
-                  更新时间
-                  {renderSortButton('updatedAt')}
-                </div>
-              </TableHead>
-            )}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {requirements.map((requirement) => (
-            <RequirementRow
-              key={requirement.id}
-              requirement={requirement}
-              isSelected={selectedRequirements.includes(requirement.id)}
-              hiddenColumns={hiddenColumns}
-              onSelect={onRequirementSelect}
-              onNeedToDoChange={onNeedToDoChange}
-              onPriorityChange={onPriorityChange}
-            />
-          ))}
-        </TableBody>
+              {visibleColumns.map(columnId => {
+                const config = columnConfig[columnId as keyof typeof columnConfig];
+                return config ? <React.Fragment key={columnId}>{config.header()}</React.Fragment> : null;
+              })}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {requirements.map((requirement) => (
+              <TableRow key={requirement.id} className="hover:bg-muted/50">
+                <TableCell className="px-2 py-3">
+                  <Checkbox
+                    checked={selectedRequirements.includes(requirement.id)}
+                    onCheckedChange={(checked) => onRequirementSelect(requirement.id, checked as boolean)}
+                  />
+                </TableCell>
+                {visibleColumns.map(columnId => {
+                  const config = columnConfig[columnId as keyof typeof columnConfig];
+                  return config ? <React.Fragment key={columnId}>{config.cell(requirement)}</React.Fragment> : null;
+                })}
+              </TableRow>
+            ))}
+          </TableBody>
         </Table>
       </div>
     </div>

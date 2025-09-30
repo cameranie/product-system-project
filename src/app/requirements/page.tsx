@@ -143,6 +143,7 @@ export default function RequirementsPage() {
           requirements={filteredRequirements}
           selectedRequirements={selectedRequirements}
           hiddenColumns={hiddenColumns}
+          columnOrder={columnOrder}
           sortConfig={sortConfig}
           onRequirementSelect={handleRequirementSelect}
           onSelectAll={handleSelectAll}
