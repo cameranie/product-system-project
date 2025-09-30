@@ -3,7 +3,81 @@
  * 统一管理各种配置项，避免重复定义
  */
 
-// 需求类型配置
+// ==================== 基础配置 ====================
+
+/**
+ * 应用端选项
+ * 用于新建和编辑需求时选择应用平台
+ */
+export const PLATFORM_OPTIONS = ['Web端', 'PC端', '移动端'] as const;
+
+/**
+ * 需求类型列表
+ * 从 REQUIREMENT_TYPE_CONFIG 中提取的类型数组
+ */
+export const REQUIREMENT_TYPES = ['新功能', '优化', 'BUG', '用户反馈', '商务需求'] as const;
+
+/**
+ * UI 尺寸配置
+ * 统一管理所有组件的尺寸，便于全局调整和保持一致性
+ */
+export const UI_SIZES = {
+  // 表格相关
+  TABLE: {
+    MIN_WIDTH: 1000, // 表格最小宽度（像素）
+    COLUMN_WIDTHS: {
+      CHECKBOX: 'w-12',    // 复选框列宽度
+      ID: 'w-16',          // ID列宽度
+      TYPE: 'w-32',        // 类型列宽度
+      PRIORITY: 'w-24',    // 优先级列宽度
+      STATUS: 'w-24',      // 状态列宽度
+    }
+  },
+  
+  // 头像尺寸
+  AVATAR: {
+    SMALL: 'h-6 w-6',    // 小头像（表格行内）
+    MEDIUM: 'h-8 w-8',   // 中等头像（评论、详情）
+    LARGE: 'h-10 w-10',  // 大头像（用户信息）
+  },
+  
+  // 图标尺寸
+  ICON: {
+    SMALL: 'h-3 w-3',    // 小图标（按钮内）
+    MEDIUM: 'h-4 w-4',   // 中等图标（一般使用）
+    LARGE: 'h-6 w-6',    // 大图标（标题、强调）
+    XLARGE: 'h-8 w-8',   // 超大图标（空状态）
+  },
+  
+  // 按钮尺寸
+  BUTTON: {
+    ICON_SMALL: 'h-6 w-6 p-0',      // 小图标按钮（表格内）
+    ICON_MEDIUM: 'h-8 w-8 p-0',     // 中等图标按钮（一般使用）
+    INPUT_HEIGHT: 'h-8',            // 输入框高度
+  },
+  
+  // 输入框宽度
+  INPUT: {
+    SMALL: 'w-[100px]',      // 小输入框（筛选操作符）
+    MEDIUM: 'w-[120px]',     // 中等输入框（筛选列选择）
+    LARGE: 'w-[200px]',      // 大输入框
+    MIN_WIDTH: 'min-w-[120px]', // 最小宽度（自适应）
+  },
+  
+  // 下拉菜单宽度
+  DROPDOWN: {
+    NARROW: 'w-16',    // 窄下拉菜单（优先级、是否要做）
+    MEDIUM: 'w-32',    // 中等下拉菜单
+    WIDE: 'w-48',      // 宽下拉菜单
+  }
+} as const;
+
+// ==================== 需求类型配置 ====================
+
+/**
+ * 需求类型配置
+ * 定义每种需求类型的显示样式和图标
+ */
 export const REQUIREMENT_TYPE_CONFIG = {
   '新功能': { 
     label: '新功能', 
@@ -32,7 +106,12 @@ export const REQUIREMENT_TYPE_CONFIG = {
   }
 } as const;
 
-// 优先级配置
+// ==================== 优先级配置 ====================
+
+/**
+ * 优先级配置
+ * 定义每个优先级的显示样式和排序顺序
+ */
 export const PRIORITY_CONFIG = {
   '低': { 
     label: '低', 
@@ -64,7 +143,12 @@ export const PRIORITY_CONFIG = {
   }
 } as const;
 
-// 是否要做配置
+// ==================== 是否要做配置 ====================
+
+/**
+ * 是否要做配置
+ * 端负责人对需求的决策选项
+ */
 export const NEED_TO_DO_CONFIG = {
   '是': { 
     label: '是', 
@@ -185,23 +269,49 @@ export const PAGINATION_CONFIG = {
   pageSizeOptions: [10, 20, 50, 100]
 } as const;
 
-// 工具函数
+// ==================== 工具函数 ====================
+
+/**
+ * 获取需求类型配置
+ * @param type - 需求类型
+ * @returns 需求类型的配置对象
+ */
 export function getRequirementTypeConfig(type: string) {
   return REQUIREMENT_TYPE_CONFIG[type as keyof typeof REQUIREMENT_TYPE_CONFIG];
 }
 
+/**
+ * 获取优先级配置
+ * @param priority - 优先级级别
+ * @returns 优先级的配置对象
+ */
 export function getPriorityConfig(priority: string) {
   return PRIORITY_CONFIG[priority as keyof typeof PRIORITY_CONFIG];
 }
 
+/**
+ * 获取"是否要做"配置
+ * @param needToDo - 是否要做的选项
+ * @returns 是否要做的配置对象
+ */
 export function getNeedToDoConfig(needToDo: string) {
   return NEED_TO_DO_CONFIG[needToDo as keyof typeof NEED_TO_DO_CONFIG];
 }
 
+/**
+ * 获取平台配置
+ * @param platform - 平台名称
+ * @returns 平台的配置对象
+ */
 export function getPlatformConfig(platform: string) {
   return PLATFORM_CONFIG[platform as keyof typeof PLATFORM_CONFIG];
 }
 
+/**
+ * 获取状态配置
+ * @param status - 需求状态
+ * @returns 状态的配置对象
+ */
 export function getStatusConfig(status: string) {
   return STATUS_CONFIG[status as keyof typeof STATUS_CONFIG];
 } 

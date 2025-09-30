@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2 } from 'lucide-react';
+import { UI_SIZES } from '@/config/requirements';
 import { useScheduledReview, type ScheduledReviewLevel } from '@/hooks/requirements/useScheduledReview';
 import type { User } from '@/lib/requirements-store';
 
@@ -81,7 +82,7 @@ export function ScheduledReviewCard({
                   onClick={() => removeReviewLevel(level.id)}
                   className="h-7 w-7 p-0"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className={UI_SIZES.ICON.MEDIUM} />
                 </Button>
               )}
             </div>

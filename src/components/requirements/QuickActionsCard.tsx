@@ -13,7 +13,9 @@ import {
   Link as LinkIcon,
   ExternalLink 
 } from 'lucide-react';
+import { UI_SIZES } from '@/config/requirements';
 import { toast } from 'sonner';
+import { isSafeURL } from '@/lib/sanitize';
 
 /**
  * 快捷操作数据接口
@@ -65,10 +67,17 @@ export function QuickActionsCard({
 
   /**
    * 跳转到相关文档
+   * 包含URL安全验证，防止XSS攻击
    */
   const handleNavigate = (type: string, id?: string) => {
     if (!id) {
       toast.error(`请先设置${type}ID`);
+      return;
+    }
+
+    // 验证URL安全性
+    if (!isSafeURL(id)) {
+      toast.error('链接格式不安全，已阻止跳转');
       return;
     }
 
@@ -82,7 +91,7 @@ export function QuickActionsCard({
 
     const url = routes[type];
     if (url) {
-      window.open(url, '_blank');
+      window.open(url, '_blank', 'noopener,noreferrer');
       toast.success(`已打开${type}页面`);
     }
   };
@@ -154,7 +163,7 @@ export function QuickActionsCard({
                   disabled={!item.value}
                   className="shrink-0"
                 >
-                  <ExternalLink className="h-4 w-4" />
+                  <ExternalLink className={UI_SIZES.ICON.MEDIUM} />
                 </Button>
               </div>
             </div>

@@ -26,7 +26,8 @@ import {
   getPriorityConfig,
   getNeedToDoConfig,
   NEED_TO_DO_CONFIG,
-  PRIORITY_CONFIG
+  PRIORITY_CONFIG,
+  UI_SIZES
 } from '@/config/requirements';
 
 interface RequirementTableProps {
@@ -59,30 +60,39 @@ export const RequirementTable = memo(function RequirementTable({
 }: RequirementTableProps) {
   const isColumnVisible = useCallback((column: string) => !hiddenColumns.includes(column), [hiddenColumns]);
 
+  /**
+   * 渲染排序按钮
+   * 使用配置化的尺寸，便于全局调整
+   */
   const renderSortButton = useCallback((field: string) => (
     <Button
       variant="ghost"
       size="sm"
-      className="h-6 w-6 p-0 ml-1"
+      className={`${UI_SIZES.BUTTON.ICON_SMALL} ml-1`}
       onClick={() => onColumnSort(field)}
     >
       {sortConfig.field === field ? (
         sortConfig.direction === 'asc' ? (
-          <ArrowUp className="h-3 w-3" />
+          <ArrowUp className={UI_SIZES.ICON.SMALL} />
         ) : (
-          <ArrowDown className="h-3 w-3" />
+          <ArrowDown className={UI_SIZES.ICON.SMALL} />
         )
       ) : (
-        <ArrowUpDown className="h-3 w-3" />
+        <ArrowUpDown className={UI_SIZES.ICON.SMALL} />
       )}
     </Button>
   ), [sortConfig, onColumnSort]);
 
-  // 列配置映射
+  /**
+   * 列配置映射
+   * 
+   * 性能优化：使用 useMemo 缓存，避免每次渲染都重新创建配置对象
+   * 可维护性：使用配置化的列宽，便于统一调整
+   */
   const columnConfig = useMemo(() => ({
     id: {
       header: () => (
-        <TableHead className="w-16 px-2">
+        <TableHead className={`${UI_SIZES.TABLE.COLUMN_WIDTHS.ID} px-2`}>
           <div className="flex items-center">
             ID
             {renderSortButton('id')}
@@ -330,10 +340,13 @@ export const RequirementTable = memo(function RequirementTable({
   return (
     <div className="rounded-md border overflow-hidden">
       <div className="overflow-x-auto">
-        <Table className="w-full table-fixed" style={{ minWidth: '1000px' }}>
+        <Table 
+          className="w-full table-fixed" 
+          style={{ minWidth: `${UI_SIZES.TABLE.MIN_WIDTH}px` }}
+        >
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12 px-2">
+              <TableHead className={`${UI_SIZES.TABLE.COLUMN_WIDTHS.CHECKBOX} px-2`}>
                 <Checkbox
                   checked={isAllSelected}
                   onCheckedChange={handleSelectAll}

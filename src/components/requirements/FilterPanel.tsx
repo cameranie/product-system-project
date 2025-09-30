@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Search, Plus, EyeOff, Settings, Trash2, GripVertical } from 'lucide-react';
+import { UI_SIZES } from '@/config/requirements';
 import {
   DndContext,
   closestCenter,
@@ -217,7 +218,7 @@ export function FilterPanel({
                     value={filter.column}
                     onValueChange={(value) => onCustomFilterUpdate(filter.id, 'column', value)}
                   >
-                    <SelectTrigger className="h-8 w-[120px]">
+                    <SelectTrigger className={`${UI_SIZES.BUTTON.INPUT_HEIGHT} ${UI_SIZES.INPUT.MEDIUM}`}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -233,7 +234,7 @@ export function FilterPanel({
                     value={filter.operator}
                     onValueChange={(value) => onCustomFilterUpdate(filter.id, 'operator', value)}
                   >
-                    <SelectTrigger className="h-8 w-[100px]">
+                    <SelectTrigger className={`${UI_SIZES.BUTTON.INPUT_HEIGHT} ${UI_SIZES.INPUT.SMALL}`}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -249,7 +250,7 @@ export function FilterPanel({
                     placeholder="筛选值"
                     value={filter.value}
                     onChange={(e) => onCustomFilterUpdate(filter.id, 'value', e.target.value)}
-                    className="h-8 flex-1 min-w-[120px]"
+                    className={`${UI_SIZES.BUTTON.INPUT_HEIGHT} flex-1 ${UI_SIZES.INPUT.MIN_WIDTH}`}
                     style={{ minWidth: '120px' }}
                     disabled={filter.operator === 'is_empty' || filter.operator === 'is_not_empty'}
                   />
@@ -258,9 +259,9 @@ export function FilterPanel({
                     variant="ghost"
                     size="sm"
                     onClick={() => onCustomFilterRemove(filter.id)}
-                    className="h-8 w-8 p-0"
+                    className={UI_SIZES.BUTTON.ICON_MEDIUM}
                   >
-                    <Trash2 className="h-3 w-3" />
+                    <Trash2 className={UI_SIZES.ICON.SMALL} />
                   </Button>
                 </div>
               </div>

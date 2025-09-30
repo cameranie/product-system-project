@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Clock } from 'lucide-react';
+import { UI_SIZES } from '@/config/requirements';
 import type { User } from '@/lib/requirements-store';
 
 /**
@@ -77,40 +78,19 @@ export function HistorySection({
   const content = (
     <>
       {records.length > 0 ? (
-        <div className={compact ? 'space-y-2' : 'space-y-4'}>
+        <div className="space-y-1">
           {records.map((record) => (
             <div
               key={record.id}
-              className={compact 
-                ? 'flex items-start gap-2 text-sm py-1 border-b last:border-0' 
-                : 'flex gap-3 p-3 border rounded-lg'
-              }
+              className="flex items-center gap-2 text-sm py-1"
             >
-              {!compact && (
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={record.user.avatar} />
-                  <AvatarFallback>{record.user.name[0]}</AvatarFallback>
-                </Avatar>
-              )}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-sm">
-                    {record.user.name}
-                  </span>
-                  {!compact && record.action && (
-                    <Badge variant="secondary" className={`text-xs ${getActionColor(record.action)}`}>
-                      {record.action.split(' ')[0]}
-                    </Badge>
-                  )}
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {record.timestamp}
-                  </span>
-                </div>
-                <p className={`text-muted-foreground ${compact ? 'text-xs mt-0.5' : 'text-sm mt-1'}`}>
-                  {formatChangeDescription(record)}
-                </p>
-              </div>
+              <Avatar className="h-5 w-5 flex-shrink-0">
+                <AvatarImage src={record.user.avatar} />
+                <AvatarFallback className="text-xs">{record.user.name[0]}</AvatarFallback>
+              </Avatar>
+              <span className="font-medium flex-shrink-0">{record.user.name}</span>
+              <span className="text-muted-foreground truncate">{formatChangeDescription(record)}</span>
+              <span className="text-xs text-muted-foreground ml-auto flex-shrink-0">{record.timestamp}</span>
             </div>
           ))}
         </div>

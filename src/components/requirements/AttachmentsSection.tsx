@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Upload, X, Paperclip, FileText, Image as ImageIcon, File } from 'lucide-react';
+import { UI_SIZES } from '@/config/requirements';
 import { toast } from 'sonner';
 import type { Attachment } from '@/lib/requirements-store';
 
@@ -53,7 +54,7 @@ export function AttachmentsSection({
    */
   const getFileIcon = (type: string) => {
     if (type.startsWith('image/')) {
-      return <ImageIcon className="h-4 w-4" />;
+      return <ImageIcon className={UI_SIZES.ICON.MEDIUM} />;
     } else if (type.includes('pdf')) {
       return <FileText className="h-4 w-4 text-red-500" />;
     } else if (type.includes('word') || type.includes('document')) {
@@ -61,7 +62,7 @@ export function AttachmentsSection({
     } else if (type.includes('sheet') || type.includes('excel')) {
       return <FileText className="h-4 w-4 text-green-500" />;
     } else {
-      return <File className="h-4 w-4" />;
+      return <File className={UI_SIZES.ICON.MEDIUM} />;
     }
   };
 
@@ -138,7 +139,7 @@ export function AttachmentsSection({
                     variant="ghost"
                     size="sm"
                     onClick={() => window.open(file.url, '_blank')}
-                    className="h-8"
+                    className={UI_SIZES.BUTTON.INPUT_HEIGHT}
                   >
                     查看
                   </Button>
@@ -150,7 +151,7 @@ export function AttachmentsSection({
                     onClick={() => handleRemove(file.id)}
                     className="h-8 w-8 p-0 hover:text-destructive"
                   >
-                    <X className="h-4 w-4" />
+                    <X className={UI_SIZES.ICON.MEDIUM} />
                   </Button>
                 )}
               </div>

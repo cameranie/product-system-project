@@ -3,13 +3,40 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/app-layout';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { useRequirementsStore } from '@/lib/requirements-store';
 import { RequirementTable } from '@/components/requirements/RequirementTable';
+import { VirtualizedRequirementTable } from '@/components/requirements/VirtualizedRequirementTable';
 import { FilterPanel } from '@/components/requirements/FilterPanel';
 import { BatchOperations } from '@/components/requirements/BatchOperations';
 import { useRequirementFilters } from '@/hooks/useRequirementFilters';
 import { FILTERABLE_COLUMNS } from '@/config/requirements';
 
+/**
+ * 筛选列配置类型（避免 readonly 类型冲突）
+ */
+type FilterableColumn = {
+  value: string;
+  label: string;
+};
+
+/**
+ * 需求池页面
+ * 
+ * 主要功能：
+ * - 需求列表展示（支持表格视图）
+ * - 多维度筛选（状态、搜索、自定义条件）
+ * - 多字段排序
+ * - 批量操作
+ * - 列显示/隐藏控制
+ * - 列顺序自定义（拖拽）
+ * 
+ * 性能优化：
+ * - 使用自定义 Hook 管理筛选和排序逻辑
+ * - 所有事件处理函数使用 useCallback 包装
+ * - 表格组件使用 React.memo 防止不必要渲染
+ * - 筛选和排序结果使用 useMemo 缓存
+ */
 export default function RequirementsPage() {
   const router = useRouter();
   const { getRequirements, updateRequirement, loading, setLoading } = useRequirementsStore();
@@ -49,46 +76,95 @@ export default function RequirementsPage() {
     }, 100);
   }, [setLoading]);
 
-  // 处理需求更新 - 优化响应速度
+  /**
+   * 处理"是否要做"字段变更
+   * 
+   * 性能优化：使用 useCallback 包装，避免子组件不必要的重渲染
+   * 
+   * @param requirementId - 需求ID
+   * @param value - 新的"是否要做"值（'是' | '否'）
+   */
   const handleNeedToDoChange = useCallback((requirementId: string, value: string) => {
-    // 类型安全检查
+    // 类型安全检查：确保值在允许的范围内
     if (!['是', '否'].includes(value)) {
       console.error('Invalid needToDo value:', value);
+      toast.error('无效的选项值');
       return;
     }
-    updateRequirement(requirementId, { needToDo: value as '是' | '否' });
+    
+    try {
+      updateRequirement(requirementId, { needToDo: value as '是' | '否' });
+    } catch (error) {
+      console.error('更新失败:', error);
+      toast.error('更新失败，请重试');
+    }
   }, [updateRequirement]);
 
+  /**
+   * 处理优先级变更
+   * 
+   * 性能优化：使用 useCallback 包装，避免子组件不必要的重渲染
+   * 
+   * @param requirementId - 需求ID
+   * @param value - 新的优先级值（'低' | '中' | '高' | '紧急'）
+   */
   const handlePriorityChange = useCallback((requirementId: string, value: string) => {
-    // 类型安全检查
+    // 类型安全检查：确保值在允许的范围内
     if (!['低', '中', '高', '紧急'].includes(value)) {
       console.error('Invalid priority value:', value);
+      toast.error('无效的优先级');
       return;
     }
-    updateRequirement(requirementId, { priority: value as '低' | '中' | '高' | '紧急' });
+    
+    try {
+      updateRequirement(requirementId, { priority: value as '低' | '中' | '高' | '紧急' });
+    } catch (error) {
+      console.error('更新失败:', error);
+      toast.error('更新失败，请重试');
+    }
   }, [updateRequirement]);
 
-  // 批量操作
+  /**
+   * 批量操作 - 批量更新"是否要做"字段
+   * 
+   * 性能优化：使用 for...of 替代 forEach
+   * - 更清晰的迭代语义
+   - 更好的性能（避免函数调用开销）
+   - 支持 break/continue（虽然这里不需要）
+   */
   const handleBatchNeedToDoUpdate = useCallback(() => {
     if (batchNeedToDoValue && selectedRequirements.length > 0) {
       // 类型安全检查
       if (!['是', '否'].includes(batchNeedToDoValue)) {
         console.error('Invalid batch needToDo value:', batchNeedToDoValue);
+        toast.error('无效的批量操作值');
         return;
       }
-      selectedRequirements.forEach(id => {
+      
+      // 使用 for...of 代替 forEach，性能更好且代码更清晰
+      for (const id of selectedRequirements) {
         updateRequirement(id, { needToDo: batchNeedToDoValue as '是' | '否' });
-      });
+      }
+      
       setBatchNeedToDoValue('');
+      toast.success(`已批量更新 ${selectedRequirements.length} 条需求`);
     }
   }, [batchNeedToDoValue, selectedRequirements, updateRequirement]);
 
 
 
+  /**
+   * 清空选择
+   * 取消所有已选中的需求
+   */
   const handleClearSelection = useCallback(() => {
     handleSelectAll(false);
   }, [handleSelectAll]);
 
+  /**
+   * 创建新需求
+   * 跳转到新建需求页面
+   */
   const handleCreateNew = useCallback(() => {
     router.push('/requirements/new');
   }, [router]);
@@ -117,7 +193,7 @@ export default function RequirementsPage() {
           hiddenColumns={hiddenColumns}
           columnOrder={columnOrder}
           stats={stats}
-          filterableColumns={FILTERABLE_COLUMNS}
+          filterableColumns={FILTERABLE_COLUMNS as unknown as FilterableColumn[]}
           onSearchChange={setSearchTerm}
           onStatusFilterChange={setStatusFilter}
           onCustomFilterAdd={addCustomFilter}
@@ -138,19 +214,36 @@ export default function RequirementsPage() {
           onClearSelection={handleClearSelection}
         />
 
-        {/* 需求表格 */}
-        <RequirementTable
-          requirements={filteredRequirements}
-          selectedRequirements={selectedRequirements}
-          hiddenColumns={hiddenColumns}
-          columnOrder={columnOrder}
-          sortConfig={sortConfig}
-          onRequirementSelect={handleRequirementSelect}
-          onSelectAll={handleSelectAll}
-          onNeedToDoChange={handleNeedToDoChange}
-          onPriorityChange={handlePriorityChange}
-          onColumnSort={handleColumnSort}
-        />
+        {/* 需求表格 - 自动切换虚拟滚动 */}
+        {filteredRequirements.length > 100 ? (
+          // 大数据量：使用虚拟滚动
+          <VirtualizedRequirementTable
+            requirements={filteredRequirements}
+            selectedRequirements={selectedRequirements}
+            hiddenColumns={hiddenColumns}
+            columnOrder={columnOrder}
+            sortConfig={sortConfig}
+            onRequirementSelect={handleRequirementSelect}
+            onSelectAll={handleSelectAll}
+            onNeedToDoChange={handleNeedToDoChange}
+            onPriorityChange={handlePriorityChange}
+            onColumnSort={handleColumnSort}
+          />
+        ) : (
+          // 小数据量：使用普通表格
+          <RequirementTable
+            requirements={filteredRequirements}
+            selectedRequirements={selectedRequirements}
+            hiddenColumns={hiddenColumns}
+            columnOrder={columnOrder}
+            sortConfig={sortConfig}
+            onRequirementSelect={handleRequirementSelect}
+            onSelectAll={handleSelectAll}
+            onNeedToDoChange={handleNeedToDoChange}
+            onPriorityChange={handlePriorityChange}
+            onColumnSort={handleColumnSort}
+          />
+        )}
 
         {/* 空状态 */}
         {filteredRequirements.length === 0 && (

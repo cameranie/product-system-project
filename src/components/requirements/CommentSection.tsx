@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Send, Reply as ReplyIcon, Upload, X, Paperclip } from 'lucide-react';
+import { UI_SIZES } from '@/config/requirements';
 import { useComments, type Comment } from '@/hooks/requirements/useComments';
 import type { User } from '@/lib/requirements-store';
+import { sanitizeText } from '@/lib/sanitize';
 
 interface CommentSectionProps {
   requirementId: string;
@@ -77,7 +79,7 @@ export function CommentSection({
             <div key={comment.id} className="space-y-3">
               {/* 评论主体 */}
               <div className="flex gap-3">
-                <Avatar className="h-8 w-8">
+                <Avatar className={UI_SIZES.AVATAR.MEDIUM}>
                   <AvatarImage src={comment.author.avatar} />
                   <AvatarFallback>{comment.author.name[0]}</AvatarFallback>
                 </Avatar>
@@ -86,7 +88,7 @@ export function CommentSection({
                     <span className="font-medium text-sm">{comment.author.name}</span>
                     <span className="text-xs text-muted-foreground">{comment.createdAt}</span>
                   </div>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{comment.content}</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{sanitizeText(comment.content)}</p>
                   
                   {/* 评论附件 */}
                   {comment.attachments.length > 0 && (
@@ -127,7 +129,7 @@ export function CommentSection({
                           <span className="font-medium text-sm">{reply.author.name}</span>
                           <span className="text-xs text-muted-foreground">{reply.createdAt}</span>
                         </div>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{reply.content}</p>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{sanitizeText(reply.content)}</p>
                         
                         {/* 回复附件 */}
                         {reply.attachments.length > 0 && (
@@ -214,7 +216,7 @@ export function CommentSection({
         {/* 新评论表单 */}
         <div className="space-y-3 pt-4 border-t">
           <div className="flex gap-3">
-            <Avatar className="h-8 w-8">
+            <Avatar className={UI_SIZES.AVATAR.MEDIUM}>
               <AvatarImage src={currentUser.avatar} />
               <AvatarFallback>{currentUser.name[0]}</AvatarFallback>
             </Avatar>

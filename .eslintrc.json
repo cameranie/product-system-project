@@ -1,0 +1,32 @@
+{
+  "extends": "next/core-web-vitals",
+  "rules": {
+    // 禁止使用硬编码的 Tailwind CSS 尺寸类
+    "no-restricted-syntax": [
+      "warn",
+      {
+        "selector": "JSXAttribute[name.name='className'] Literal[value=/className=\"[^\"]*h-[0-9]+ w-[0-9]+[^\"]*\"/]",
+        "message": "❌ 禁止硬编码尺寸！请使用 UI_SIZES 配置。示例：className={UI_SIZES.AVATAR.MEDIUM}"
+      },
+      {
+        "selector": "JSXAttribute[name.name='className'] TemplateLiteral[expressions.0] TemplateElement[value.raw=~/h-[0-9]+ w-[0-9]+/]",
+        "message": "❌ 禁止硬编码尺寸！请使用 UI_SIZES 配置。"
+      }
+    ]
+  },
+  "overrides": [
+    {
+      // 对 requirements 相关的组件严格检查
+      "files": ["src/components/requirements/**/*.tsx", "src/app/requirements/**/*.tsx"],
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "Literal[value=/h-[0-9]+ w-[0-9]+/]",
+            "message": "❌ 严格禁止硬编码尺寸！请使用 UI_SIZES 配置。\n示例：\n  import { UI_SIZES } from '@/config/requirements';\n  <Avatar className={UI_SIZES.AVATAR.MEDIUM} />"
+          }
+        ]
+      }
+    }
+  ]
+} 

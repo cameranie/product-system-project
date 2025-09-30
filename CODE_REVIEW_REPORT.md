@@ -1,606 +1,675 @@
-# 代码审查报告 - 需求管理系统
+# 需求管理系统代码检查报告
 
-生成时间: 2024-09-30
-审查范围: 需求池页面、需求新建页、需求编辑页、需求详情页
-
----
-
-## 📋 目录
-
-1. [正确性检查](#1-正确性检查)
-2. [组件与结构](#2-组件与结构)
-3. [代码质量](#3-代码质量)
-4. [性能优化](#4-性能优化)
-5. [安全性](#5-安全性)
-6. [注释与文档](#6-注释与文档)
+生成时间：2025-09-30
+检查范围：需求池页面、新建页、编辑页、详情页
 
 ---
 
-## 1. 正确性检查
+## 一、正确性检查
 
-### 🔴 高优先级问题
+### 1. 需求池页面 (`/app/requirements/page.tsx`)
 
-#### 1.1 类型不一致问题
-**位置**: `requirements-store.ts` + 所有页面
-**问题**: 
-- `Requirement.priority` 定义为 `'低' | '中' | '高' | '紧急'`
-- `EndOwnerOpinion.priority` 定义为 `'高' | '中' | '低'`（缺少"紧急"）
-- `needToDo` 在不同地方类型不一致：
-  - `Requirement.needToDo`: `'是' | '否' | undefined`
-  - `EndOwnerOpinion.needToDo`: `boolean | undefined`
+#### ✅ 优点
+- 使用了自定义 Hook (`useRequirementFilters`) 进行状态管理，逻辑清晰
+- 正确使用 `useCallback` 优化性能，避免不必要的重渲染
+- 类型安全检查完善（`needToDo` 和 `priority` 值校验）
+- 空状态处理得当
 
-**影响**: 
-- 数据转换时可能出现类型错误
-- 新建页面中 `needToDo` 使用 boolean，但需求池使用字符串
-- 可能导致数据不同步
+#### ⚠️ 潜在问题
+1. **加载状态管理不够优雅**
+   ```typescript
+   useEffect(() => {
+     setTimeout(() => {
+       setLoading(false);
+     }, 100);
+   }, [setLoading]);
+   ```
+   - 使用 `setTimeout` 模拟加载，在生产环境中应该是真实的异步数据加载
+   - 建议：使用真实的 API 调用，或移除这个人工延迟
 
-**建议修复**:
-```typescript
-// 统一类型定义
-export interface EndOwnerOpinion {
-  needToDo?: '是' | '否';  // 改为字符串类型
-  priority?: '低' | '中' | '高' | '紧急';  // 增加"紧急"
-  opinion?: string;
-  owner?: User;
-}
-```
+2. **未处理更新失败的情况**
+   - `handleNeedToDoChange` 和 `handlePriorityChange` 只有 console.error，没有用户反馈
+   - 建议：添加 `toast.error()` 提示用户
 
-#### 1.2 必填字段校验不完整
-**位置**: 
-- `new/page.tsx` 第267-275行
-- `[id]/edit/page.tsx` 第414-422行
+3. **批量操作没有确认步骤**
+   - 批量更新可能影响多个需求，建议添加确认对话框
 
-**问题**: 
-- 只校验了 `title` 和 `description`
-- 没有校验 `type`、`platforms` 等必要字段
-- `priority` 字段可能为 undefined，但在某些地方没有处理
-
-**潜在bug**: 
-- 用户可能提交不完整的需求
-- 创建后某些字段显示异常
-
-**建议修复**:
-```typescript
-const handleSave = async () => {
-  // 基础字段校验
-  if (!formData.title.trim()) {
-    toast.error('请输入需求标题');
-    return;
-  }
-  if (!formData.description.trim()) {
-    toast.error('请输入需求描述');
-    return;
-  }
-  
-  // 增加其他必要字段校验
-  if (!formData.type) {
-    toast.error('请选择需求类型');
-    return;
-  }
-  
-  if (!formData.platforms || formData.platforms.length === 0) {
-    toast.error('请至少选择一个应用端');
-    return;
-  }
-  
-  // ... 其他校验
-};
-```
-
-#### 1.3 ID 编码问题
-**位置**: 
-- `[id]/page.tsx` 第144行
-- `[id]/edit/page.tsx` 第259行
-
-**问题**: 
-```typescript
-const decodedId = decodeURIComponent(params.id);
-```
-- ID 格式为 `#1`、`#2`
-- `#` 在 URL 中有特殊含义（锚点）
-- `decodeURIComponent` 无法正确处理
-
-**潜在bug**: 
-- 直接点击需求标题跳转时，`#1` 可能被浏览器解析为锚点
-- 导致页面无法找到对应需求
-
-**建议修复**:
-```typescript
-// 在跳转时进行 URL 编码
-const handleTitleClick = (id: string) => {
-  // 使用 encodeURIComponent 处理 #
-  router.push(`/requirements/${encodeURIComponent(id)}`);
-};
-
-// 在页面中解码
-const decodedId = decodeURIComponent(params.id);
-```
-
-#### 1.4 时间格式化缺失
-**位置**: 新建页面和编辑页面的评论/回复功能
-
-**问题**: 
-```typescript
-// new/page.tsx 第198-199行
-const now = new Date();
-const timeString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-```
-- 手动格式化时间，代码冗长且容易出错
-- 与 `formatDateTime()` 工具函数不一致
-
-**建议修复**:
-```typescript
-// 统一使用工具函数
-const { formatDateTime } = await import('@/lib/file-upload-utils');
-const timeString = formatDateTime();
-```
-
-### 🟡 中优先级问题
-
-#### 1.5 异步操作未捕获错误
-**位置**: 多处 `async` 函数
-
-**问题**: 
-```typescript
-// new/page.tsx 第214行
-const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const files = Array.from(e.target.files || []);
-  
-  try {
-    const { validateFiles } = await import('@/lib/file-upload-utils');
-    // ... 处理文件
-  } catch (error) {
-    console.error('文件验证失败:', error);
-    toast.error('文件验证失败，请重试');
-  }
-};
-```
-- 有错误处理，但不够完善
-- 没有区分不同类型的错误
-
-**建议**: 使用统一的错误处理机制
-
-#### 1.6 状态更新可能导致过时闭包
-**位置**: `[id]/page.tsx` 和 `[id]/edit/page.tsx` 的评论功能
-
-**问题**: 
-```typescript
-const handleSubmitReply = (commentId: string) => {
-  // ... 使用 replyContent 和 replyFiles
-  setComments(prev => prev.map(comment => 
-    comment.id === commentId 
-      ? { ...comment, replies: [...comment.replies, reply] }
-      : comment
-  ));
-};
-```
-- 在回调中使用状态，可能获取到过时的值
-
-**建议**: 使用 `useCallback` 并正确声明依赖
-
-#### 1.7 File URL 内存泄漏风险
-**位置**: 
-- `[id]/edit/page.tsx` 第392行
-- `[id]/page.tsx` 第245行
-
-**问题**: 
-```typescript
-url: URL.createObjectURL(file)
-```
-- 没有在组件卸载时调用 `URL.revokeObjectURL()`
-- 可能导致内存泄漏
-
-**建议修复**:
-```typescript
-// 使用 FileURLManager
-useEffect(() => {
-  return () => {
-    import('@/lib/file-upload-utils').then(({ FileURLManager }) => {
-      FileURLManager.revokeAllURLs();
-    });
-  };
-}, []);
-```
+#### 🐛 Bug
+- 无严重 Bug
 
 ---
 
-## 2. 组件与结构
+### 2. 新建需求页面 (`/app/requirements/new/page.tsx`)
 
-### 🟡 中优先级问题
+#### ✅ 优点
+- 表单验证完善（标题、描述必填）
+- 正确使用了共享组件（`ScheduledReviewCard`、`EndOwnerOpinionCard` 等）
+- 文件上传有安全验证（`validateFiles`）
+- 组件卸载时正确清理 URL 对象，避免内存泄漏
 
-#### 2.1 组件过大
-**位置**: 
-- `[id]/page.tsx` - 951行
-- `[id]/edit/page.tsx` - 1328行
-- `new/page.tsx` - 831行
+#### ⚠️ 潜在问题
+1. **ID 生成方式不安全**
+   ```typescript
+   id: `#${Date.now()}`
+   ```
+   - 使用时间戳作为 ID，在高并发情况下可能重复
+   - 建议：使用 UUID 或服务器端生成的唯一 ID
 
-**问题**: 
-- 单个文件代码量过大，难以维护
-- 评论区、附件上传、预排期评审等逻辑可以抽取为独立组件
+2. **需求类型的 Checkbox 逻辑混淆**
+   ```typescript
+   const handleTypeChange = (type: typeof requirementTypes[number], checked: boolean) => {
+     if (checked) {
+       setFormData(prev => ({ ...prev, type: type as RequirementFormData['type'] }));
+     }
+   };
+   ```
+   - 只允许选中一个类型，应该使用 Radio 而不是 Checkbox
+   - 当前逻辑：取消勾选不会清空 `type` 字段
 
-**建议**: 
-```
-components/requirements/
-  - CommentSection.tsx      # 评论区组件
-  - AttachmentList.tsx      # 附件列表组件
-  - ScheduledReview.tsx     # 预排期评审组件
-  - EndOwnerOpinion.tsx     # 端负责人意见组件
-  - BasicInfoCard.tsx       # 基本信息卡片组件
-```
+3. **表单提交后没有重置状态**
+   - 如果提交失败但用户留在页面，表单状态应该保持
+   - 如果提交成功，页面会跳转，这个问题不大
 
-#### 2.2 代码重复
-**位置**: 详情页和编辑页
+4. **附件和快捷操作的数据未完全保存**
+   ```typescript
+   prototypeId: formData.quickActions.prototypeId,
+   prdId: formData.quickActions.prdId
+   // uiDesignId 和 bugTrackingId 被忽略了
+   ```
+   - `uiDesignId` 和 `bugTrackingId` 在 `formData` 中有值，但没有保存到 `Requirement` 对象
 
-**问题**: 
-- 评论逻辑在详情页和编辑页重复
-- 预排期评审逻辑重复
-- 附件上传逻辑重复
+#### 🐛 Bug
+- **中等严重度**：需求类型使用 Checkbox 但只能单选，用户体验混乱
 
-**建议**: 创建共享组件和自定义 hook
+---
 
+### 3. 需求详情页面 (`/app/requirements/[id]/page.tsx`)
+
+#### ✅ 优点
+- 正确处理 URL 解码（`decodeURIComponent(id)`）
+- 状态切换逻辑清晰，有 loading 状态
+- 错误处理较好，有 toast 提示
+- 使用共享组件，代码复用性强
+
+#### ⚠️ 潜在问题
+1. **requirement 类型使用 `any`**
+   ```typescript
+   const [requirement, setRequirement] = useState<any>(null);
+   ```
+   - 应该使用明确的 `Requirement` 类型
+   - 这会导致 TypeScript 无法提供类型检查和智能提示
+
+2. **本地状态和全局状态不同步**
+   - 使用 `setRequirement` 更新本地状态，同时调用 `updateRequirement` 更新全局状态
+   - 可能导致数据不一致，建议只维护一个数据源
+
+3. **历史记录是硬编码的模拟数据**
+   ```typescript
+   const historyRecords: HistoryRecord[] = [
+     { id: '1', action: '创建', ... },
+     { id: '2', action: '修改', ... }
+   ];
+   ```
+   - 应该从 `requirement` 对象或 API 获取真实数据
+
+4. **快捷操作更新时更新了不应该更新的字段**
+   ```typescript
+   setRequirement({
+     ...requirement,
+     prototypeId: actions.prototypeId,
+     prdId: actions.prdId,
+     uiDesignId: actions.uiDesignId,  // 这两个字段没有通过 updateRequirement 保存
+     bugTrackingId: actions.bugTrackingId
+   });
+   ```
+   - `uiDesignId` 和 `bugTrackingId` 在 `updateRequirement` 中没有传递，本地状态会不一致
+
+5. **未使用的 import**
+   ```typescript
+   import { ArrowLeft, Edit, Clock, CheckCircle, XCircle } from 'lucide-react';
+   ```
+   - `ArrowLeft`、`Clock`、`CheckCircle`、`XCircle` 未使用
+
+#### 🐛 Bug
+- **中等严重度**：本地状态和全局状态可能不同步
+
+---
+
+### 4. 需求编辑页面 (`/app/requirements/[id]/edit/page.tsx`)
+
+#### ✅ 优点
+- 数据加载逻辑完善，正确初始化表单
+- 表单验证与新建页面一致
+- 保存成功后跳转到详情页
+- 使用共享组件
+
+#### ⚠️ 潜在问题
+1. **originalRequirement 类型使用 `any`**
+   ```typescript
+   const [originalRequirement, setOriginalRequirement] = useState<any>(null);
+   ```
+   - 同详情页问题，应该使用 `Requirement` 类型
+
+2. **初始化 formData 时使用了空对象作为默认值**
+   ```typescript
+   const [formData, setFormData] = useState<RequirementFormData>({
+     title: '',
+     type: '新功能',
+     // ...
+   });
+   ```
+   - 然后在 `useEffect` 中重新设置，可能导致不必要的渲染
+   - 建议：初始状态设为 `null`，等数据加载后再设置
+
+3. **需求类型的 Checkbox 逻辑问题**（同新建页）
+
+4. **快捷操作的 `uiDesignId` 和 `bugTrackingId` 硬编码为空字符串**
+   ```typescript
+   quickActions: {
+     prototypeId: requirement.prototypeId || '',
+     prdId: requirement.prdId || '',
+     uiDesignId: '',  // 应该从 requirement 加载
+     bugTrackingId: ''
+   }
+   ```
+
+5. **历史记录是硬编码的模拟数据**（同详情页）
+
+6. **附件删除没有确认步骤**
+   - 用户可能误删重要附件
+
+#### 🐛 Bug
+- **低严重度**：快捷操作数据初始化不完整
+
+---
+
+## 二、组件和结构检查
+
+### 1. 整体架构评估
+
+#### ✅ 优点
+- **清晰的分层架构**
+  - 页面层：负责数据获取和业务逻辑
+  - 组件层：可复用的 UI 组件
+  - Hook 层：抽象的状态管理逻辑
+  - Store 层：全局状态管理
+
+- **良好的代码复用**
+  - 共享组件：`ScheduledReviewCard`、`EndOwnerOpinionCard`、`AttachmentsSection` 等
+  - 自定义 Hook：`useRequirementFilters`、`useComments`、`useScheduledReview`
+  - 配置文件：`REQUIREMENT_TYPE_CONFIG`、`FILTERABLE_COLUMNS`
+
+- **组件职责单一**
+  - 每个组件只负责一个功能模块
+  - 易于测试和维护
+
+#### ⚠️ 改进建议
+
+1. **页面组件过大**
+   - `new/page.tsx`：357 行
+   - `edit/page.tsx`：421 行
+   - 建议：拆分为更小的子组件（如 `BasicInfoForm`、`DescriptionForm`）
+
+2. **重复的表单逻辑**
+   - 新建页和编辑页有大量相同的逻辑（`handleTypeChange`、`handlePlatformChange`、`handleFileUpload` 等）
+   - 建议：抽取为自定义 Hook（如 `useRequirementForm`）
+
+3. **硬编码的配置**
+   ```typescript
+   const platformOptions = ['Web端', 'PC端', '移动端'];
+   ```
+   - 应该放到配置文件中（`requirements.ts`）
+
+4. **缺少统一的数据加载 Hook**
+   - 详情页和编辑页都有 `getRequirementById` 逻辑
+   - 建议：创建 `useRequirement(id)` Hook
+
+---
+
+### 2. 组件设计分析
+
+#### 需求池页面
+
+**结构合理性：⭐⭐⭐⭐⭐**
+- 使用了组合模式，将页面拆分为 `FilterPanel`、`BatchOperations`、`RequirementTable` 三个独立组件
+- 使用自定义 Hook 管理复杂的状态逻辑
+- 组件间通过 props 传递数据和回调，耦合度低
+
+**建议优化：**
+- 考虑使用 Context API 减少 prop drilling（如果组件层级更深）
+
+---
+
+#### 新建/编辑页面
+
+**结构合理性：⭐⭐⭐☆☆**
+- 成功使用了共享组件
+- 左右布局清晰
+
+**存在问题：**
+1. **表单逻辑分散**
+   - 基本信息、需求类型、应用端的逻辑都在页面组件中
+   - 建议：抽取为 `RequirementFormFields` 组件
+
+2. **状态管理复杂**
+   - `formData` 是一个嵌套很深的对象
+   - 建议：使用 `useReducer` 或表单库（如 React Hook Form）
+
+3. **缺少表单验证反馈**
+   - 只在提交时验证，用户体验不佳
+   - 建议：添加实时验证和错误提示
+
+**建议重构：**
 ```typescript
-// hooks/useComments.ts
-export function useComments() {
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [newComment, setNewComment] = useState('');
-  // ... 所有评论相关逻辑
-  
+// 抽取为自定义 Hook
+function useRequirementForm(initialData?: Requirement) {
+  const [formData, setFormData] = useState<RequirementFormData>(() => 
+    initialData ? mapRequirementToFormData(initialData) : getDefaultFormData()
+  );
+  const [attachments, setAttachments] = useState<Attachment[]>(initialData?.attachments || []);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const handleTypeChange = useCallback((type: string, checked: boolean) => {
+    if (checked) {
+      setFormData(prev => ({ ...prev, type: type as RequirementFormData['type'] }));
+    }
+  }, []);
+
+  const handlePlatformChange = useCallback((platform: string, checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      platforms: checked 
+        ? [...prev.platforms, platform]
+        : prev.platforms.filter(p => p !== platform)
+    }));
+  }, []);
+
+  const handleFileUpload = useCallback(async (files: File[]) => {
+    // 文件上传逻辑
+  }, []);
+
+  const validate = useCallback(() => {
+    const newErrors: Record<string, string> = {};
+    if (!formData.title.trim()) newErrors.title = '请输入需求标题';
+    if (!formData.description.trim()) newErrors.description = '请输入需求描述';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }, [formData]);
+
   return {
-    comments,
-    newComment,
-    handleSubmitComment,
-    handleSubmitReply,
-    // ...
+    formData,
+    attachments,
+    errors,
+    setFormData,
+    handleTypeChange,
+    handlePlatformChange,
+    handleFileUpload,
+    validate
   };
 }
 ```
 
-#### 2.3 硬编码数据
-**位置**: 多处
+### 2. 抽取基本信息表单组件
 
-**问题**: 
 ```typescript
-// new/page.tsx 第49行
-const requirementTypes = ['新功能', '优化', 'BUG', '用户反馈', '商务需求'];
-```
-- 配置数据应该从 `requirements.ts` 导入，而不是重复定义
+// components/requirements/BasicInfoForm.tsx
+interface BasicInfoFormProps {
+  formData: RequirementFormData;
+  errors?: Record<string, string>;
+  onTitleChange: (value: string) => void;
+  onTypeChange: (type: string, checked: boolean) => void;
+  onPlatformChange: (platform: string, checked: boolean) => void;
+}
 
-**建议**: 
-```typescript
-import { REQUIREMENT_TYPE_CONFIG } from '@/config/requirements';
-const requirementTypes = Object.keys(REQUIREMENT_TYPE_CONFIG);
-```
+export function BasicInfoForm({
+  formData,
+  errors,
+  onTitleChange,
+  onTypeChange,
+  onPlatformChange
+}: BasicInfoFormProps) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">基本信息</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* 标题 */}
+        <div className="space-y-2">
+          <Label htmlFor="title">
+            需求标题 <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="title"
+            placeholder="请输入需求标题"
+            value={formData.title}
+            onChange={(e) => onTitleChange(e.target.value)}
+            className={errors?.title ? 'border-red-500' : ''}
+          />
+          {errors?.title && (
+            <p className="text-sm text-red-500">{errors.title}</p>
+          )}
+        </div>
 
----
+        {/* 需求类型 */}
+        <div className="space-y-2">
+          <Label>需求类型</Label>
+          <div className="flex flex-wrap gap-4">
+            {REQUIREMENT_TYPES.map(type => (
+              <div key={type} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`type-${type}`}
+                  checked={formData.type === type}
+                  onCheckedChange={(checked) => onTypeChange(type, !!checked)}
+                />
+                <Label htmlFor={`type-${type}`} className="text-sm font-normal cursor-pointer">
+                  {type}
+                </Label>
+              </div>
+            ))}
+          </div>
+        </div>
 
-## 3. 代码质量
-
-### 🟡 中优先级问题
-
-#### 3.1 类型标注不完整
-**位置**: 多处
-
-**问题**: 
-```typescript
-// [id]/page.tsx 第72行
-const [requirement, setRequirement] = useState<any>(null); // TODO: 使用正确的Requirement类型
-```
-- 使用 `any` 类型
-- 降低类型安全性
-
-**建议**: 
-```typescript
-const [requirement, setRequirement] = useState<Requirement | null>(null);
-```
-
-#### 3.2 魔法数字和字符串
-**位置**: 多处
-
-**问题**: 
-```typescript
-// requirements-store.ts 第282行
-await new Promise(resolve => setTimeout(resolve, 1000));
-```
-- 硬编码的数字没有说明
-- 字符串重复出现
-
-**建议**: 
-```typescript
-const MOCK_API_DELAY = 1000; // 模拟API调用延迟（毫秒）
-await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
-```
-
-#### 3.3 console.error 使用
-**位置**: 多处
-
-**问题**: 
-```typescript
-console.error('文件验证失败:', error);
-```
-- 生产环境应该使用统一的日志系统
-- 没有上报错误
-
-**建议**: 使用统一的错误处理工具
-
----
-
-## 4. 性能优化
-
-### 🟢 低优先级问题
-
-#### 4.1 缺少 React.memo
-**位置**: `RequirementTable`、`FilterPanel`、`BatchOperations`
-
-**当前状态**: 
-```typescript
-export const RequirementTable = memo(function RequirementTable({ ... }) {
-  // 已经使用 memo
-});
-```
-✅ 已经使用了 `React.memo`
-
-#### 4.2 useCallback 和 useMemo 使用良好
-**位置**: `useRequirementFilters.ts`
-
-**当前状态**: 
-- 所有回调函数都使用了 `useCallback`
-- 计算逻辑使用了 `useMemo`
-✅ 性能优化到位
-
-#### 4.3 列表渲染优化
-**问题**: 长列表没有虚拟化
-
-**建议**: 
-- 如果需求数量超过100条，考虑使用 `react-window` 或 `react-virtualized`
-- 当前数据量小，暂不需要
-
----
-
-## 5. 安全性
-
-### 🟡 中优先级问题
-
-#### 5.1 文件上传安全
-**位置**: `new/page.tsx`、`[id]/edit/page.tsx`
-
-**当前状态**: 
-```typescript
-const { validateFiles } = await import('@/lib/file-upload-utils');
-const { validFiles, errors } = validateFiles(files, formData.attachments.length);
-```
-✅ 已经有文件验证
-
-**建议加强**: 
-- 添加文件内容检测（防止伪装文件类型）
-- 添加病毒扫描（生产环境）
-- 限制文件名长度和特殊字符
-
-#### 5.2 XSS 防护
-**位置**: 评论和需求描述显示
-
-**当前状态**: 
-```typescript
-<div className="text-sm leading-relaxed">{comment.content}</div>
-```
-- React 默认会转义内容
-✅ 基本安全
-
-**建议**: 
-- 如果需要富文本，使用 `DOMPurify` 清理 HTML
-
-#### 5.3 权限控制
-**位置**: 详情页和编辑页
-
-**当前状态**: 
-```typescript
-disabled={mockUsers[0].id !== requirement.endOwnerOpinion?.owner?.id}
-```
-- 仅前端禁用，后端需要真实权限校验
-- 使用 `mockUsers[0]` 模拟当前用户
-
-**建议**: 
-- 实现真实的用户认证系统
-- 后端 API 必须验证权限
-
----
-
-## 6. 注释与文档
-
-### 🟢 低优先级问题
-
-#### 6.1 缺少 JSDoc 注释
-**位置**: 所有自定义函数和组件
-
-**建议**: 
-```typescript
-/**
- * 需求筛选自定义 Hook
- * @param requirements - 需求列表
- * @returns 筛选相关的状态和方法
- */
-export function useRequirementFilters({ requirements }: UseRequirementFiltersProps) {
-  // ...
+        {/* 应用端 */}
+        <div className="space-y-2">
+          <Label>应用端</Label>
+          <div className="flex flex-wrap gap-4">
+            {PLATFORM_OPTIONS.map(platform => (
+              <div key={platform} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`platform-${platform}`}
+                  checked={formData.platforms.includes(platform)}
+                  onCheckedChange={(checked) => onPlatformChange(platform, !!checked)}
+                />
+                <Label htmlFor={`platform-${platform}`} className="text-sm font-normal cursor-pointer">
+                  {platform}
+                </Label>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 ```
 
-#### 6.2 TODO 注释未清理
-**位置**: 
+### 3. 配置文件补充
+
 ```typescript
-// [id]/page.tsx 第72行
-const [requirement, setRequirement] = useState<any>(null); // TODO: 使用正确的Requirement类型
-```
+// config/requirements.ts
+export const PLATFORM_OPTIONS = ['Web端', 'PC端', '移动端'] as const;
 
-**建议**: 立即修复或创建 Issue 跟踪
-
----
-
-## 📊 问题统计
-
-| 优先级 | 数量 | 类别 |
-|--------|------|------|
-| 🔴 高 | 4 | 类型不一致、必填校验、ID编码、时间格式 |
-| 🟡 中 | 10 | 错误处理、内存泄漏、组件结构、代码重复、安全性 |
-| 🟢 低 | 3 | 注释文档、TODO清理 |
-| **总计** | **17** | |
-
----
-
-## ✅ 测试用例建议
-
-### 需求池页面
-```typescript
-describe('需求池页面', () => {
-  test('应该正确显示需求列表', () => {
-    // 测试基本渲染
-  });
-  
-  test('应该正确筛选开放中的需求', () => {
-    // 测试状态筛选
-  });
-  
-  test('搜索功能应该在多个字段中查找', () => {
-    // 测试搜索: ID、标题、创建人、应用端
-  });
-  
-  test('自定义筛选应该正确应用', () => {
-    // 测试高级筛选
-  });
-  
-  test('排序功能应该正确工作', () => {
-    // 测试ID、标题、优先级、时间排序
-  });
-  
-  test('批量操作应该更新所有选中的需求', () => {
-    // 测试批量设置"是否要做"
-  });
-  
-  test('列隐藏和拖动排序应该正确工作', () => {
-    // 测试列显示/隐藏和拖动重排
-  });
-});
-```
-
-### 需求新建页面
-```typescript
-describe('需求新建页面', () => {
-  test('应该阻止提交空标题', () => {
-    // 测试必填校验
-  });
-  
-  test('应该正确上传和显示附件', () => {
-    // 测试文件上传
-  });
-  
-  test('应该验证文件类型和大小', () => {
-    // 测试文件验证
-  });
-  
-  test('预排期评审应该支持添加和删除级别', () => {
-    // 测试动态评审级别
-  });
-  
-  test('应该正确转换并保存数据', () => {
-    // 测试 needToDo boolean -> 字符串转换
-  });
-});
-```
-
-### 需求详情页面
-```typescript
-describe('需求详情页面', () => {
-  test('应该正确加载并显示需求信息', () => {
-    // 测试数据加载
-  });
-  
-  test('关闭/重启需求按钮应该正确工作', () => {
-    // 测试状态切换
-  });
-  
-  test('应该支持添加评论和回复', () => {
-    // 测试评论功能
-  });
-  
-  test('评论可以包含附件', () => {
-    // 测试评论附件
-  });
-  
-  test('只有端负责人能修改是否要做和优先级', () => {
-    // 测试权限控制
-  });
-  
-  test('只有评审人能修改评审状态', () => {
-    // 测试权限控制
-  });
-});
-```
-
-### 需求编辑页面
-```typescript
-describe('需求编辑页面', () => {
-  test('应该加载现有需求数据', () => {
-    // 测试数据回显
-  });
-  
-  test('应该阻止提交无效数据', () => {
-    // 测试表单验证
-  });
-  
-  test('保存后应该更新全局状态', () => {
-    // 测试状态同步
-  });
-  
-  test('评论和修改记录应该与详情页同步', () => {
-    // 测试数据一致性
-  });
-  
-  test('离开前应该提示未保存的修改', () => {
-    // 测试用户体验
-  });
-});
+export const REQUIREMENT_TYPES = Object.keys(REQUIREMENT_TYPE_CONFIG) as Array<
+  keyof typeof REQUIREMENT_TYPE_CONFIG
+>;
 ```
 
 ---
 
-## 🎯 建议修复顺序
+#### 详情页面
 
-1. **立即修复** (高优先级):
-   - 1.1 类型不一致问题
-   - 1.3 ID 编码问题
-   - 1.2 必填字段校验
+**结构合理性：⭐⭐⭐⭐☆**
+- 成功使用共享组件
+- 左右布局合理
+- 职责清晰
 
-2. **本周修复** (中优先级):
-   - 1.7 File URL 内存泄漏
-   - 2.1 组件拆分 (编辑页和详情页)
-   - 2.2 代码重复 (评论逻辑抽取)
+**存在问题：**
+1. **状态管理不一致**
+   - 同时维护本地状态和全局状态
+   - 建议：统一使用全局状态，或只用本地状态
 
-3. **下周修复** (低优先级):
-   - 6.1 添加 JSDoc 注释
-   - 6.2 清理 TODO
-   - 3.2 消除魔法数字
+2. **业务逻辑耦合在组件中**
+   - `handleEndOwnerOpinionChange` 等函数包含更新逻辑
+   - 建议：移到自定义 Hook 中
 
----
-
-## 💡 总体评价
-
-### 优点
-✅ 使用了 TypeScript 提供类型安全  
-✅ 使用 Zustand 进行全局状态管理  
-✅ 代码结构清晰，功能模块化  
-✅ 已经使用 React.memo、useCallback、useMemo 进行性能优化  
-✅ 有基本的错误处理和用户提示  
-✅ 实现了权限控制逻辑  
-
-### 需要改进
-⚠️ 类型定义需要统一和完善  
-⚠️ 组件需要进一步拆分  
-⚠️ 需要添加完整的单元测试  
-⚠️ 错误处理需要更加统一和完善  
-⚠️ 需要清理重复代码  
-
-### 整体评分
-**7.5/10** - 代码质量良好，但还有优化空间
+**建议重构：**
+```typescript
+function useRequirementDetail(id: string) {
+  const { getRequirementById, updateRequirement } = useRequirementsStore();
+  const [requirement, setRequirement] = useState<Requirement | null>(null);
+  const [isToggling, setIsToggling] = useState(false);
+  
+  useEffect(() => {
+    const req = getRequirementById(decodeURIComponent(id));
+    setRequirement(req);
+  }, [id, getRequirementById]);
+  
+  const toggleStatus = async () => { /* ... */ };
+  const updateEndOwnerOpinion = async (opinion: EndOwnerOpinionData) => { /* ... */ };
+  
+  return { requirement, isToggling, toggleStatus, updateEndOwnerOpinion };
+}
+```
 
 ---
 
-**审查人**: AI Code Reviewer  
-**日期**: 2024-09-30 
+### 3. 模块化程度评估
+
+| 方面 | 评分 | 说明 |
+|------|------|------|
+| **组件复用** | ⭐⭐⭐⭐⭐ | 共享组件设计良好，复用性高 |
+| **逻辑复用** | ⭐⭐⭐⭐☆ | 有自定义 Hook，但可以进一步抽象 |
+| **配置管理** | ⭐⭐⭐⭐☆ | 使用了配置文件，但还有硬编码 |
+| **类型安全** | ⭐⭐⭐☆☆ | 部分使用 `any` 类型，降低了类型安全性 |
+| **错误处理** | ⭐⭐⭐☆☆ | 有基本的错误处理，但不够全面 |
+| **测试友好** | ⭐⭐⭐☆☆ | 组件职责单一，但缺少纯函数 |
+
+---
+
+## 三、最佳实践对比
+
+### 符合的最佳实践 ✅
+1. **单一职责原则**：每个组件只负责一个功能
+2. **DRY（Don't Repeat Yourself）**：使用共享组件避免重复
+3. **关注点分离**：UI、逻辑、数据分层清晰
+4. **可组合性**：组件可以灵活组合使用
+5. **性能优化**：使用 `useCallback`、`useMemo` 优化性能
+
+### 未完全符合的最佳实践 ⚠️
+1. **类型安全**：部分使用 `any` 类型
+2. **错误边界**：没有使用 Error Boundary
+3. **加载状态**：loading 状态管理不统一
+4. **表单管理**：没有使用成熟的表单库
+5. **代码注释**：缺少必要的注释和文档
+
+---
+
+## 四、优先级修复建议
+
+### 🔴 高优先级（影响功能正确性）
+1. 修复需求类型 Checkbox 逻辑，改为 Radio 或单选 Checkbox
+2. 统一详情页的状态管理，避免本地和全局状态不同步
+3. 修复快捷操作中 `uiDesignId` 和 `bugTrackingId` 未保存的问题
+4. 将所有 `any` 类型改为明确的类型
+
+### 🟡 中优先级（提升代码质量）
+1. 抽取 `useRequirementForm` Hook，统一新建和编辑页的表单逻辑
+2. 抽取 `useRequirementDetail` Hook，简化详情页逻辑
+3. 将硬编码的配置移到 `requirements.ts`
+4. 添加更完善的错误处理和用户反馈
+5. 移除未使用的 import
+
+### 🟢 低优先级（优化体验）
+1. 添加批量操作的确认对话框
+2. 添加附件删除的确认对话框
+3. 改进表单验证，添加实时反馈
+4. 优化 ID 生成方式，使用 UUID
+5. 添加代码注释和 JSDoc 文档
+
+---
+
+## 五、重构建议代码示例
+
+### 1. 统一表单 Hook
+
+```typescript
+// hooks/useRequirementForm.ts
+export function useRequirementForm(initialData?: Requirement) {
+  const [formData, setFormData] = useState<RequirementFormData>(() => 
+    initialData ? mapRequirementToFormData(initialData) : getDefaultFormData()
+  );
+  const [attachments, setAttachments] = useState<Attachment[]>(initialData?.attachments || []);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const handleTypeChange = useCallback((type: string, checked: boolean) => {
+    if (checked) {
+      setFormData(prev => ({ ...prev, type: type as RequirementFormData['type'] }));
+    }
+  }, []);
+
+  const handlePlatformChange = useCallback((platform: string, checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      platforms: checked 
+        ? [...prev.platforms, platform]
+        : prev.platforms.filter(p => p !== platform)
+    }));
+  }, []);
+
+  const handleFileUpload = useCallback(async (files: File[]) => {
+    // 文件上传逻辑
+  }, []);
+
+  const validate = useCallback(() => {
+    const newErrors: Record<string, string> = {};
+    if (!formData.title.trim()) newErrors.title = '请输入需求标题';
+    if (!formData.description.trim()) newErrors.description = '请输入需求描述';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }, [formData]);
+
+  return {
+    formData,
+    attachments,
+    errors,
+    setFormData,
+    handleTypeChange,
+    handlePlatformChange,
+    handleFileUpload,
+    validate
+  };
+}
+```
+
+### 2. 抽取基本信息表单组件
+
+```typescript
+// components/requirements/BasicInfoForm.tsx
+interface BasicInfoFormProps {
+  formData: RequirementFormData;
+  errors?: Record<string, string>;
+  onTitleChange: (value: string) => void;
+  onTypeChange: (type: string, checked: boolean) => void;
+  onPlatformChange: (platform: string, checked: boolean) => void;
+}
+
+export function BasicInfoForm({
+  formData,
+  errors,
+  onTitleChange,
+  onTypeChange,
+  onPlatformChange
+}: BasicInfoFormProps) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">基本信息</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* 标题 */}
+        <div className="space-y-2">
+          <Label htmlFor="title">
+            需求标题 <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="title"
+            placeholder="请输入需求标题"
+            value={formData.title}
+            onChange={(e) => onTitleChange(e.target.value)}
+            className={errors?.title ? 'border-red-500' : ''}
+          />
+          {errors?.title && (
+            <p className="text-sm text-red-500">{errors.title}</p>
+          )}
+        </div>
+
+        {/* 需求类型 */}
+        <div className="space-y-2">
+          <Label>需求类型</Label>
+          <div className="flex flex-wrap gap-4">
+            {REQUIREMENT_TYPES.map(type => (
+              <div key={type} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`type-${type}`}
+                  checked={formData.type === type}
+                  onCheckedChange={(checked) => onTypeChange(type, !!checked)}
+                />
+                <Label htmlFor={`type-${type}`} className="text-sm font-normal cursor-pointer">
+                  {type}
+                </Label>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 应用端 */}
+        <div className="space-y-2">
+          <Label>应用端</Label>
+          <div className="flex flex-wrap gap-4">
+            {PLATFORM_OPTIONS.map(platform => (
+              <div key={platform} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`platform-${platform}`}
+                  checked={formData.platforms.includes(platform)}
+                  onCheckedChange={(checked) => onPlatformChange(platform, !!checked)}
+                />
+                <Label htmlFor={`platform-${platform}`} className="text-sm font-normal cursor-pointer">
+                  {platform}
+                </Label>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+### 3. 配置文件补充
+
+```typescript
+// config/requirements.ts
+export const PLATFORM_OPTIONS = ['Web端', 'PC端', '移动端'] as const;
+
+export const REQUIREMENT_TYPES = Object.keys(REQUIREMENT_TYPE_CONFIG) as Array<
+  keyof typeof REQUIREMENT_TYPE_CONFIG
+>;
+```
+
+---
+
+## 六、总结
+
+### 整体评价
+代码质量：**⭐⭐⭐⭐☆ (4/5)**
+
+**优势：**
+- 架构清晰，分层合理
+- 组件复用性高
+- 使用了现代化的 React 模式（Hooks、组合）
+- 性能优化意识强
+
+**待改进：**
+- 类型安全需要加强
+- 表单逻辑可以更优雅
+- 状态管理需要统一
+- 错误处理需要完善
+
+### 建议行动计划
+1. **第一阶段（1-2天）**：修复高优先级问题
+2. **第二阶段（3-5天）**：重构表单逻辑和状态管理
+3. **第三阶段（持续）**：添加测试和文档
+
+整体而言，这是一个结构良好、可维护性强的代码库，经过上述优化后将更加健壮和优雅。 

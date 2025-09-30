@@ -99,6 +99,100 @@ export function getFileExtension(filename: string): string {
   return filename.slice((filename.lastIndexOf('.') - 1 >>> 0) + 2);
 }
 
+/**
+ * 文件签名（Magic Number）映射
+ * 用于验证文件真实类型，防止MIME类型欺骗
+ */
+const FILE_SIGNATURES: Record<string, number[]> = {
+  'image/jpeg': [0xFF, 0xD8, 0xFF],
+  'image/png': [0x89, 0x50, 0x4E, 0x47],
+  'image/gif': [0x47, 0x49, 0x46],
+  'application/pdf': [0x25, 0x50, 0x44, 0x46],
+  'application/zip': [0x50, 0x4B, 0x03, 0x04],
+  'application/x-rar-compressed': [0x52, 0x61, 0x72, 0x21],
+};
+
+/**
+ * 验证文件真实类型（通过文件头）
+ * 
+ * 防止MIME类型欺骗攻击，通过读取文件的前几个字节（Magic Number）
+ * 来验证文件的真实类型是否与声明的MIME类型匹配
+ * 
+ * @param file - 待验证的文件
+ * @returns 文件类型是否匹配
+ * 
+ * @example
+ * ```typescript
+ * const file = new File([...], 'image.jpg', { type: 'image/jpeg' });
+ * const isValid = await validateFileSignature(file);
+ * // true 如果文件确实是JPEG格式
+ * // false 如果文件被伪装成JPEG但实际不是
+ * ```
+ */
+export async function validateFileSignature(file: File): Promise<boolean> {
+  try {
+    // 读取文件的前4个字节
+    const buffer = await file.slice(0, 4).arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    
+    // 获取该MIME类型的签名
+    const signature = FILE_SIGNATURES[file.type];
+    
+    // 如果没有定义签名，跳过验证（信任MIME类型）
+    if (!signature) {
+      return true;
+    }
+    
+    // 验证文件头是否匹配签名
+    return signature.every((byte, index) => bytes[index] === byte);
+  } catch (error) {
+    console.error('文件签名验证失败:', error);
+    // 验证失败时拒绝文件
+    return false;
+  }
+}
+
+/**
+ * 增强的文件验证
+ * 
+ * 在原有验证基础上，增加文件签名验证
+ * 
+ * @param files - 待验证的文件列表
+ * @param existingFilesCount - 已有文件数量
+ * @param config - 验证配置
+ * @returns 验证结果（包含有效文件和错误信息）
+ */
+export async function validateFilesEnhanced(
+  files: File[],
+  existingFilesCount: number = 0,
+  config: FileValidationConfig = {}
+): Promise<FileValidationResult> {
+  // 先进行基础验证
+  const basicValidation = validateFiles(files, existingFilesCount, config);
+  
+  // 如果基础验证失败，直接返回
+  if (basicValidation.errors.length > 0) {
+    return basicValidation;
+  }
+  
+  // 对通过基础验证的文件进行签名验证
+  const validFiles: File[] = [];
+  const errors: string[] = [];
+  
+  for (const file of basicValidation.validFiles) {
+    // 验证文件签名
+    const isValidSignature = await validateFileSignature(file);
+    
+    if (!isValidSignature) {
+      errors.push(`文件类型验证失败: ${file.name} (文件内容与声明类型不匹配)`);
+    } else {
+      validFiles.push(file);
+    }
+  }
+  
+  return { validFiles, errors };
+}
+
 // 内存管理相关函数
 export class FileURLManager {
   private static urls = new Set<string>();
@@ -122,21 +216,67 @@ export class FileURLManager {
   }
 }
 
-// 生成安全的唯一ID
+/**
+ * 生成安全的唯一ID
+ * 
+ * 优先使用浏览器原生的 crypto.randomUUID() API，
+ * 如果不可用则回退到基于时间戳和随机数的方案
+ * 
+ * @returns 唯一ID字符串
+ * 
+ * @example
+ * ```typescript
+ * const attachmentId = generateSecureId();
+ * // 输出类似: "550e8400-e29b-41d4-a716-446655440000" 或 "l8xqz-abc123def456-xyz789ghi012"
+ * ```
+ */
 export function generateSecureId(): string {
-  // 使用crypto.randomUUID如果可用，否则回退到时间戳+随机数
+  // 使用crypto.randomUUID如果可用（现代浏览器支持）
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
   }
   
   // 回退方案：使用更安全的随机数生成
+  // 格式: {timestamp}-{random}-{random}
   const timestamp = Date.now().toString(36);
   const randomPart = Math.random().toString(36).substring(2, 15);
   const extraRandom = Math.random().toString(36).substring(2, 15);
   return `${timestamp}-${randomPart}-${extraRandom}`;
 }
 
-// 时间格式化工具函数
+/**
+ * 生成需求ID
+ * 
+ * 生成格式为 #数字 的需求ID
+ * 在实际生产环境中，应该由后端API返回
+ * 
+ * @returns 需求ID，格式为 #123456
+ * 
+ * @example
+ * ```typescript
+ * const requirementId = generateRequirementId();
+ * // 输出类似: "#1727695234567"
+ * ```
+ */
+export function generateRequirementId(): string {
+  // 使用时间戳作为ID的一部分，确保唯一性
+  // 在实际项目中，这应该由后端数据库的自增ID或UUID提供
+  return `#${Date.now()}`;
+}
+
+/**
+ * 时间格式化工具函数
+ * 
+ * 将当前时间格式化为 "YYYY-MM-DD HH:MM" 格式
+ * 
+ * @returns 格式化后的时间字符串
+ * 
+ * @example
+ * ```typescript
+ * const now = formatDateTime();
+ * // 输出类似: "2025-09-30 12:33"
+ * ```
+ */
 export function formatDateTime(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
