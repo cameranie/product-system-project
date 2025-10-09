@@ -2,14 +2,11 @@
 // 约定：API_BASE_URL 指向后端"API前缀根"，例如 http://localhost:3001/api 或 https://xxx.up.railway.app/api
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
-import { TokenManager } from './secure-storage';
-import { CSRFProtection } from './csrf';
-
-// 从安全存储读取登录后的 token
+// 从 localStorage 读取登录后的 token
 function getAuthToken(): string | null {
   if (typeof window !== 'undefined') {
     try {
-      return TokenManager.getToken();
+      return localStorage.getItem('auth_token');
     } catch {
       return null;
     }
@@ -17,30 +14,17 @@ function getAuthToken(): string | null {
   return null;
 }
 
-// GraphQL查询函数（增强版：包含CSRF防护）
+// GraphQL查询函数
 async function graphqlRequest(query: string, variables?: Record<string, unknown>) {
   // 获取认证Token
   const token = getAuthToken();
-  
-  // 获取CSRF Token（仅在浏览器环境）
-  let csrfToken: string | null = null;
-  if (typeof window !== 'undefined') {
-    try {
-      csrfToken = await CSRFProtection.getToken();
-    } catch (error) {
-      console.warn('获取CSRF Token失败，继续请求:', error);
-      // 不阻止请求，由服务器决定是否需要CSRF Token
-    }
-  }
   
   const response = await fetch(`${API_BASE_URL}/graphql`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(token && { 'Authorization': `Bearer ${token}` }),
-      ...(csrfToken && { 'X-CSRF-Token': csrfToken }),
     },
-    credentials: 'include', // 重要：携带Cookie
     body: JSON.stringify({
       query,
       variables,
@@ -120,9 +104,9 @@ export const authApi = {
 
     const result = await graphqlRequest(query, { input: { email, password } });
     
-    // 存储token
-    if (result.login.access_token) {
-      TokenManager.setToken(result.login.access_token);
+    // 存储token到 localStorage
+    if (result.login.access_token && typeof window !== 'undefined') {
+      localStorage.setItem('auth_token', result.login.access_token);
     }
     
     return result.login;
@@ -152,8 +136,9 @@ export const authApi = {
 
   // 登出
   logout() {
-    TokenManager.clearToken();
-    CSRFProtection.clearToken();
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('auth_token');
+    }
   },
 
   // 检查是否已登录
