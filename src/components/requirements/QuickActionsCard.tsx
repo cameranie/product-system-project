@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { UI_SIZES } from '@/config/requirements';
 import { toast } from 'sonner';
-import { isSafeURL } from '@/lib/sanitize';
 
 /**
  * 快捷操作数据接口
@@ -67,7 +66,6 @@ export function QuickActionsCard({
 
   /**
    * 跳转到相关文档
-   * 包含URL安全验证，防止XSS攻击
    */
   const handleNavigate = (type: string, id?: string) => {
     if (!id) {
@@ -75,18 +73,12 @@ export function QuickActionsCard({
       return;
     }
 
-    // 验证URL安全性
-    if (!isSafeURL(id)) {
-      toast.error('链接格式不安全，已阻止跳转');
-      return;
-    }
-
     // 这里可以根据实际情况配置跳转路径
     const routes: Record<string, string> = {
-      '原型': `/prototype/${id}`,
-      'PRD': `/prd/${id}`,
-      'UI设计': `/design/${id}`,
-      'Bug追踪': `/bugs/${id}`
+      '原型': `/prototype/${encodeURIComponent(id)}`,
+      'PRD': `/prd/${encodeURIComponent(id)}`,
+      'UI设计': `/design/${encodeURIComponent(id)}`,
+      'Bug追踪': `/bugs/${encodeURIComponent(id)}`
     };
 
     const url = routes[type];
