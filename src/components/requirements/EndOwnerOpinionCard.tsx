@@ -158,7 +158,8 @@ export function EndOwnerOpinionCard({
           <div className="space-y-2">
             <Label className="text-sm">优先级</Label>
             <div className="flex gap-4 flex-wrap">
-              {Object.entries(PRIORITY_CONFIG).map(([key, config]) => (
+              {/* 按优先级从高到低排序：紧急 > 高 > 中 > 低 */}
+              {['紧急', '高', '中', '低'].map((key) => (
                 <div key={key} className="flex items-center space-x-2">
                   <Checkbox
                     id={`priority-${key}`}

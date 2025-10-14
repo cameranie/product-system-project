@@ -8,9 +8,18 @@ import { useRequirementsStore } from '@/lib/requirements-store';
 import { RequirementTable } from '@/components/requirements/RequirementTable';
 import { VirtualizedRequirementTable } from '@/components/requirements/VirtualizedRequirementTable';
 import { FilterPanel } from '@/components/requirements/FilterPanel';
-import { BatchOperations } from '@/components/requirements/BatchOperations';
 import { useRequirementFilters } from '@/hooks/useRequirementFilters';
 import { FILTERABLE_COLUMNS } from '@/config/requirements';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { X } from 'lucide-react';
+import { validateNeedToDo, validatePriority, validateRequirementIds } from '@/lib/input-validation';
+import { executeSyncBatchOperation } from '@/lib/batch-operations';
 
 /**
  * 筛选列配置类型（避免 readonly 类型冲突）
@@ -62,13 +71,11 @@ export default function RequirementsPage() {
     handleColumnSort,
     toggleColumnVisibility,
     handleColumnReorder,
+    resetColumns,
     handleRequirementSelect,
     handleSelectAll
   } = useRequirementFilters({ requirements });
 
-  // 批量操作状态
-  const [batchNeedToDoValue, setBatchNeedToDoValue] = useState<string>('');
-  
   // 加载状态
   useEffect(() => {
     setTimeout(() => {
@@ -80,23 +87,26 @@ export default function RequirementsPage() {
    * 处理"是否要做"字段变更
    * 
    * 性能优化：使用 useCallback 包装，避免子组件不必要的重渲染
+   * P1: 添加输入验证和错误处理
    * 
    * @param requirementId - 需求ID
-   * @param value - 新的"是否要做"值（'是' | '否'）
+   * @param value - 新的"是否要做"值（'是' | '否' | ''）
    */
   const handleNeedToDoChange = useCallback((requirementId: string, value: string) => {
-    // 类型安全检查：确保值在允许的范围内
-    if (!['是', '否'].includes(value)) {
+    // P0: 输入验证
+    const validationResult = validateNeedToDo(value);
+    if (!validationResult.valid) {
       console.error('Invalid needToDo value:', value);
-      toast.error('无效的选项值');
+      toast.error(validationResult.error || '无效的选项值');
       return;
     }
     
     try {
-      updateRequirement(requirementId, { needToDo: value as '是' | '否' });
-    } catch (error) {
+      // 如果验证通过的值为 undefined，说明是取消选择
+      updateRequirement(requirementId, { needToDo: validationResult.value });
+    } catch (error: any) {
       console.error('更新失败:', error);
-      toast.error('更新失败，请重试');
+      toast.error(error?.message || '更新失败，请重试');
     }
   }, [updateRequirement]);
 
@@ -104,52 +114,69 @@ export default function RequirementsPage() {
    * 处理优先级变更
    * 
    * 性能优化：使用 useCallback 包装，避免子组件不必要的重渲染
+   * P1: 添加输入验证和错误处理
    * 
    * @param requirementId - 需求ID
-   * @param value - 新的优先级值（'低' | '中' | '高' | '紧急'）
+   * @param value - 新的优先级值（'低' | '中' | '高' | '紧急' | ''）
    */
   const handlePriorityChange = useCallback((requirementId: string, value: string) => {
-    // 类型安全检查：确保值在允许的范围内
-    if (!['低', '中', '高', '紧急'].includes(value)) {
+    // P0: 输入验证
+    const validationResult = validatePriority(value);
+    if (!validationResult.valid) {
       console.error('Invalid priority value:', value);
-      toast.error('无效的优先级');
+      toast.error(validationResult.error || '无效的优先级');
       return;
     }
     
     try {
-      updateRequirement(requirementId, { priority: value as '低' | '中' | '高' | '紧急' });
-    } catch (error) {
+      // 如果验证通过的值为 undefined，说明是取消选择
+      updateRequirement(requirementId, { priority: validationResult.value });
+    } catch (error: any) {
       console.error('更新失败:', error);
-      toast.error('更新失败，请重试');
+      toast.error(error?.message || '更新失败，请重试');
     }
   }, [updateRequirement]);
 
   /**
    * 批量操作 - 批量更新"是否要做"字段
    * 
-   * 性能优化：使用 for...of 替代 forEach
-   * - 更清晰的迭代语义
-   - 更好的性能（避免函数调用开销）
-   - 支持 break/continue（虽然这里不需要）
+   * P1 功能稳定性修复：
+   * - ✅ 添加输入验证
+   * - ✅ 添加批量操作限制
+   * - ✅ 统一错误处理
+   * - ✅ 记录失败项
    */
-  const handleBatchNeedToDoUpdate = useCallback(() => {
-    if (batchNeedToDoValue && selectedRequirements.length > 0) {
-      // 类型安全检查
-      if (!['是', '否'].includes(batchNeedToDoValue)) {
-        console.error('Invalid batch needToDo value:', batchNeedToDoValue);
-        toast.error('无效的批量操作值');
-        return;
-      }
-      
-      // 使用 for...of 代替 forEach，性能更好且代码更清晰
-      for (const id of selectedRequirements) {
-        updateRequirement(id, { needToDo: batchNeedToDoValue as '是' | '否' });
-      }
-      
-      setBatchNeedToDoValue('');
-      toast.success(`已批量更新 ${selectedRequirements.length} 条需求`);
+  const handleBatchNeedToDo = useCallback((value: '是' | '否') => {
+    // P0: 输入验证
+    const validationResult = validateNeedToDo(value);
+    if (!validationResult.valid) {
+      toast.error(validationResult.error || '无效的选项值');
+      return;
     }
-  }, [batchNeedToDoValue, selectedRequirements, updateRequirement]);
+
+    // P1: 批量操作ID验证（包括数量限制）
+    const idsValidation = validateRequirementIds(selectedRequirements, 100);
+    if (!idsValidation.valid) {
+      toast.error(idsValidation.error || '无效的需求选择');
+      return;
+    }
+    
+    // P1: 使用统一的批量操作工具
+    executeSyncBatchOperation(
+      selectedRequirements,
+      (id) => {
+        updateRequirement(id, { needToDo: value });
+      },
+      {
+        operationName: `批量设置是否要做为 ${value}`,
+        showSuccessToast: true,
+        showErrorToast: true,
+      }
+    );
+    
+    // 清空选择
+    handleSelectAll(false);
+  }, [selectedRequirements, updateRequirement, handleSelectAll]);
 
 
 
@@ -184,36 +211,74 @@ export default function RequirementsPage() {
 
   return (
     <AppLayout>
-      <div className="space-y-4">
-        {/* 筛选面板 */}
-        <FilterPanel
-          searchTerm={searchTerm}
-          statusFilter={statusFilter}
-          customFilters={customFilters}
-          hiddenColumns={hiddenColumns}
-          columnOrder={columnOrder}
-          stats={stats}
-          filterableColumns={FILTERABLE_COLUMNS as unknown as FilterableColumn[]}
-          onSearchChange={setSearchTerm}
-          onStatusFilterChange={setStatusFilter}
-          onCustomFilterAdd={addCustomFilter}
-          onCustomFilterUpdate={updateCustomFilter}
-          onCustomFilterRemove={removeCustomFilter}
-          onCustomFiltersReset={clearAllFilters}
-          onColumnToggle={toggleColumnVisibility}
-          onColumnReorder={handleColumnReorder}
-          onCreateNew={handleCreateNew}
-        />
+      {/* 固定区域：搜索栏和批量操作 */}
+      <div className="sticky top-0 z-20 bg-background border-b shadow-sm">
+        <div className="px-4 pt-4 pb-3 space-y-3">
+          <FilterPanel
+            searchTerm={searchTerm}
+            statusFilter={statusFilter}
+            customFilters={customFilters}
+            hiddenColumns={hiddenColumns}
+            columnOrder={columnOrder}
+            stats={stats}
+            filterableColumns={FILTERABLE_COLUMNS as unknown as FilterableColumn[]}
+            onSearchChange={setSearchTerm}
+            onStatusFilterChange={setStatusFilter}
+            onCustomFilterAdd={addCustomFilter}
+            onCustomFilterUpdate={updateCustomFilter}
+            onCustomFilterRemove={removeCustomFilter}
+            onCustomFiltersReset={clearAllFilters}
+            onColumnToggle={toggleColumnVisibility}
+            onColumnReorder={handleColumnReorder}
+            onResetColumns={() => {
+              resetColumns();
+              toast.success('已恢复默认列设置');
+            }}
+            onCreateNew={handleCreateNew}
+          />
 
-        {/* 批量操作 */}
-        <BatchOperations
-          selectedCount={selectedRequirements.length}
-          batchNeedToDoValue={batchNeedToDoValue}
-          onBatchNeedToDoChange={setBatchNeedToDoValue}
-          onBatchNeedToDoUpdate={handleBatchNeedToDoUpdate}
-          onClearSelection={handleClearSelection}
-        />
+          {/* 批量操作栏 */}
+          {selectedRequirements.length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <span className="text-sm font-medium">
+                    已选择 <span className="text-blue-600">{selectedRequirements.length}</span> 个需求
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleClearSelection}
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    取消选择
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" variant="outline">
+                        批量是否要做
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => handleBatchNeedToDo('是')}>
+                        设置为 是
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleBatchNeedToDo('否')}>
+                        设置为 否
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
+      {/* 内容区域 */}
+      <div className="px-4 pt-4">
         {/* 需求表格 - 自动切换虚拟滚动 */}
         {filteredRequirements.length > 100 ? (
           // 大数据量：使用虚拟滚动

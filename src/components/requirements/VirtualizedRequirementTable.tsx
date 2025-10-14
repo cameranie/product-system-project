@@ -198,28 +198,37 @@ export const VirtualizedRequirementTable = memo(function VirtualizedRequirementT
               );
 
             case 'needToDo':
+              const currentNeedToDo = requirement.needToDo;
+              const needToDoConfig = currentNeedToDo ? getNeedToDoConfig(currentNeedToDo) : null;
               return (
                 <div key="needToDo" className="w-24 px-3 py-3 flex-shrink-0">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button
-                        className={`h-6 px-2 py-1 text-xs rounded-md border-0 ${
-                          requirement.needToDo 
-                            ? (getNeedToDoConfig(requirement.needToDo)?.className || 'bg-gray-100 text-gray-800')
-                            : 'bg-gray-50 text-gray-400'
-                        } hover:opacity-80 transition-opacity cursor-pointer w-full text-center`}
+                        className={`h-6 px-2 py-1 text-xs rounded-md ${
+                          needToDoConfig?.className || 'bg-gray-100 text-gray-600'
+                        } hover:opacity-80 transition-opacity cursor-pointer inline-flex items-center`}
                       >
-                        {requirement.needToDo || '-'}
+                        {needToDoConfig?.label || '-'}
                       </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="center" className={UI_SIZES.DROPDOWN.NARROW}>
+                    <DropdownMenuContent align="center" className="w-20">
                       {Object.entries(NEED_TO_DO_CONFIG).map(([value, config]) => (
                         <DropdownMenuItem
                           key={value}
-                          onClick={() => onNeedToDoChange(requirement.id, value)}
-                          className={`${config.color} ${config.bgColor} justify-center`}
+                          onClick={() => {
+                            // 如果点击的是当前选中项，则取消选择（设为空）
+                            if (currentNeedToDo === value) {
+                              onNeedToDoChange(requirement.id, '');
+                            } else {
+                              onNeedToDoChange(requirement.id, value);
+                            }
+                          }}
+                          className={`cursor-pointer ${currentNeedToDo === value ? 'bg-accent' : ''}`}
                         >
-                          {config.label}
+                          <span className={`px-2 py-1 rounded text-sm ${config.className} inline-block`}>
+                            {config.label}
+                          </span>
                         </DropdownMenuItem>
                       ))}
                     </DropdownMenuContent>
@@ -228,30 +237,44 @@ export const VirtualizedRequirementTable = memo(function VirtualizedRequirementT
               );
 
             case 'priority':
+              const currentPriority = requirement.priority;
+              const priorityConfig = currentPriority ? getPriorityConfig(currentPriority) : null;
+              // 按优先级从高到低排序：紧急 > 高 > 中 > 低
+              const priorityOrder = ['紧急', '高', '中', '低'];
               return (
                 <div key="priority" className="w-24 px-3 py-3 flex-shrink-0">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button
-                        className={`h-6 px-2 py-1 text-xs rounded-md border-0 ${
-                          requirement.priority
-                            ? (getPriorityConfig(requirement.priority)?.className || 'bg-gray-100 text-gray-800')
-                            : 'bg-gray-50 text-gray-400'
-                        } hover:opacity-80 transition-opacity cursor-pointer w-full text-center`}
+                        className={`h-6 px-2 py-1 text-xs rounded-md ${
+                          priorityConfig?.className || 'bg-gray-100 text-gray-600'
+                        } hover:opacity-80 transition-opacity cursor-pointer inline-flex items-center`}
                       >
-                        {requirement.priority || '-'}
+                        {priorityConfig?.label || '-'}
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="center" className="w-20">
-                      {Object.entries(PRIORITY_CONFIG).map(([value, config]) => (
-                        <DropdownMenuItem
-                          key={value}
-                          onClick={() => onPriorityChange(requirement.id, value)}
-                          className={`${config.color} ${config.bgColor} justify-center`}
-                        >
-                          {config.label}
-                        </DropdownMenuItem>
-                      ))}
+                      {priorityOrder.map(value => {
+                        const config = PRIORITY_CONFIG[value as keyof typeof PRIORITY_CONFIG];
+                        return (
+                          <DropdownMenuItem
+                            key={value}
+                            onClick={() => {
+                              // 如果点击的是当前选中项，则取消选择（设为空）
+                              if (currentPriority === value) {
+                                onPriorityChange(requirement.id, '');
+                              } else {
+                                onPriorityChange(requirement.id, value);
+                              }
+                            }}
+                            className={`cursor-pointer ${currentPriority === value ? 'bg-accent' : ''}`}
+                          >
+                            <span className={`px-2 py-1 rounded text-sm ${config.className} inline-block`}>
+                              {config.label}
+                            </span>
+                          </DropdownMenuItem>
+                        );
+                      })}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -280,15 +303,10 @@ export const VirtualizedRequirementTable = memo(function VirtualizedRequirementT
 
             case 'platforms':
               return (
-                <div key="platforms" className="w-40 px-3 py-3 flex-shrink-0">
-                  <div className="flex flex-wrap gap-1">
-                    {(requirement.platforms || []).map((platform, idx) => (
-                      <span key={idx} className="text-xs text-gray-600">
-                        {platform}
-                        {idx < (requirement.platforms?.length || 0) - 1 && ','}
-                      </span>
-                    ))}
-                  </div>
+                <div key="platforms" className="w-48 px-3 py-3 flex-shrink-0">
+                  <span className="text-sm truncate block" title={(requirement.platforms || []).join(', ')}>
+                    {(requirement.platforms || []).join(', ') || '-'}
+                  </span>
                 </div>
               );
 

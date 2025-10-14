@@ -129,7 +129,7 @@ export function ScheduledReviewCard({
                       htmlFor={`${level.id}-approved`} 
                       className="text-sm font-normal cursor-pointer"
                     >
-                      评审通过
+                      通过
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -145,7 +145,7 @@ export function ScheduledReviewCard({
                       htmlFor={`${level.id}-rejected`} 
                       className="text-sm font-normal cursor-pointer"
                     >
-                      评审不通过
+                      不通过
                     </Label>
                   </div>
                 </div>

@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Save } from 'lucide-react';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useRequirementsStore, mockUsers, type User } from '@/lib/requirements-store';
 import { REQUIREMENT_TYPES, PLATFORM_OPTIONS } from '@/config/requirements';
 import {
@@ -38,14 +38,20 @@ import { useRequirementForm } from '@/hooks/requirements/useRequirementForm';
 export default function RequirementEditPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const router = useRouter();
-  const { getRequirementById, updateRequirement, loading } = useRequirementsStore();
+  const searchParams = useSearchParams();
+  const fromSource = searchParams?.get('from'); // 获取来源参数
+  
+  // 直接订阅 requirements 数组和相关函数，确保数据变化时自动更新
+  const requirements = useRequirementsStore(state => state.requirements);
+  const updateRequirement = useRequirementsStore(state => state.updateRequirement);
+  const loading = useRequirementsStore(state => state.loading);
   
   // 当前用户（模拟）
   const currentUser = mockUsers[0];
 
-  // 解码 URL 中的 ID 并获取需求数据
+  // 解码 URL 中的 ID，并从订阅的 requirements 中查找
   const decodedId = decodeURIComponent(id);
-  const originalRequirement = getRequirementById(decodedId);
+  const originalRequirement = requirements.find(req => req.id === decodedId);
 
   // 使用自定义表单Hook，传入原始数据进行初始化
   const {
@@ -60,6 +66,36 @@ export default function RequirementEditPage({ params }: { params: { id: string }
     validate,
     setAttachments
   } = useRequirementForm({ initialData: originalRequirement });
+
+  // 当 originalRequirement 的 updatedAt 变化时，同步更新表单数据
+  // updatedAt 在每次数据更新时都会改变，这样可以准确追踪数据变化
+  useEffect(() => {
+    if (originalRequirement) {
+      setFormData({
+        title: originalRequirement.title,
+        type: originalRequirement.type,
+        description: originalRequirement.description,
+        platforms: originalRequirement.platforms || [],
+        endOwnerOpinion: originalRequirement.endOwnerOpinion || {
+          needToDo: undefined,
+          priority: undefined,
+          opinion: '',
+          owner: undefined
+        },
+        scheduledReview: {
+          reviewLevels: originalRequirement.scheduledReview?.reviewLevels || []
+        },
+        quickActions: {
+          prototypeId: originalRequirement.prototypeId || '',
+          prdId: originalRequirement.prdId || '',
+          uiDesignId: '',
+          bugTrackingId: ''
+        }
+      });
+      setAttachments(originalRequirement.attachments || []);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [originalRequirement?.updatedAt, originalRequirement?.id]);
 
   // 组件卸载时清理文件URL
   useEffect(() => {
@@ -128,7 +164,8 @@ export default function RequirementEditPage({ params }: { params: { id: string }
       });
 
       toast.success('需求更新成功');
-      router.push(`/requirements/${encodeURIComponent(originalRequirement.id)}`);
+      const detailUrl = `/requirements/${encodeURIComponent(originalRequirement.id)}${fromSource ? `?from=${fromSource}` : ''}`;
+      router.push(detailUrl);
     } catch (error) {
       console.error('保存失败:', error);
       toast.error('保存失败，请重试');

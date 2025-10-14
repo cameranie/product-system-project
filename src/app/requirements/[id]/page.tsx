@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Edit } from 'lucide-react';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useRequirementsStore, mockUsers, type User, type Requirement } from '@/lib/requirements-store';
 import { REQUIREMENT_TYPE_CONFIG } from '@/config/requirements';
 import {
@@ -26,15 +26,21 @@ import type { ScheduledReviewLevel } from '@/hooks/requirements/useScheduledRevi
 export default function RequirementDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const router = useRouter();
-  const { getRequirementById, updateRequirement } = useRequirementsStore();
+  const searchParams = useSearchParams();
+  const fromSource = searchParams?.get('from'); // 获取来源参数
+  
+  // 直接订阅 requirements 数组，确保数据变化时自动更新
+  const requirements = useRequirementsStore(state => state.requirements);
+  const updateRequirement = useRequirementsStore(state => state.updateRequirement);
+  
   const [isToggling, setIsToggling] = useState(false);
 
   // 当前用户（模拟）
   const currentUser = mockUsers[0];
 
-  // 解码 URL 中的 ID
+  // 解码 URL 中的 ID，并从订阅的 requirements 中查找
   const decodedId = decodeURIComponent(id);
-  const requirement = getRequirementById(decodedId);
+  const requirement = requirements.find(req => req.id === decodedId);
 
   useEffect(() => {
     if (!requirement) {
@@ -189,7 +195,10 @@ export default function RequirementDetailPage({ params }: { params: { id: string
                 {isToggling ? '处理中...' : '重启需求'}
               </Button>
             )}
-            <Button onClick={() => router.push(`/requirements/${encodeURIComponent(requirement.id)}/edit`)}>
+            <Button onClick={() => {
+              const editUrl = `/requirements/${encodeURIComponent(requirement.id)}/edit${fromSource ? `?from=${fromSource}` : ''}`;
+              router.push(editUrl);
+            }}>
               <Edit className="h-4 w-4 mr-2" />
               编辑
             </Button>

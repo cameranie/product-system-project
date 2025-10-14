@@ -107,7 +107,7 @@ export const RequirementTable = memo(function RequirementTable({
     },
     title: {
       header: () => (
-        <TableHead className="px-3 w-[35%] sm:w-[40%] lg:w-[35%] xl:w-[30%]">
+        <TableHead className="px-3 w-[30%] sm:w-[35%] lg:w-[30%] xl:w-[25%]">
           <div className="flex items-center">
             标题
             {renderSortButton('title')}
@@ -147,18 +147,14 @@ export const RequirementTable = memo(function RequirementTable({
     },
     platforms: {
       header: () => (
-        <TableHead className="px-3 w-[10%] sm:w-[12%] lg:w-[10%]">应用端</TableHead>
+        <TableHead className="px-3 w-[12%] sm:w-[14%] lg:w-[12%]">应用端</TableHead>
       ),
       cell: (requirement: Requirement) => (
         <TableCell className="px-3 py-3">
           {requirement.platforms && requirement.platforms.length > 0 ? (
-            <div className="flex flex-wrap gap-1">
-              {requirement.platforms.map((platform, index) => (
-                <span key={index} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                  {platform}
-                </span>
-              ))}
-            </div>
+            <span className="text-sm truncate block" title={requirement.platforms.join(', ')}>
+              {requirement.platforms.join(', ')}
+            </span>
           ) : (
             <span className="text-sm text-muted-foreground">-</span>
           )}
@@ -200,34 +196,43 @@ export const RequirementTable = memo(function RequirementTable({
       header: () => (
         <TableHead className="px-3 w-[10%] sm:w-[12%] lg:w-[10%]">是否要做</TableHead>
       ),
-      cell: (requirement: Requirement) => (
-        <TableCell className="px-3 py-3">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={`h-6 px-2 py-1 text-xs rounded-md border-0 ${requirement.needToDo ? (getNeedToDoConfig(requirement.needToDo)?.className || 'bg-gray-100 text-gray-800') : 'bg-gray-50 text-gray-400'} hover:opacity-80 transition-opacity duration-150 whitespace-nowrap`}
-              >
-                {requirement.needToDo ? (getNeedToDoConfig(requirement.needToDo)?.label || requirement.needToDo) : '-'}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" className="w-20">
-              {Object.entries(NEED_TO_DO_CONFIG).map(([key, config]) => (
-                <DropdownMenuItem
-                  key={key}
-                  onClick={() => onNeedToDoChange(requirement.id, key)}
-                  className="cursor-pointer"
+      cell: (requirement: Requirement) => {
+        const currentValue = requirement.needToDo;
+        const config = currentValue ? getNeedToDoConfig(currentValue) : null;
+        return (
+          <TableCell className="px-3 py-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={`h-6 px-2 py-1 text-xs rounded-md ${config?.className || 'bg-gray-100 text-gray-600'} hover:opacity-80 transition-opacity duration-150 cursor-pointer inline-flex items-center`}
                 >
-                  <div className={`px-2 py-1 rounded text-sm ${config.color} ${config.bgColor} w-full text-center`}>
-                    {config.label}
-                  </div>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </TableCell>
-      )
+                  {config?.label || '-'}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center" className="w-20">
+                {Object.entries(NEED_TO_DO_CONFIG).map(([key, config]) => (
+                  <DropdownMenuItem
+                    key={key}
+                    onClick={() => {
+                      // 如果点击的是当前选中项，则取消选择（设为空）
+                      if (currentValue === key) {
+                        onNeedToDoChange(requirement.id, '');
+                      } else {
+                        onNeedToDoChange(requirement.id, key);
+                      }
+                    }}
+                    className={`cursor-pointer ${currentValue === key ? 'bg-accent' : ''}`}
+                  >
+                    <span className={`px-2 py-1 rounded text-sm ${config.className} inline-block`}>
+                      {config.label}
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TableCell>
+        );
+      }
     },
     priority: {
       header: () => (
@@ -238,34 +243,48 @@ export const RequirementTable = memo(function RequirementTable({
           </div>
         </TableHead>
       ),
-      cell: (requirement: Requirement) => (
-        <TableCell className="px-3 py-3">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={`h-6 px-2 py-1 text-xs rounded-md border-0 ${requirement.priority ? (getPriorityConfig(requirement.priority)?.className || 'bg-gray-100 text-gray-800') : 'bg-gray-50 text-gray-400'} hover:opacity-80 transition-opacity duration-150 whitespace-nowrap`}
-              >
-                {requirement.priority || '-'}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" className="w-16">
-              {Object.entries(PRIORITY_CONFIG).map(([key, config]) => (
-                <DropdownMenuItem
-                  key={key}
-                  onClick={() => onPriorityChange(requirement.id, key)}
-                  className="cursor-pointer"
+      cell: (requirement: Requirement) => {
+        const currentValue = requirement.priority;
+        const config = currentValue ? getPriorityConfig(currentValue) : null;
+        // 按优先级从高到低排序：紧急 > 高 > 中 > 低
+        const priorityOrder = ['紧急', '高', '中', '低'];
+        return (
+          <TableCell className="px-3 py-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={`h-6 px-2 py-1 text-xs rounded-md ${config?.className || 'bg-gray-100 text-gray-600'} hover:opacity-80 transition-opacity duration-150 cursor-pointer inline-flex items-center`}
                 >
-                  <div className={`px-2 py-1 rounded text-sm ${config.className} w-full text-center`}>
-                    {config.label}
-                  </div>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </TableCell>
-      )
+                  {config?.label || '-'}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center" className="w-20">
+                {priorityOrder.map(key => {
+                  const config = PRIORITY_CONFIG[key as keyof typeof PRIORITY_CONFIG];
+                  return (
+                    <DropdownMenuItem
+                      key={key}
+                      onClick={() => {
+                        // 如果点击的是当前选中项，则取消选择（设为空）
+                        if (currentValue === key) {
+                          onPriorityChange(requirement.id, '');
+                        } else {
+                          onPriorityChange(requirement.id, key);
+                        }
+                      }}
+                      className={`cursor-pointer ${currentValue === key ? 'bg-accent' : ''}`}
+                    >
+                      <span className={`px-2 py-1 rounded text-sm ${config.className} inline-block`}>
+                        {config.label}
+                      </span>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TableCell>
+        );
+      }
     },
     creator: {
       header: () => (
@@ -338,44 +357,42 @@ export const RequirementTable = memo(function RequirementTable({
   }, [columnOrder, isColumnVisible]);
 
   return (
-    <div className="rounded-md border overflow-hidden">
-      <div className="overflow-x-auto">
-        <Table 
-          className="w-full table-fixed" 
-          style={{ minWidth: `${UI_SIZES.TABLE.MIN_WIDTH}px` }}
-        >
-          <TableHeader>
-            <TableRow>
-              <TableHead className={`${UI_SIZES.TABLE.COLUMN_WIDTHS.CHECKBOX} px-2`}>
+    <div className="rounded-md border overflow-x-auto">
+      <Table 
+        className="w-full table-fixed" 
+        style={{ minWidth: `${UI_SIZES.TABLE.MIN_WIDTH}px` }}
+      >
+        <TableHeader>
+          <TableRow>
+            <TableHead className={`${UI_SIZES.TABLE.COLUMN_WIDTHS.CHECKBOX} px-2`}>
+              <Checkbox
+                checked={isAllSelected}
+                onCheckedChange={handleSelectAll}
+              />
+            </TableHead>
+            {visibleColumns.map(columnId => {
+              const config = columnConfig[columnId as keyof typeof columnConfig];
+              return config ? <React.Fragment key={columnId}>{config.header()}</React.Fragment> : null;
+            })}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {requirements.map((requirement) => (
+            <TableRow key={requirement.id} className="hover:bg-muted/50">
+              <TableCell className="px-2 py-3">
                 <Checkbox
-                  checked={isAllSelected}
-                  onCheckedChange={handleSelectAll}
+                  checked={selectedRequirements.includes(requirement.id)}
+                  onCheckedChange={(checked) => onRequirementSelect(requirement.id, checked as boolean)}
                 />
-              </TableHead>
+              </TableCell>
               {visibleColumns.map(columnId => {
                 const config = columnConfig[columnId as keyof typeof columnConfig];
-                return config ? <React.Fragment key={columnId}>{config.header()}</React.Fragment> : null;
+                return config ? <React.Fragment key={columnId}>{config.cell(requirement)}</React.Fragment> : null;
               })}
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {requirements.map((requirement) => (
-              <TableRow key={requirement.id} className="hover:bg-muted/50">
-                <TableCell className="px-2 py-3">
-                  <Checkbox
-                    checked={selectedRequirements.includes(requirement.id)}
-                    onCheckedChange={(checked) => onRequirementSelect(requirement.id, checked as boolean)}
-                  />
-                </TableCell>
-                {visibleColumns.map(columnId => {
-                  const config = columnConfig[columnId as keyof typeof columnConfig];
-                  return config ? <React.Fragment key={columnId}>{config.cell(requirement)}</React.Fragment> : null;
-                })}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }); 

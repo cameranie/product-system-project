@@ -111,6 +111,7 @@ export const REQUIREMENT_TYPE_CONFIG = {
 /**
  * 优先级配置
  * 定义每个优先级的显示样式和排序顺序
+ * 注意：优先级可以为空（undefined/null），下拉支持取消选择
  */
 export const PRIORITY_CONFIG = {
   '低': { 
@@ -148,6 +149,7 @@ export const PRIORITY_CONFIG = {
 /**
  * 是否要做配置
  * 端负责人对需求的决策选项
+ * 注意：是否要做可以为空（undefined/null），下拉支持取消选择
  */
 export const NEED_TO_DO_CONFIG = {
   '是': { 

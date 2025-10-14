@@ -70,6 +70,8 @@ export interface Requirement {
   attachments: Attachment[];
   endOwnerOpinion: EndOwnerOpinion;
   scheduledReview: ScheduledReviewData;
+  delayTag?: string; // 延期标签，如 "PC 8.25 延版本"
+  isOperational?: 'yes' | 'no'; // 是否运营性需求
 }
 
 // 模拟用户数据
@@ -158,6 +160,7 @@ const initialRequirements: Requirement[] = [
                createdAt: '2024-01-18 09:15',
            updatedAt: '2024-01-18 09:15',
     platforms: ['移动端'],
+    plannedVersion: 'v1.3.0',
     isOpen: true,
     needToDo: '是',
     reviewStatus: 'pending',
@@ -179,14 +182,16 @@ const initialRequirements: Requirement[] = [
           status: 'pending'
         }
       ]
-    }
+    },
+    delayTag: '移动端 8.15 延版本',
+    isOperational: 'yes'
   },
   {
     id: '#3',
     title: '数据导出功能',
     type: '新功能',
     status: '开发中',
-    priority: undefined,
+    priority: '高',
     creator: mockUsers[2],
     project: mockProjects[2],
     description: '支持用户导出各种格式的数据，包括Excel、CSV、PDF等格式。',
@@ -194,6 +199,7 @@ const initialRequirements: Requirement[] = [
                createdAt: '2024-01-10 16:45',
            updatedAt: '2024-01-22 11:20',
     platforms: ['Web端', 'PC端', '移动端'],
+    plannedVersion: 'v1.2.0',
     isOpen: true,
     needToDo: '是',
     reviewStatus: 'approved',
@@ -229,6 +235,470 @@ const initialRequirements: Requirement[] = [
         }
       ]
     }
+  },
+  // v1.2.0 版本 - 新增需求
+  {
+    id: '#4',
+    title: '性能监控面板',
+    type: '新功能',
+    status: '待评审',
+    priority: '高',
+    creator: mockUsers[0],
+    project: mockProjects[0],
+    description: '实时监控系统性能指标',
+    tags: ['性能', '监控'],
+    createdAt: '2024-01-16 10:00',
+    updatedAt: '2024-01-16 10:00',
+    platforms: ['Web端', 'PC端'],
+    plannedVersion: 'v1.2.0',
+    isOpen: true,
+    needToDo: '是',
+    reviewStatus: 'pending',
+    attachments: [],
+    endOwnerOpinion: { needToDo: undefined, priority: undefined, opinion: '', owner: undefined },
+    scheduledReview: {
+      reviewLevels: [
+        { id: '6', level: 1, levelName: '一级评审', status: 'pending' }
+      ]
+    }
+  },
+  {
+    id: '#5',
+    title: '用户权限管理优化',
+    type: '优化',
+    status: '评审中',
+    priority: '中',
+    creator: mockUsers[1],
+    project: mockProjects[0],
+    description: '优化用户权限管理功能',
+    tags: ['权限', '管理'],
+    createdAt: '2024-01-17 11:30',
+    updatedAt: '2024-01-17 14:20',
+    platforms: ['Web端'],
+    plannedVersion: 'v1.2.0',
+    isOpen: true,
+    needToDo: '是',
+    reviewStatus: 'first_review',
+    attachments: [],
+    endOwnerOpinion: { needToDo: '是', priority: '中', opinion: '需要优化', owner: mockUsers[2] },
+    scheduledReview: {
+      reviewLevels: [
+        { id: '7', level: 1, levelName: '一级评审', status: 'approved', reviewer: mockUsers[2], opinion: '同意' },
+        { id: '8', level: 2, levelName: '二级评审', status: 'pending' }
+      ]
+    }
+  },
+  {
+    id: '#6',
+    title: '数据统计报表',
+    type: '新功能',
+    status: '待评审',
+    priority: '中',
+    creator: mockUsers[2],
+    project: mockProjects[1],
+    description: '提供数据统计和分析报表',
+    tags: ['统计', '报表'],
+    createdAt: '2024-01-18 09:00',
+    updatedAt: '2024-01-18 09:00',
+    platforms: ['Web端', 'PC端'],
+    plannedVersion: 'v1.2.0',
+    isOpen: true,
+    needToDo: '是',
+    reviewStatus: 'pending',
+    attachments: [],
+    endOwnerOpinion: { needToDo: undefined, priority: undefined, opinion: '', owner: undefined },
+    scheduledReview: {
+      reviewLevels: [
+        { id: '9', level: 1, levelName: '一级评审', status: 'pending' }
+      ]
+    }
+  },
+  {
+    id: '#7',
+    title: '消息推送功能',
+    type: '新功能',
+    status: '评审中',
+    priority: '高',
+    creator: mockUsers[3],
+    project: mockProjects[0],
+    description: '实现站内消息推送',
+    tags: ['消息', '推送'],
+    createdAt: '2024-01-19 10:30',
+    updatedAt: '2024-01-19 15:45',
+    platforms: ['Web端', '移动端'],
+    plannedVersion: 'v1.2.0',
+    isOpen: true,
+    needToDo: '是',
+    reviewStatus: 'approved',
+    attachments: [],
+    endOwnerOpinion: { needToDo: '是', priority: '高', opinion: '重要功能', owner: mockUsers[1] },
+    scheduledReview: {
+      reviewLevels: [
+        { id: '10', level: 1, levelName: '一级评审', status: 'approved', reviewer: mockUsers[1], opinion: '同意开发' },
+        { id: '11', level: 2, levelName: '二级评审', status: 'approved', reviewer: mockUsers[2], opinion: '技术可行' }
+      ]
+    }
+  },
+  {
+    id: '#8',
+    title: '文件上传优化',
+    type: '优化',
+    status: '待评审',
+    priority: '低',
+    creator: mockUsers[4],
+    project: mockProjects[2],
+    description: '提升文件上传速度和稳定性',
+    tags: ['文件', '上传', '优化'],
+    createdAt: '2024-01-20 14:00',
+    updatedAt: '2024-01-20 14:00',
+    platforms: ['Web端', 'PC端'],
+    plannedVersion: 'v1.2.0',
+    isOpen: true,
+    needToDo: '是',
+    reviewStatus: 'pending',
+    attachments: [],
+    endOwnerOpinion: { needToDo: undefined, priority: undefined, opinion: '', owner: undefined },
+    scheduledReview: {
+      reviewLevels: [
+        { id: '12', level: 1, levelName: '一级评审', status: 'pending' }
+      ]
+    }
+  },
+  {
+    id: '#9',
+    title: '搜索功能增强',
+    type: '优化',
+    status: '评审中',
+    priority: '中',
+    creator: mockUsers[0],
+    project: mockProjects[1],
+    description: '增强搜索功能，支持更多搜索条件',
+    tags: ['搜索', '优化'],
+    createdAt: '2024-01-21 09:30',
+    updatedAt: '2024-01-21 11:20',
+    platforms: ['Web端'],
+    plannedVersion: 'v1.2.0',
+    isOpen: true,
+    needToDo: '是',
+    reviewStatus: 'first_review',
+    attachments: [],
+    endOwnerOpinion: { needToDo: '是', priority: '中', opinion: '可以优化', owner: mockUsers[3] },
+    scheduledReview: {
+      reviewLevels: [
+        { id: '13', level: 1, levelName: '一级评审', status: 'approved', reviewer: mockUsers[3], opinion: '同意' },
+        { id: '14', level: 2, levelName: '二级评审', status: 'pending' }
+      ]
+    },
+    isOperational: 'no'
+  },
+  {
+    id: '#10',
+    title: '用户反馈模块',
+    type: '新功能',
+    status: '待评审',
+    priority: '低',
+    creator: mockUsers[1],
+    project: mockProjects[0],
+    description: '收集用户反馈和建议',
+    tags: ['反馈', '用户'],
+    createdAt: '2024-01-22 10:00',
+    updatedAt: '2024-01-22 10:00',
+    platforms: ['Web端', '移动端'],
+    plannedVersion: 'v1.2.0',
+    isOpen: true,
+    needToDo: '是',
+    reviewStatus: 'pending',
+    attachments: [],
+    endOwnerOpinion: { needToDo: undefined, priority: undefined, opinion: '', owner: undefined },
+    scheduledReview: {
+      reviewLevels: [
+        { id: '15', level: 1, levelName: '一级评审', status: 'pending' }
+      ]
+    }
+  },
+  {
+    id: '#11',
+    title: '系统日志查询',
+    type: '新功能',
+    status: '评审中',
+    priority: '中',
+    creator: mockUsers[2],
+    project: mockProjects[2],
+    description: '提供系统日志查询功能',
+    tags: ['日志', '查询'],
+    createdAt: '2024-01-23 11:00',
+    updatedAt: '2024-01-23 14:30',
+    platforms: ['Web端', 'PC端'],
+    plannedVersion: 'v1.2.0',
+    isOpen: true,
+    needToDo: '是',
+    reviewStatus: 'second_review',
+    attachments: [],
+    endOwnerOpinion: { needToDo: '是', priority: '中', opinion: '有必要', owner: mockUsers[4] },
+    scheduledReview: {
+      reviewLevels: [
+        { id: '16', level: 1, levelName: '一级评审', status: 'approved', reviewer: mockUsers[4], opinion: '同意' },
+        { id: '17', level: 2, levelName: '二级评审', status: 'pending', reviewer: mockUsers[1] }
+      ]
+    }
+  },
+  // v1.3.0 版本 - 新增需求
+  {
+    id: '#12',
+    title: '移动端首页改版',
+    type: '优化',
+    status: '待评审',
+    priority: '高',
+    creator: mockUsers[3],
+    project: mockProjects[1],
+    description: '重新设计移动端首页布局',
+    tags: ['移动端', '首页', '改版'],
+    createdAt: '2024-01-24 09:00',
+    updatedAt: '2024-01-24 09:00',
+    platforms: ['移动端'],
+    plannedVersion: 'v1.3.0',
+    isOpen: true,
+    needToDo: '是',
+    reviewStatus: 'pending',
+    attachments: [],
+    endOwnerOpinion: { needToDo: undefined, priority: undefined, opinion: '', owner: undefined },
+    scheduledReview: {
+      reviewLevels: [
+        { id: '18', level: 1, levelName: '一级评审', status: 'pending' }
+      ]
+    }
+  },
+  {
+    id: '#13',
+    title: '在线客服系统',
+    type: '新功能',
+    status: '评审中',
+    priority: '中',
+    creator: mockUsers[4],
+    project: mockProjects[0],
+    description: '集成在线客服功能',
+    tags: ['客服', '在线'],
+    createdAt: '2024-01-25 10:30',
+    updatedAt: '2024-01-25 13:45',
+    platforms: ['Web端', '移动端'],
+    plannedVersion: 'v1.3.0',
+    isOpen: true,
+    needToDo: '是',
+    reviewStatus: 'first_review',
+    attachments: [],
+    endOwnerOpinion: { needToDo: '是', priority: '中', opinion: '可以接入', owner: mockUsers[0] },
+    scheduledReview: {
+      reviewLevels: [
+        { id: '19', level: 1, levelName: '一级评审', status: 'approved', reviewer: mockUsers[0], opinion: '同意' },
+        { id: '20', level: 2, levelName: '二级评审', status: 'pending' }
+      ]
+    },
+    isOperational: 'yes'
+  },
+  {
+    id: '#14',
+    title: '图片压缩功能',
+    type: '新功能',
+    status: '待评审',
+    priority: '低',
+    creator: mockUsers[0],
+    project: mockProjects[2],
+    description: '自动压缩上传的图片',
+    tags: ['图片', '压缩'],
+    createdAt: '2024-01-26 14:00',
+    updatedAt: '2024-01-26 14:00',
+    platforms: ['Web端', 'PC端', '移动端'],
+    plannedVersion: 'v1.3.0',
+    isOpen: true,
+    needToDo: '是',
+    reviewStatus: 'pending',
+    attachments: [],
+    endOwnerOpinion: { needToDo: undefined, priority: undefined, opinion: '', owner: undefined },
+    scheduledReview: {
+      reviewLevels: [
+        { id: '21', level: 1, levelName: '一级评审', status: 'pending' }
+      ]
+    }
+  },
+  {
+    id: '#15',
+    title: '多语言支持',
+    type: '新功能',
+    status: '评审中',
+    priority: '高',
+    creator: mockUsers[1],
+    project: mockProjects[1],
+    description: '支持中英文切换',
+    tags: ['国际化', '多语言'],
+    createdAt: '2024-01-27 09:30',
+    updatedAt: '2024-01-27 16:20',
+    platforms: ['Web端', 'PC端', '移动端'],
+    plannedVersion: 'v1.3.0',
+    isOpen: true,
+    needToDo: '是',
+    reviewStatus: 'approved',
+    attachments: [],
+    endOwnerOpinion: { needToDo: '是', priority: '高', opinion: '国际化需求', owner: mockUsers[2] },
+    scheduledReview: {
+      reviewLevels: [
+        { id: '22', level: 1, levelName: '一级评审', status: 'approved', reviewer: mockUsers[2], opinion: '同意开发' },
+        { id: '23', level: 2, levelName: '二级评审', status: 'approved', reviewer: mockUsers[3], opinion: '技术方案OK' }
+      ]
+    }
+  },
+  {
+    id: '#16',
+    title: '主题切换功能',
+    type: '新功能',
+    status: '待评审',
+    priority: '低',
+    creator: mockUsers[2],
+    project: mockProjects[0],
+    description: '支持明暗主题切换',
+    tags: ['主题', '界面'],
+    createdAt: '2024-01-28 10:00',
+    updatedAt: '2024-01-28 10:00',
+    platforms: ['Web端', 'PC端'],
+    plannedVersion: 'v1.3.0',
+    isOpen: true,
+    needToDo: '是',
+    reviewStatus: 'pending',
+    attachments: [],
+    endOwnerOpinion: { needToDo: undefined, priority: undefined, opinion: '', owner: undefined },
+    scheduledReview: {
+      reviewLevels: [
+        { id: '24', level: 1, levelName: '一级评审', status: 'pending' }
+      ]
+    }
+  },
+  {
+    id: '#17',
+    title: '数据备份功能',
+    type: '新功能',
+    status: '评审中',
+    priority: '高',
+    creator: mockUsers[3],
+    project: mockProjects[2],
+    description: '定期自动备份数据',
+    tags: ['备份', '数据'],
+    createdAt: '2024-01-29 11:30',
+    updatedAt: '2024-01-29 15:20',
+    platforms: ['Web端', 'PC端'],
+    plannedVersion: 'v1.3.0',
+    isOpen: true,
+    needToDo: '是',
+    reviewStatus: 'second_review',
+    attachments: [],
+    endOwnerOpinion: { needToDo: '是', priority: '高', opinion: '安全需求', owner: mockUsers[1] },
+    scheduledReview: {
+      reviewLevels: [
+        { id: '25', level: 1, levelName: '一级评审', status: 'approved', reviewer: mockUsers[1], opinion: '必要功能' },
+        { id: '26', level: 2, levelName: '二级评审', status: 'pending', reviewer: mockUsers[4] }
+      ]
+    }
+  },
+  {
+    id: '#18',
+    title: '操作日志记录',
+    type: '新功能',
+    status: '待评审',
+    priority: '中',
+    creator: mockUsers[4],
+    project: mockProjects[1],
+    description: '记录用户关键操作',
+    tags: ['日志', '审计'],
+    createdAt: '2024-01-30 09:00',
+    updatedAt: '2024-01-30 09:00',
+    platforms: ['Web端', 'PC端'],
+    plannedVersion: 'v1.3.0',
+    isOpen: true,
+    needToDo: '是',
+    reviewStatus: 'pending',
+    attachments: [],
+    endOwnerOpinion: { needToDo: undefined, priority: undefined, opinion: '', owner: undefined },
+    scheduledReview: {
+      reviewLevels: [
+        { id: '27', level: 1, levelName: '一级评审', status: 'pending' }
+      ]
+    }
+  },
+  {
+    id: '#19',
+    title: 'API接口优化',
+    type: '优化',
+    status: '评审中',
+    priority: '中',
+    creator: mockUsers[0],
+    project: mockProjects[0],
+    description: '优化API响应速度',
+    tags: ['API', '性能', '优化'],
+    createdAt: '2024-01-31 10:30',
+    updatedAt: '2024-01-31 14:15',
+    platforms: ['Web端', 'PC端', '移动端'],
+    plannedVersion: 'v1.3.0',
+    isOpen: true,
+    needToDo: '是',
+    reviewStatus: 'first_review',
+    attachments: [],
+    endOwnerOpinion: { needToDo: '是', priority: '中', opinion: '性能优化', owner: mockUsers[3] },
+    scheduledReview: {
+      reviewLevels: [
+        { id: '28', level: 1, levelName: '一级评审', status: 'approved', reviewer: mockUsers[3], opinion: '同意优化' },
+        { id: '29', level: 2, levelName: '二级评审', status: 'pending' }
+      ]
+    },
+    isOperational: 'no'
+  },
+  {
+    id: '#20',
+    title: '通知中心',
+    type: '新功能',
+    status: '待评审',
+    priority: '低',
+    creator: mockUsers[1],
+    project: mockProjects[2],
+    description: '集中管理所有通知消息',
+    tags: ['通知', '消息'],
+    createdAt: '2024-02-01 11:00',
+    updatedAt: '2024-02-01 11:00',
+    platforms: ['Web端', '移动端'],
+    plannedVersion: 'v1.3.0',
+    isOpen: true,
+    needToDo: '是',
+    reviewStatus: 'pending',
+    attachments: [],
+    endOwnerOpinion: { needToDo: undefined, priority: undefined, opinion: '', owner: undefined },
+    scheduledReview: {
+      reviewLevels: [
+        { id: '30', level: 1, levelName: '一级评审', status: 'pending' }
+      ]
+    }
+  },
+  {
+    id: '#21',
+    title: '数据可视化图表',
+    type: '新功能',
+    status: '评审中',
+    priority: '高',
+    creator: mockUsers[2],
+    project: mockProjects[1],
+    description: '提供丰富的数据可视化图表',
+    tags: ['可视化', '图表', '数据'],
+    createdAt: '2024-02-02 09:30',
+    updatedAt: '2024-02-02 16:45',
+    platforms: ['Web端', 'PC端'],
+    plannedVersion: 'v1.3.0',
+    isOpen: true,
+    needToDo: '是',
+    reviewStatus: 'approved',
+    attachments: [],
+    endOwnerOpinion: { needToDo: '是', priority: '高', opinion: '数据分析需要', owner: mockUsers[4] },
+    scheduledReview: {
+      reviewLevels: [
+        { id: '31', level: 1, levelName: '一级评审', status: 'approved', reviewer: mockUsers[4], opinion: '同意开发' },
+        { id: '32', level: 2, levelName: '二级评审', status: 'approved', reviewer: mockUsers[0], opinion: '技术可行' }
+      ]
+    }
   }
 ];
 
@@ -259,9 +729,10 @@ interface RequirementsStore {
   setError: (error: string | null) => void;
 }
 
-export const useRequirementsStore = create<RequirementsStore>()(
-  persist(
-    (set, get) => ({
+// 临时禁用持久化，确保数据更新
+const enablePersistence = false; // 改为 true 可重新启用持久化
+
+const storeConfig = (set: any, get: any) => ({
       requirements: initialRequirements,
       loading: false,
       error: null,
@@ -368,22 +839,35 @@ export const useRequirementsStore = create<RequirementsStore>()(
       setError: (error: string | null) => {
         set({ error });
       },
-    }),
-    {
-      name: 'requirements-store',
-      version: 2, // 增加版本号，强制使用新数据
-      partialize: (state) => ({ requirements: state.requirements }),
-      migrate: (persistedState: any, version: number) => {
-        // 如果是旧版本，返回初始数据
-        if (version < 2) {
-          return {
-            requirements: initialRequirements,
-            loading: false,
-            error: null
+    });
+
+// 根据配置决定是否启用持久化
+export const useRequirementsStore = enablePersistence 
+  ? create<RequirementsStore>()(
+      persist(storeConfig, {
+        name: 'requirements-store',
+        version: 4,
+        partialize: (state) => ({ requirements: state.requirements }),
+        migrate: (persistedState: any, version: number) => {
+          if (version < 4) {
+            console.log('Migrating to version 4, using fresh data with 22 requirements');
+            return {
+              requirements: initialRequirements,
+              loading: false,
+              error: null
+            };
+          }
+          return persistedState;
+        },
+        onRehydrateStorage: () => {
+          return (state, error) => {
+            if (error) {
+              console.error('Error rehydrating store:', error);
+            } else if (state) {
+              console.log('Store rehydrated with', state.requirements.length, 'requirements');
+            }
           };
         }
-        return persistedState;
-      }
-    }
-  )
-); 
+      })
+    )
+  : create<RequirementsStore>()(storeConfig); 
