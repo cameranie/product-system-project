@@ -83,7 +83,7 @@ function loadConfig() {
     const customFilters = safeGetItem(KEYS.CUSTOM_FILTERS, [] as any[], arrayValidator());
     const hiddenColumns = safeGetItem(KEYS.HIDDEN_COLUMNS, DEFAULT_HIDDEN_COLUMNS, arrayValidator());
     const columnOrder = safeGetItem(KEYS.COLUMN_ORDER, DEFAULT_COLUMN_ORDER, arrayValidator());
-    const sortConfig = safeGetItem(KEYS.SORT_CONFIG, { field: 'updatedAt', direction: 'desc' }, objectValidator(['field', 'direction']));
+    const sortConfig = safeGetItem(KEYS.SORT_CONFIG, { field: 'updatedAt', direction: 'desc' } as SortConfig, objectValidator(['field', 'direction'])) as SortConfig;
 
     // 版本检测和数据验证
     if (configVersion !== CONFIG_VERSION) {
