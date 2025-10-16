@@ -488,12 +488,12 @@ export const objectUtils = {
    * 深度合并
    */
   deepMerge: <T extends Record<string, any>>(target: T, source: Partial<T>): T => {
-    const result = { ...target };
+    const result = { ...target } as any;
     Object.keys(source).forEach(key => {
       if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
-        result[key] = objectUtils.deepMerge(result[key] || {}, source[key]) as any;
+        result[key] = objectUtils.deepMerge(result[key] || {}, source[key]);
       } else {
-        result[key] = source[key] as any;
+        result[key] = source[key];
       }
     });
     return result;
