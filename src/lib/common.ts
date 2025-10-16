@@ -436,9 +436,9 @@ export const arrayUtils = {
    * 数组扁平化
    */
   flatten: <T>(arr: (T | T[])[]): T[] => {
-    return arr.reduce((flat, item) => {
-      return flat.concat(Array.isArray(item) ? arrayUtils.flatten(item) : [item]) as T[];
-    }, [] as T[]);
+    return arr.reduce<T[]>((flat, item) => {
+      return flat.concat(Array.isArray(item) ? arrayUtils.flatten(item) : [item]);
+    }, []);
   },
 
   /**
