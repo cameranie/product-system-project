@@ -211,7 +211,8 @@ export const testAssertions = {
    * 检查异步操作
    */
   expectAsyncToResolve: async <T,>(promise: Promise<T>): Promise<T> => {
-    return expect(promise).resolves.toBeDefined();
+    await expect(promise).resolves.toBeDefined();
+    return promise;
   },
 
   /**
