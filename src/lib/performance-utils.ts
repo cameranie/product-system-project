@@ -413,7 +413,7 @@ export default {
   delay,
   rafAsync,
   idleAsync,
-  withPerformanceMonitoring,
+  // withPerformanceMonitoring, // 已注释，因为使用 React
   PERFORMANCE_CONFIG,
 };
 
