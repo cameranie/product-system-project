@@ -2,6 +2,9 @@ import { useState, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import type { User, Attachment, Comment, Reply } from '@/lib/requirements-store';
 
+// 重新导出类型供外部使用
+export type { Comment, Reply, User, Attachment } from '@/lib/requirements-store';
+
 /**
  * Hook 配置选项
  */

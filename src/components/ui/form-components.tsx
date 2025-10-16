@@ -7,7 +7,7 @@ import { Label } from './label';
 import { Textarea } from './textarea';
 import { Badge } from './badge';
 import { X, Upload, File, Image } from 'lucide-react';
-import { FieldValidationResult } from '@/lib/validation';
+import { ValidationResult } from '@/lib/validation';
 
 // 表单字段包装器
 export interface FormFieldProps {
@@ -47,7 +47,7 @@ export function FormField({
 // 验证输入框
 export interface ValidatedInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
-  validation?: FieldValidationResult;
+  validation?: ValidationResult;
   required?: boolean;
   description?: string;
 }
@@ -82,7 +82,7 @@ export function ValidatedInput({
 // 验证文本域
 export interface ValidatedTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label: string;
-  validation?: FieldValidationResult;
+  validation?: ValidationResult;
   required?: boolean;
   description?: string;
 }
@@ -121,7 +121,7 @@ export interface TagInputProps {
   onTagsChange: (tags: string[]) => void;
   placeholder?: string;
   maxTags?: number;
-  validation?: FieldValidationResult;
+  validation?: ValidationResult;
   required?: boolean;
   description?: string;
   className?: string;
@@ -211,7 +211,7 @@ export interface FileUploadProps {
   multiple?: boolean;
   maxFiles?: number;
   maxSize?: number; // bytes
-  validation?: FieldValidationResult;
+  validation?: ValidationResult;
   required?: boolean;
   description?: string;
   className?: string;
@@ -343,7 +343,7 @@ export interface CheckboxGroupProps {
   selectedValues: string[];
   onSelectionChange: (values: string[]) => void;
   multiple?: boolean;
-  validation?: FieldValidationResult;
+  validation?: ValidationResult;
   required?: boolean;
   description?: string;
   className?: string;

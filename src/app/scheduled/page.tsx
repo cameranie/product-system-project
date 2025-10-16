@@ -453,7 +453,7 @@ export default function ScheduledRequirementsPage() {
       if (!filter.column || !filter.operator) return;
       
       filtered = filtered.filter(req => {
-        const value = String((req as Record<string, unknown>)[filter.column] || '').toLowerCase();
+        const value = String((req as unknown as Record<string, unknown>)[filter.column] || '').toLowerCase();
         const filterValue = filter.value.toLowerCase();
         
         switch (filter.operator) {
@@ -494,8 +494,8 @@ export default function ScheduledRequirementsPage() {
     Object.keys(groups).forEach(version => {
       groups[version].sort((a, b) => {
         const { field, direction } = sortConfig;
-        let aValue: unknown = a[field as keyof Requirement];
-        let bValue: unknown = b[field as keyof Requirement];
+        let aValue: any = a[field as keyof Requirement];
+        let bValue: any = b[field as keyof Requirement];
 
         // 处理不同类型的字段
         if (field === 'priority') {
