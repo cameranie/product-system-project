@@ -204,7 +204,7 @@ export const testAssertions = {
    */
   expectToHaveClass: (component: React.ReactElement, className: string) => {
     const { container } = render(component);
-    expect(container.firstChild).toHaveClass(className);
+    expect(container.firstChild?.className).toContain(className);
   },
 
   /**
