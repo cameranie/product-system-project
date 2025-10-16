@@ -125,7 +125,7 @@ export async function executeBatchOperationWithProgress<T>(
           const { item } = result.value as any;
           succeeded.push(item);
         } else {
-          const { item, error } = result.reason || result.value as any;
+          const { item, error } = (result.reason || {}) as any;
           failed.push({ item, error });
         }
       });
