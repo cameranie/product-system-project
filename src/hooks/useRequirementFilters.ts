@@ -153,7 +153,7 @@ export function useRequirementFilters({ requirements }: UseRequirementFiltersPro
     { key: createStorageKey('hidden-columns'), value: hiddenColumns },
     { key: createStorageKey('column-order'), value: columnOrder },
     { key: createStorageKey('sort-config'), value: sortConfig },
-  ], { delay: 500 });
+  ] as Array<{ key: string; value: any }>, { delay: 500 });
 
   // 使用通用排序Hook
   const { sortedItems: sortedRequirements, handleSort } = useTableSort({
