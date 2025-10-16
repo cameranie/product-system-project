@@ -156,7 +156,7 @@ export function useRequirementFilters({ requirements }: UseRequirementFiltersPro
   ] as Array<{ key: string; value: any }>, { delay: 500 });
 
   // 使用通用排序Hook
-  const { sortedItems: sortedRequirements, handleSort } = useTableSort({
+  const { sortedItems: sortedRequirements, setSort } = useTableSort({
     items: requirements,
     defaultSortField: sortConfig.field as keyof Requirement,
     defaultSortDirection: sortConfig.direction,
@@ -278,13 +278,13 @@ export function useRequirementFilters({ requirements }: UseRequirementFiltersPro
 
   // 列排序处理
   const handleColumnSort = useCallback((field: string) => {
-    handleSort(field);
+    setSort(field as keyof Requirement);
     // 更新sortConfig以便保存到localStorage
     setSortConfig(prev => ({
       field,
       direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc',
     }));
-  }, [handleSort]);
+  }, [setSort]);
 
   // 统计信息
   const stats = useMemo(() => {
