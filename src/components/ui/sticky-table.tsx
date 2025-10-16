@@ -200,11 +200,11 @@ export function StickyTableCell({
  */
 export function calculateStickyOffsets(widths: number[]): number[] {
   const offsets: number[] = [];
-  let累计 = 0;
+  let accumulated = 0;
   
   for (const width of widths) {
-    offsets.push(累计);
-    累计 += width;
+    offsets.push(accumulated);
+    accumulated += width;
   }
   
   return offsets;
