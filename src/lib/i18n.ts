@@ -524,41 +524,42 @@ export const i18n = new I18nManager();
 
 /**
  * 翻译 Hook
+ * 注意：由于此文件是 .ts 扩展名，React Hook 已被注释。如需使用，请创建单独的 .tsx 文件。
  */
-export function useTranslation() {
-  const [locale, setLocale] = React.useState<SupportedLocale>(i18n.getCurrentLocale());
-
-  React.useEffect(() => {
-    const handleLocaleChange = (event: CustomEvent) => {
-      setLocale(event.detail.locale);
-    };
-
-    window.addEventListener('localeChanged', handleLocaleChange as EventListener);
-    return () => {
-      window.removeEventListener('localeChanged', handleLocaleChange as EventListener);
-    };
-  }, []);
-
-  const t = React.useCallback((key: TranslationKey, params?: TranslationParams) => {
-    return i18n.t(key, params);
-  }, [locale]);
-
-  const changeLocale = React.useCallback(async (newLocale: SupportedLocale) => {
-    await i18n.setLocale(newLocale);
-  }, []);
-
-  return {
-    t,
-    locale,
-    changeLocale,
-    formatDate: i18n.formatDate.bind(i18n),
-    formatTime: i18n.formatTime.bind(i18n),
-    formatNumber: i18n.formatNumber.bind(i18n),
-    formatCurrency: i18n.formatCurrency.bind(i18n),
-    formatRelativeTime: i18n.formatRelativeTime.bind(i18n),
-    plural: i18n.plural.bind(i18n),
-  };
-}
+// export function useTranslation() {
+//   const [locale, setLocale] = React.useState<SupportedLocale>(i18n.getCurrentLocale());
+//
+//   React.useEffect(() => {
+//     const handleLocaleChange = (event: CustomEvent) => {
+//       setLocale(event.detail.locale);
+//     };
+//
+//     window.addEventListener('localeChanged', handleLocaleChange as EventListener);
+//     return () => {
+//       window.removeEventListener('localeChanged', handleLocaleChange as EventListener);
+//     };
+//   }, []);
+//
+//   const t = React.useCallback((key: TranslationKey, params?: TranslationParams) => {
+//     return i18n.t(key, params);
+//   }, [locale]);
+//
+//   const changeLocale = React.useCallback(async (newLocale: SupportedLocale) => {
+//     await i18n.setLocale(newLocale);
+//   }, []);
+//
+//   return {
+//     t,
+//     locale,
+//     changeLocale,
+//     formatDate: i18n.formatDate.bind(i18n),
+//     formatTime: i18n.formatTime.bind(i18n),
+//     formatNumber: i18n.formatNumber.bind(i18n),
+//     formatCurrency: i18n.formatCurrency.bind(i18n),
+//     formatRelativeTime: i18n.formatRelativeTime.bind(i18n),
+//     plural: i18n.plural.bind(i18n),
+//   };
+// }
 
 /**
  * 翻译组件
