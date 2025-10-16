@@ -96,15 +96,15 @@ const VerticalCutReveal = forwardRef<VerticalCutRevealRef, TextProps>(
       (index: number) => {
         const total =
           splitBy === "characters"
-            ? elements.reduce(
+            ? (elements as WordObject[]).reduce(
                 (acc, word) =>
                   acc +
                   (typeof word === "string"
                     ? 1
-                    : word.characters.length + (word.needsSpace ? 1 : 0)),
+                    : word.characters?.length || 0),
                 0
               )
-            : elements.length
+            : (elements as string[]).length
         if (staggerFrom === "first") return index * staggerDuration
         if (staggerFrom === "last") return (total - 1 - index) * staggerDuration
         if (staggerFrom === "center") {
@@ -117,7 +117,7 @@ const VerticalCutReveal = forwardRef<VerticalCutRevealRef, TextProps>(
         }
         return Math.abs(staggerFrom - index) * staggerDuration
       },
-      [elements.length, staggerFrom, staggerDuration]
+      [elements, splitBy, staggerFrom, staggerDuration]
     )
 
     const startAnimation = useCallback(() => {
@@ -169,7 +169,7 @@ const VerticalCutReveal = forwardRef<VerticalCutRevealRef, TextProps>(
         ).map((wordObj, wordIndex, array) => {
           const previousCharsCount = array
             .slice(0, wordIndex)
-            .reduce((sum, word) => sum + word.characters.length, 0)
+            .reduce((sum, word) => sum + (word.characters?.length || 0), 0)
 
           return (
             <span

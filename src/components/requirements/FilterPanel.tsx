@@ -120,6 +120,7 @@ interface FilterPanelProps {
   onCustomFiltersReset: () => void;
   onColumnToggle: (column: string) => void;
   onColumnReorder: (newOrder: string[]) => void;
+  onResetColumns?: () => void;
   onCreateNew: () => void;
 }
 
@@ -149,6 +150,7 @@ export function FilterPanel({
   onCustomFiltersReset,
   onColumnToggle,
   onColumnReorder,
+  onResetColumns,
   onCreateNew
 }: FilterPanelProps) {
   // 验证筛选条件是否完整和有效
@@ -326,6 +328,21 @@ export function FilterPanel({
                 ))}
               </SortableContext>
             </DndContext>
+            {onResetColumns && (
+              <>
+                <DropdownMenuSeparator />
+                <div className="p-2">
+                  <Button 
+                    onClick={onResetColumns} 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full"
+                  >
+                    恢复默认
+                  </Button>
+                </div>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 

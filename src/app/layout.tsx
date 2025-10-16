@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { ErrorBoundaryProvider } from "@/components/error-boundary";
+import { PerformanceMonitorComponent } from "@/lib/performance";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -28,7 +30,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <PerformanceMonitorComponent>
+          <ErrorBoundaryProvider>
+            {children}
+          </ErrorBoundaryProvider>
+        </PerformanceMonitorComponent>
         <Toaster />
       </body>
     </html>

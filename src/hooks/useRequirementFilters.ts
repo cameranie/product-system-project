@@ -1,5 +1,12 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Requirement } from '@/lib/requirements-store';
+import { safeGetItem, safeSetItem, arrayValidator, objectValidator } from '@/lib/storage-utils';
+import { validateSearchTerm } from '@/lib/input-validation';
+import { useDebouncedLocalStorageBatch } from './useDebouncedLocalStorage';
+import { useTableSort, useTableSelection } from './useTableSelection';
+import { CONFIG_VERSIONS, STORAGE_KEYS } from '@/config/storage';
+import { arrayUtils, stringUtils } from '@/lib/common-utils';
+import logger from '@/lib/logger-util';
 
 /**
  * 筛选条件接口
@@ -27,216 +34,203 @@ interface UseRequirementFiltersProps {
 }
 
 /**
- * 需求筛选和排序 Hook
+ * 配置版本号（使用统一的配置管理）
+ */
+const CONFIG_VERSION = CONFIG_VERSIONS.REQUIREMENTS_POOL;
+const KEYS = STORAGE_KEYS.REQUIREMENTS_POOL;
+
+/**
+ * 默认配置
+ * 注意：index 和 title 必须显示且固定在前两列
+ */
+const DEFAULT_HIDDEN_COLUMNS = ['id', 'platforms', 'creator', 'createdAt', 'updatedAt'];
+const DEFAULT_COLUMN_ORDER = [
+  'index', 'title', 'id', 'type', 'platforms', 'endOwner', 'needToDo', 'priority', 'creator', 'createdAt', 'updatedAt'
+];
+
+/**
+ * 筛选条件验证器
+ */
+const filterValidator = (filters: FilterCondition[]): boolean => {
+  return filters.every(filter => 
+    filter.id && 
+    filter.column && 
+    filter.operator && 
+    filter.value.trim() !== ''
+  );
+};
+
+/**
+ * 排序配置验证器
+ */
+const sortValidator = (sort: SortConfig): boolean => {
+  return !!(sort.field && sort.direction && ['asc', 'desc'].includes(sort.direction));
+};
+
+/**
+ * 列配置验证器
+ */
+const columnValidator = (columns: string[]): boolean => {
+  return Array.isArray(columns) && columns.length > 0;
+};
+
+/**
+ * 加载配置函数
+ */
+function loadConfig() {
+  try {
+    const configVersion = safeGetItem(KEYS.CONFIG_VERSION, '1.0');
+    const customFilters = safeGetItem(KEYS.CUSTOM_FILTERS, [], arrayValidator);
+    const hiddenColumns = safeGetItem(KEYS.HIDDEN_COLUMNS, DEFAULT_HIDDEN_COLUMNS, arrayValidator);
+    const columnOrder = safeGetItem(KEYS.COLUMN_ORDER, DEFAULT_COLUMN_ORDER, arrayValidator);
+    const sortConfig = safeGetItem(KEYS.SORT_CONFIG, { field: 'updatedAt', direction: 'desc' }, objectValidator);
+
+    // 版本检测和数据验证
+    if (configVersion !== CONFIG_VERSION) {
+      logger.info('配置版本不匹配，使用默认配置', { configVersion, expectedVersion: CONFIG_VERSION });
+      return {
+        searchTerm: '',
+        customFilters: [],
+        hiddenColumns: DEFAULT_HIDDEN_COLUMNS,
+        columnOrder: DEFAULT_COLUMN_ORDER,
+        sortConfig: { field: 'updatedAt', direction: 'desc' as const },
+      };
+    }
+
+    // 数据验证
+    const validatedFilters = filterValidator(customFilters) ? customFilters : [];
+    const validatedHiddenColumns = columnValidator(hiddenColumns) ? hiddenColumns : DEFAULT_HIDDEN_COLUMNS;
+    const validatedColumnOrder = columnValidator(columnOrder) ? columnOrder : DEFAULT_COLUMN_ORDER;
+    const validatedSortConfig = sortValidator(sortConfig) ? sortConfig : { field: 'updatedAt', direction: 'desc' as const };
+
+    return {
+      searchTerm: '',
+      customFilters: validatedFilters,
+      hiddenColumns: validatedHiddenColumns,
+      columnOrder: validatedColumnOrder,
+      sortConfig: validatedSortConfig,
+    };
+  } catch (error) {
+    logger.error('加载配置失败，使用默认配置', error);
+    return {
+      searchTerm: '',
+      customFilters: [],
+      hiddenColumns: DEFAULT_HIDDEN_COLUMNS,
+      columnOrder: DEFAULT_COLUMN_ORDER,
+      sortConfig: { field: 'updatedAt', direction: 'desc' as const },
+    };
+  }
+}
+
+/**
+ * 创建存储键
+ */
+function createStorageKey(key: string): string {
+  return `requirements-pool-${key}`;
+}
+
+/**
+ * 需求筛选Hook
  * 
- * 统一管理需求列表的筛选、排序、列控制、选择等功能
- * 
- * 性能优化策略：
- * 1. 使用 useMemo 缓存筛选和排序结果，避免每次渲染都重新计算
- * 2. 使用 useCallback 包装所有事件处理函数，避免子组件不必要的重渲染
- * 3. 将筛选逻辑拆分为多个独立函数，提高代码可维护性
- * 4. 短路评估优化搜索性能
- * 
- * 时间复杂度分析：
- * - 搜索筛选：O(n × m)，n=需求数量，m=搜索字段数量
- * - 状态筛选：O(n)
- * - 自定义筛选：O(n × k)，k=筛选条件数量
- * - 排序：O(n log n)
- * - 总计：O(n × (m + k) + n log n)
- * 
- * 优化效果：
- * - 依赖不变时，直接返回缓存结果，时间复杂度 O(1)
- * - 100条数据时，从 ~50ms 降至 ~0ms（缓存命中时）
- * 
- * @param requirements - 原始需求列表
- * @returns 筛选状态、筛选结果和操作方法
+ * 提供需求池页面的筛选、排序、列管理功能
+ * 使用通用工具函数减少重复代码
  */
 export function useRequirementFilters({ requirements }: UseRequirementFiltersProps) {
-  // 状态管理
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('开放中');
-  const [customFilters, setCustomFilters] = useState<FilterCondition[]>([]);
-  const [sortConfig, setSortConfig] = useState<SortConfig>({
-    field: 'updatedAt',
-    direction: 'desc'
+  // 从localStorage加载配置
+  const initialConfig = loadConfig();
+  
+  const [searchTerm, setSearchTerm] = useState(initialConfig.searchTerm);
+  const [statusFilter, setStatusFilter] = useState('全部');
+  const [customFilters, setCustomFilters] = useState<FilterCondition[]>(initialConfig.customFilters);
+  const [hiddenColumns, setHiddenColumns] = useState<string[]>(initialConfig.hiddenColumns);
+  const [columnOrder, setColumnOrder] = useState<string[]>(initialConfig.columnOrder);
+  const [sortConfig, setSortConfig] = useState<SortConfig>(initialConfig.sortConfig);
+
+  // 使用防抖优化 localStorage 写入
+  useDebouncedLocalStorageBatch([
+    { key: createStorageKey('config-version'), value: CONFIG_VERSION },
+    { key: createStorageKey('custom-filters'), value: customFilters },
+    { key: createStorageKey('hidden-columns'), value: hiddenColumns },
+    { key: createStorageKey('column-order'), value: columnOrder },
+    { key: createStorageKey('sort-config'), value: sortConfig },
+  ], { delay: 500 });
+
+  // 使用通用排序Hook
+  const { sortedItems: sortedRequirements, handleSort } = useTableSort({
+    items: requirements,
+    defaultSortField: sortConfig.field as keyof Requirement,
+    defaultSortDirection: sortConfig.direction,
   });
-  const [hiddenColumns, setHiddenColumns] = useState<string[]>(['platforms', 'creator', 'createdAt', 'updatedAt']);
-  const [columnOrder, setColumnOrder] = useState<string[]>([
-    'id', 'title', 'type', 'platforms', 'endOwner', 'needToDo', 'priority', 'creator', 'createdAt', 'updatedAt'
-  ]);
-  const [selectedRequirements, setSelectedRequirements] = useState<string[]>([]);
 
-  // 统计数据
-  const stats = useMemo(() => {
-    const total = requirements.length;
-    const open = requirements.filter(req => req.isOpen).length;
-    const closed = total - open;
-    return { total, open, closed };
-  }, [requirements]);
-
-  // 应用搜索筛选
-  const applySearchFilter = useCallback((reqs: Requirement[], search: string) => {
-    if (!search.trim()) return reqs;
-    
-    const searchLower = search.toLowerCase();
-    return reqs.filter(req =>
-      req.id.toLowerCase().includes(searchLower) ||
-      req.title.toLowerCase().includes(searchLower) ||
-      req.description.toLowerCase().includes(searchLower) ||
-      req.creator?.name?.toLowerCase().includes(searchLower) ||
-      req.type.toLowerCase().includes(searchLower) ||
-      (req.platforms || []).some(p => p.toLowerCase().includes(searchLower)) ||
-      (req.project?.name.toLowerCase().includes(searchLower)) ||
-      (req.tags?.some(tag => tag.toLowerCase().includes(searchLower)))
-    );
-  }, []);
-
-  // 应用状态筛选
-  const applyStatusFilter = useCallback((reqs: Requirement[], status: string) => {
-    switch (status) {
-      case '开放中':
-        return reqs.filter(req => req.isOpen);
-      case '已关闭':
-        return reqs.filter(req => !req.isOpen);
-      case '全部':
-      default:
-        return reqs;
-    }
-  }, []);
-
-  // 应用自定义筛选
-  const applyCustomFilters = useCallback((reqs: Requirement[], filters: FilterCondition[]) => {
-    if (filters.length === 0) return reqs;
-
-    return reqs.filter(requirement => {
-      return filters.every(filter => {
-        if (!filter.column || !filter.operator) return true;
-
-        let fieldValue: string;
-        switch (filter.column) {
-          case 'id':
-            fieldValue = requirement.id;
-            break;
-          case 'title':
-            fieldValue = requirement.title;
-            break;
-          case 'type':
-            fieldValue = requirement.type;
-            break;
-          case 'priority':
-            fieldValue = requirement.priority || '';
-            break;
-          case 'creator':
-            fieldValue = requirement.creator?.name || '';
-            break;
-          case 'endOwner':
-            fieldValue = requirement.endOwnerOpinion?.owner?.name || '';
-            break;
-          case 'platforms':
-            fieldValue = (requirement.platforms || []).join(', ');
-            break;
-          default:
-            return true;
-        }
-
-        const filterValue = filter.value.toLowerCase();
-        const fieldValueLower = fieldValue.toLowerCase();
-
-        switch (filter.operator) {
-          case 'contains':
-            return fieldValueLower.includes(filterValue);
-          case 'equals':
-            return fieldValueLower === filterValue;
-          case 'not_equals':
-            return fieldValueLower !== filterValue;
-          case 'starts_with':
-            return fieldValueLower.startsWith(filterValue);
-          case 'ends_with':
-            return fieldValueLower.endsWith(filterValue);
-          case 'is_empty':
-            return !fieldValue.trim();
-          case 'is_not_empty':
-            return !!fieldValue.trim();
-          default:
-            return true;
-        }
-      });
-    });
-  }, []);
-
-  // 应用排序
-  const applySorting = useCallback((reqs: Requirement[], config: SortConfig) => {
-    if (!config.field) return reqs;
-
-    return [...reqs].sort((a, b) => {
-      let aValue: string | number | Date;
-      let bValue: string | number | Date;
-
-      switch (config.field) {
-        case 'id':
-          aValue = parseInt(a.id.replace('#', ''));
-          bValue = parseInt(b.id.replace('#', ''));
-          break;
-        case 'title':
-          aValue = a.title;
-          bValue = b.title;
-          break;
-        case 'priority':
-          const priorityOrder = { '低': 1, '中': 2, '高': 3, '紧急': 4 };
-          aValue = priorityOrder[a.priority as keyof typeof priorityOrder] || 0;
-          bValue = priorityOrder[b.priority as keyof typeof priorityOrder] || 0;
-          break;
-        case 'creator':
-          aValue = a.creator?.name || '';
-          bValue = b.creator?.name || '';
-          break;
-        case 'endOwner':
-          aValue = a.endOwnerOpinion?.owner?.name || '';
-          bValue = b.endOwnerOpinion?.owner?.name || '';
-          break;
-        case 'createdAt':
-        case 'updatedAt':
-          aValue = new Date(a[config.field]);
-          bValue = new Date(b[config.field]);
-          break;
-        default:
-          return 0;
-      }
-
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        aValue = aValue.toLowerCase();
-        bValue = bValue.toLowerCase();
-      }
-
-      let comparison = 0;
-      if (aValue < bValue) comparison = -1;
-      if (aValue > bValue) comparison = 1;
-
-      return config.direction === 'desc' ? -comparison : comparison;
-    });
-  }, []);
-
-  // 计算筛选后的需求列表
+  // 筛选逻辑（提前计算，供选择Hook使用）
   const filteredRequirements = useMemo(() => {
-    let result = requirements;
-    
-    // 应用各种筛选
-    result = applySearchFilter(result, searchTerm);
-    result = applyStatusFilter(result, statusFilter);
-    result = applyCustomFilters(result, customFilters);
-    result = applySorting(result, sortConfig);
-    
-    return result;
-  }, [requirements, searchTerm, statusFilter, customFilters, sortConfig, 
-      applySearchFilter, applyStatusFilter, applyCustomFilters, applySorting]);
+    let filtered = sortedRequirements;
 
-  // 筛选条件管理
+    // 搜索词筛选
+    if (searchTerm.trim()) {
+      const validation = validateSearchTerm(searchTerm);
+      if (validation.valid) {
+        const searchLower = searchTerm.toLowerCase();
+        filtered = filtered.filter(req => 
+          req.title.toLowerCase().includes(searchLower) ||
+          req.id.toLowerCase().includes(searchLower) ||
+          req.creator.name.toLowerCase().includes(searchLower) ||
+          req.description.toLowerCase().includes(searchLower)
+        );
+      }
+    }
+
+    // 自定义筛选条件
+    const validFilters = customFilters.filter(f => f.column && f.operator && f.value.trim() !== '');
+    if (validFilters.length > 0) {
+      filtered = filtered.filter(req => {
+        return validFilters.every(filter => {
+          const value = (req as any)[filter.column];
+          const filterValue = filter.value.toLowerCase();
+
+          switch (filter.operator) {
+            case 'contains':
+              return String(value).toLowerCase().includes(filterValue);
+            case 'equals':
+              return String(value).toLowerCase() === filterValue;
+            case 'not_equals':
+              return String(value).toLowerCase() !== filterValue;
+            case 'is_empty':
+              return !value || String(value).trim() === '';
+            case 'is_not_empty':
+              return value && String(value).trim() !== '';
+            default:
+              return true;
+          }
+        });
+      });
+    }
+
+    return filtered;
+  }, [sortedRequirements, searchTerm, customFilters]);
+
+  // 使用选择Hook（基于筛选后的结果）
+  const {
+    selectedItems: selectedRequirements,
+    selectItem: handleRequirementSelect,
+    selectAll: handleSelectAll,
+  } = useTableSelection({
+    items: filteredRequirements,
+    getItemId: (req) => req.id,
+  });
+
+  // 列管理
+  const visibleColumns = useMemo(() => {
+    return columnOrder.filter(col => !hiddenColumns.includes(col));
+  }, [columnOrder, hiddenColumns]);
+
+  // 操作函数
   const addCustomFilter = useCallback(() => {
     const newFilter: FilterCondition = {
       id: Date.now().toString(),
-      column: 'title',
+      column: '',
       operator: 'contains',
-      value: ''
+      value: '',
     };
     setCustomFilters(prev => [...prev, newFilter]);
   }, []);
@@ -257,66 +251,87 @@ export function useRequirementFilters({ requirements }: UseRequirementFiltersPro
     setCustomFilters([]);
   }, []);
 
-  // 排序管理
-  const handleColumnSort = useCallback((field: string) => {
-    setSortConfig(prev => ({
-      field,
-      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc'
-    }));
-  }, []);
-
-  // 列显示管理
-  const toggleColumnVisibility = useCallback((column: string) => {
+  const toggleColumn = useCallback((column: string) => {
     setHiddenColumns(prev => 
-      prev.includes(column) 
+      prev.includes(column)
         ? prev.filter(col => col !== column)
         : [...prev, column]
     );
   }, []);
 
-  // 列排序管理
-  const handleColumnReorder = useCallback((newOrder: string[]) => {
+  const reorderColumns = useCallback((newOrder: string[]) => {
     setColumnOrder(newOrder);
   }, []);
 
-  // 选择管理
-  const handleRequirementSelect = useCallback((id: string, checked: boolean) => {
-    setSelectedRequirements(prev => 
-      checked 
-        ? [...prev, id]
-        : prev.filter(reqId => reqId !== id)
-    );
+  const resetColumns = useCallback(() => {
+    setHiddenColumns(DEFAULT_HIDDEN_COLUMNS);
+    setColumnOrder(DEFAULT_COLUMN_ORDER);
   }, []);
 
-  const handleSelectAll = useCallback((checked: boolean) => {
-    setSelectedRequirements(checked ? filteredRequirements.map(req => req.id) : []);
-  }, [filteredRequirements]);
+  const updateSort = useCallback((field: string, direction: 'asc' | 'desc') => {
+    setSortConfig({ field, direction });
+  }, []);
+
+  const resetSort = useCallback(() => {
+    setSortConfig({ field: 'updatedAt', direction: 'desc' });
+  }, []);
+
+  // 列排序处理
+  const handleColumnSort = useCallback((field: string) => {
+    handleSort(field);
+    // 更新sortConfig以便保存到localStorage
+    setSortConfig(prev => ({
+      field,
+      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  }, [handleSort]);
+
+  // 统计信息
+  const stats = useMemo(() => {
+    const total = requirements?.length || 0;
+    const filtered = filteredRequirements?.length || 0;
+    const hidden = hiddenColumns?.length || 0;
+    const visible = visibleColumns?.length || 0;
+
+    return {
+      total,
+      filtered,
+      hidden,
+      visible,
+      hasFilters: searchTerm.trim() !== '' || customFilters.length > 0,
+      hasHiddenColumns: hiddenColumns.length > 0,
+    };
+  }, [requirements?.length, filteredRequirements?.length, hiddenColumns?.length, visibleColumns?.length, searchTerm, customFilters.length]);
 
   return {
     // 状态
     searchTerm,
     statusFilter,
     customFilters,
-    sortConfig,
     hiddenColumns,
     columnOrder,
+    sortConfig,
+    visibleColumns,
     selectedRequirements,
-    stats,
-    
-    // 计算结果
     filteredRequirements,
     
-    // 操作方法
+    // 操作函数
     setSearchTerm,
     setStatusFilter,
     addCustomFilter,
     updateCustomFilter,
     removeCustomFilter,
     clearAllFilters,
+    toggleColumnVisibility: toggleColumn,
+    handleColumnReorder: reorderColumns,
+    resetColumns,
+    updateSort,
+    resetSort,
     handleColumnSort,
-    toggleColumnVisibility,
-    handleColumnReorder,
     handleRequirementSelect,
-    handleSelectAll
+    handleSelectAll,
+    
+    // 统计信息
+    stats,
   };
-} 
+}

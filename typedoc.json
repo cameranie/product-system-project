@@ -1,0 +1,46 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/lib",
+    "src/hooks",
+    "src/components/requirements",
+    "src/components/ui"
+  ],
+  "entryPointStrategy": "expand",
+  "out": "docs/api",
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/__tests__/**",
+    "**/node_modules/**"
+  ],
+  "excludePrivate": true,
+  "excludeProtected": false,
+  "excludeExternals": true,
+  "includeVersion": true,
+  "sort": ["source-order"],
+  "categorizeByGroup": true,
+  "defaultCategory": "其他",
+  "categoryOrder": [
+    "Hooks",
+    "Components",
+    "Utils",
+    "Types",
+    "Config",
+    "*"
+  ],
+  "readme": "docs/API.md",
+  "plugin": [],
+  "name": "产品需求管理系统 API文档",
+  "navigationLinks": {
+    "GitHub": "https://github.com/your-org/your-repo",
+    "开发指南": "./DEVELOPMENT_GUIDE.md"
+  },
+  "hideGenerator": false,
+  "searchInComments": true,
+  "theme": "default"
+}
+
+
+
+

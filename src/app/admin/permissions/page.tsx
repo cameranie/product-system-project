@@ -31,7 +31,7 @@ export default function PermissionsHome() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const adminRoleNames = new Set(['super_admin','admin','hr_manager']);
   const adminUsers = users.filter(u => (u.roles || []).some(r => adminRoleNames.has(r.name)));
