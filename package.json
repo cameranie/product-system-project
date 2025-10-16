@@ -14,7 +14,6 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage --maxWorkers=2",
-    "prepare": "husky install",
     "docs:api": "typedoc --out docs/api src/lib src/hooks src/components",
     "docs:serve": "npx http-server docs/api -o"
   },
