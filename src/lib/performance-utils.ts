@@ -360,28 +360,29 @@ export function idleAsync(): Promise<IdleDeadline> {
 
 /**
  * 性能监控HOC
+ * 注意：由于此文件是 .ts 扩展名，React HOC 已被注释。如需使用，请创建单独的 .tsx 文件。
  */
-export function withPerformanceMonitoring<P extends object>(
-  Component: React.ComponentType<P>,
-  componentName?: string
-): React.ComponentType<P> {
-  const name = componentName || Component.displayName || Component.name || 'Component';
-
-  return function PerformanceMonitoredComponent(props: P) {
-    const startTime = performance.now();
-
-    React.useEffect(() => {
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-      
-      if (FEATURE_FLAGS.ENABLE_PERFORMANCE_MONITORING) {
-        logger.debug(`[Performance] ${name} render: ${duration.toFixed(2)}ms`);
-      }
-    });
-
-    return React.createElement(Component, props);
-  };
-}
+// export function withPerformanceMonitoring<P extends object>(
+//   Component: React.ComponentType<P>,
+//   componentName?: string
+// ): React.ComponentType<P> {
+//   const name = componentName || Component.displayName || Component.name || 'Component';
+//
+//   return function PerformanceMonitoredComponent(props: P) {
+//     const startTime = performance.now();
+//
+//     React.useEffect(() => {
+//       const endTime = performance.now();
+//       const duration = endTime - startTime;
+//       
+//       if (FEATURE_FLAGS.ENABLE_PERFORMANCE_MONITORING) {
+//         logger.debug(`[Performance] ${name} render: ${duration.toFixed(2)}ms`);
+//       }
+//     });
+//
+//     return React.createElement(Component, props);
+//   };
+// }
 
 /**
  * 性能优化配置
