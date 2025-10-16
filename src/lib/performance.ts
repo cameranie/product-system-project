@@ -190,7 +190,11 @@ class PerformanceMonitor {
     };
 
     this.metrics.push(metrics);
-    logPagePerformance('Page Load', metrics);
+    logPagePerformance('Page Load', {
+      loadTime: metrics.loadTime,
+      renderTime: metrics.fcp || 0, // 使用 FCP 作为 renderTime
+      memoryUsage: metrics.memoryUsage,
+    });
   }
 
   /**
@@ -640,14 +644,8 @@ export function PerformanceMonitorComponent({ children }: { children: React.Reac
         
         logPagePerformance('App Load', {
           loadTime,
+          renderTime: 0,
           memoryUsage,
-          fcp: 0,
-          lcp: 0,
-          fid: 0,
-          cls: 0,
-          ttfb: 0,
-          networkRequests: 0,
-          resourceSize: 0,
         });
       };
 
