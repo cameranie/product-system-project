@@ -48,7 +48,7 @@ export function customRender(
 ) {
   const { theme, ...renderOptions } = options;
   
-  const Wrapper = ({ children }: { children: React.ReactNode }): JSX.Element => {
+  const Wrapper = ({ children }: { children: React.ReactNode }): React.ReactElement => {
     return <TestProviders theme={theme}>{children}</TestProviders>;
   };
 
