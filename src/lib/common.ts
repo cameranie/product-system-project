@@ -437,7 +437,7 @@ export const arrayUtils = {
    */
   flatten: <T>(arr: (T | T[])[]): T[] => {
     return arr.reduce((flat, item) => {
-      return flat.concat(Array.isArray(item) ? arrayUtils.flatten(item) : item);
+      return flat.concat(Array.isArray(item) ? arrayUtils.flatten(item) : [item]) as T[];
     }, [] as T[]);
   },
 
