@@ -760,7 +760,7 @@ const storeConfig = (set: any, get: any) => ({
       },
 
       getRequirementById: (id: string) => {
-        return get().requirements.find(req => req.id === id);
+        return get().requirements.find((req: Requirement) => req.id === id);
       },
 
       createRequirement: async (requirementData) => {
