@@ -39,13 +39,13 @@ export function UserAvatar({
   className = '' 
 }: UserAvatarProps) {
   const sizeClasses = {
-    sm: 'h-6 w-6',
+    sm: 'h-5 w-5',
     md: 'h-8 w-8',
     lg: 'h-10 w-10'
   };
 
   const textSizeClasses = {
-    sm: 'text-sm',
+    sm: 'text-xs',
     md: 'text-base',
     lg: 'text-lg'
   };

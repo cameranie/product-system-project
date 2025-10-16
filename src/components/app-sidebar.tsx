@@ -13,6 +13,7 @@ import {
   Shield,
   BookOpen,
   Calendar,
+  Package,
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -44,8 +45,13 @@ const data = {
     },
     {
       title: "预排期",
-      url: "/requirements/scheduled",
+      url: "/scheduled",
       icon: Calendar,
+    },
+    {
+      title: "版本号管理",
+      url: "/versions",
+      icon: Package,
     },
     {
       title: "任务看板",

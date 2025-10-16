@@ -48,6 +48,7 @@ export const typeUtils = {
   /**
    * 检查是否为函数
    */
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   isFunction: (value: any): value is Function => typeof value === 'function',
 
   /**
@@ -861,3 +862,12 @@ export async function batchProcess<T, R>(
   
   return results;
 }
+
+
+
+
+
+
+
+
+

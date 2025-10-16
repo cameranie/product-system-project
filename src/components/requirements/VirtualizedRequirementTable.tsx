@@ -33,6 +33,8 @@ interface VirtualizedRequirementTableProps {
     field: string;
     direction: 'asc' | 'desc';
   };
+  batchMode?: boolean;
+  onBatchModeChange?: (enabled: boolean) => void;
   onRequirementSelect: (id: string, checked: boolean) => void;
   onSelectAll: (checked: boolean) => void;
   onNeedToDoChange: (id: string, value: string) => void;
@@ -64,6 +66,8 @@ export const VirtualizedRequirementTable = memo(function VirtualizedRequirementT
   hiddenColumns,
   columnOrder,
   sortConfig,
+  batchMode = false,
+  onBatchModeChange,
   onRequirementSelect,
   onSelectAll,
   onNeedToDoChange,
@@ -120,15 +124,34 @@ export const VirtualizedRequirementTable = memo(function VirtualizedRequirementT
   }, [columnOrder, isColumnVisible]);
 
   /**
+   * 计算固定列的偏移量
+   * 用于 sticky 定位
+   */
+  const stickyOffsets = useMemo(() => {
+    // 定义各列的宽度（像素）
+    const checkboxWidth = 48; // w-12 = 48px
+    const idWidth = 64; // w-16 = 64px
+    
+    return {
+      checkbox: 0,
+      id: checkboxWidth,
+      title: checkboxWidth + idWidth,
+    };
+  }, []);
+
+  /**
    * 渲染单行内容
    */
   const renderRow = useCallback((requirement: Requirement) => {
     const isSelected = selectedRequirements.includes(requirement.id);
 
     return (
-      <div className="flex items-center border-b hover:bg-muted/50 transition-colors">
-        {/* 复选框 */}
-        <div className={`${UI_SIZES.TABLE.COLUMN_WIDTHS.CHECKBOX} px-2 flex-shrink-0`}>
+      <div className="flex items-center border-b hover:bg-muted/50 transition-colors relative">
+        {/* 复选框 - 固定 */}
+        <div 
+          className={`${UI_SIZES.TABLE.COLUMN_WIDTHS.CHECKBOX} px-2 flex-shrink-0 sticky z-10 bg-background`}
+          style={{ left: `${stickyOffsets.checkbox}px` }}
+        >
           <Checkbox
             checked={isSelected}
             onCheckedChange={(checked) => onRequirementSelect(requirement.id, !!checked)}
@@ -137,23 +160,36 @@ export const VirtualizedRequirementTable = memo(function VirtualizedRequirementT
 
         {/* 动态列 */}
         {visibleColumns.map(columnId => {
+          const isSticky = columnId === 'id' || columnId === 'title';
+          const stickyLeft = columnId === 'id' ? stickyOffsets.id : 
+                           columnId === 'title' ? stickyOffsets.title : undefined;
+          const showShadow = columnId === 'title';
+          
           switch (columnId) {
             case 'id':
               return (
-                <div key="id" className={`${UI_SIZES.TABLE.COLUMN_WIDTHS.ID} px-2 flex-shrink-0`}>
-                  <div className="text-sm text-center">{requirement.id}</div>
+                <div 
+                  key="id" 
+                  className={`${UI_SIZES.TABLE.COLUMN_WIDTHS.ID} px-2 flex-shrink-0 sticky z-10 bg-background`}
+                  style={{ left: `${stickyLeft}px` }}
+                >
+                  <div className="text-xs text-center">{requirement.id}</div>
                 </div>
               );
 
             case 'title':
               return (
-                <div key="title" className="flex-1 min-w-0 px-3 py-3">
+                <div 
+                  key="title" 
+                  className={`flex-1 min-w-0 px-3 py-3 sticky z-10 bg-background ${showShadow ? 'shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]' : ''}`}
+                  style={{ left: `${stickyLeft}px` }}
+                >
                   <Link 
                     href={`/requirements/${encodeURIComponent(requirement.id)}`}
                     className="hover:underline"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-medium text-sm truncate min-w-0">
+                      <span className="font-normal text-xs truncate min-w-0">
                         {requirement.title}
                       </span>
                       <Badge 
@@ -170,7 +206,7 @@ export const VirtualizedRequirementTable = memo(function VirtualizedRequirementT
             case 'type':
               return (
                 <div key="type" className="w-32 px-3 py-3 flex-shrink-0">
-                  <span className="text-sm text-gray-700">
+                  <span className="text-xs text-gray-700">
                     {getRequirementTypeConfig(requirement.type)?.label || requirement.type}
                   </span>
                 </div>
@@ -189,7 +225,7 @@ export const VirtualizedRequirementTable = memo(function VirtualizedRequirementT
                           {requirement.endOwnerOpinion.owner.name?.slice(0, 2) || 'U'}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="text-sm truncate min-w-0">
+                      <span className="text-xs truncate min-w-0">
                         {requirement.endOwnerOpinion.owner.name}
                       </span>
                     </div>
@@ -226,7 +262,7 @@ export const VirtualizedRequirementTable = memo(function VirtualizedRequirementT
                           }}
                           className={`cursor-pointer ${currentNeedToDo === value ? 'bg-accent' : ''}`}
                         >
-                          <span className={`px-2 py-1 rounded text-sm ${config.className} inline-block`}>
+                          <span className={`px-2 py-1 rounded text-xs ${config.className} inline-block`}>
                             {config.label}
                           </span>
                         </DropdownMenuItem>
@@ -269,7 +305,7 @@ export const VirtualizedRequirementTable = memo(function VirtualizedRequirementT
                             }}
                             className={`cursor-pointer ${currentPriority === value ? 'bg-accent' : ''}`}
                           >
-                            <span className={`px-2 py-1 rounded text-sm ${config.className} inline-block`}>
+                            <span className={`px-2 py-1 rounded text-xs ${config.className} inline-block`}>
                               {config.label}
                             </span>
                           </DropdownMenuItem>
@@ -293,7 +329,7 @@ export const VirtualizedRequirementTable = memo(function VirtualizedRequirementT
                           {requirement.creator.name?.slice(0, 2) || 'U'}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="text-sm truncate min-w-0">
+                      <span className="text-xs truncate min-w-0">
                         {requirement.creator.name}
                       </span>
                     </div>
@@ -304,7 +340,7 @@ export const VirtualizedRequirementTable = memo(function VirtualizedRequirementT
             case 'platforms':
               return (
                 <div key="platforms" className="w-48 px-3 py-3 flex-shrink-0">
-                  <span className="text-sm truncate block" title={(requirement.platforms || []).join(', ')}>
+                  <span className="text-xs truncate block" title={(requirement.platforms || []).join(', ')}>
                     {(requirement.platforms || []).join(', ') || '-'}
                   </span>
                 </div>
@@ -313,14 +349,14 @@ export const VirtualizedRequirementTable = memo(function VirtualizedRequirementT
             case 'createdAt':
               return (
                 <div key="createdAt" className="w-40 px-3 py-3 flex-shrink-0">
-                  <span className="text-sm text-muted-foreground">{requirement.createdAt}</span>
+                  <span className="text-xs text-muted-foreground">{requirement.createdAt}</span>
                 </div>
               );
 
             case 'updatedAt':
               return (
                 <div key="updatedAt" className="w-40 px-3 py-3 flex-shrink-0">
-                  <span className="text-sm text-muted-foreground">{requirement.updatedAt}</span>
+                  <span className="text-xs text-muted-foreground">{requirement.updatedAt}</span>
                 </div>
               );
 
@@ -330,14 +366,17 @@ export const VirtualizedRequirementTable = memo(function VirtualizedRequirementT
         })}
       </div>
     );
-  }, [visibleColumns, selectedRequirements, onRequirementSelect, onNeedToDoChange, onPriorityChange]);
+  }, [visibleColumns, selectedRequirements, onRequirementSelect, onNeedToDoChange, onPriorityChange, stickyOffsets]);
 
   return (
     <div className="rounded-md border overflow-hidden">
       {/* 表头 - 固定不滚动 */}
-      <div className="border-b bg-muted/50">
-        <div className="flex items-center" style={{ minWidth: `${UI_SIZES.TABLE.MIN_WIDTH}px` }}>
-          <div className={`${UI_SIZES.TABLE.COLUMN_WIDTHS.CHECKBOX} px-2 py-3 flex-shrink-0`}>
+      <div className="border-b bg-muted/50 overflow-x-auto">
+        <div className="flex items-center relative" style={{ minWidth: `${UI_SIZES.TABLE.MIN_WIDTH}px` }}>
+          <div 
+            className={`${UI_SIZES.TABLE.COLUMN_WIDTHS.CHECKBOX} px-2 py-3 flex-shrink-0 sticky z-20 bg-muted/50`}
+            style={{ left: `${stickyOffsets.checkbox}px` }}
+          >
             <Checkbox
               checked={isAllSelected}
               onCheckedChange={handleSelectAll}
@@ -346,18 +385,25 @@ export const VirtualizedRequirementTable = memo(function VirtualizedRequirementT
 
           {visibleColumns.map(columnId => {
             const sortable = ['id', 'title', 'priority', 'createdAt', 'updatedAt', 'endOwner'].includes(columnId);
+            const isSticky = columnId === 'id' || columnId === 'title';
+            const stickyLeft = columnId === 'id' ? stickyOffsets.id : 
+                             columnId === 'title' ? stickyOffsets.title : undefined;
+            const showShadow = columnId === 'title';
             
             return (
               <div 
                 key={columnId}
                 className={`
                   px-3 py-3 flex-shrink-0
+                  ${isSticky ? 'sticky z-20 bg-muted/50' : ''}
+                  ${showShadow ? 'shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]' : ''}
                   ${columnId === 'id' ? UI_SIZES.TABLE.COLUMN_WIDTHS.ID : ''}
                   ${columnId === 'title' ? 'flex-1 min-w-0' : ''}
                   ${['type', 'endOwner', 'creator'].includes(columnId) ? 'w-32' : ''}
                   ${['needToDo', 'priority'].includes(columnId) ? 'w-24' : ''}
                   ${['platforms', 'createdAt', 'updatedAt'].includes(columnId) ? 'w-40' : ''}
                 `}
+                style={isSticky ? { left: `${stickyLeft}px` } : undefined}
               >
                 <div className="flex items-center">
                   <span className="text-sm font-medium">

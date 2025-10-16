@@ -19,6 +19,9 @@ import {
   validatePriority as validatePriorityInput
 } from '@/lib/input-validation';
 import { executeSyncBatchOperation } from '@/lib/batch-operations';
+import { executeSyncBatchOperationWithProgress } from '@/lib/batch-operations-ui';
+import { useKeyboardShortcuts, COMMON_SHORTCUTS } from '@/hooks/useKeyboardShortcuts';
+import { useVersionStore } from '@/lib/version-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -95,6 +98,7 @@ import {
   UI_SIZES,
 } from '@/config/requirements';
 import Link from 'next/link';
+import { ScheduledTableSkeleton } from '@/components/ui/table-skeleton';
 import {
   DndContext,
   closestCenter,
@@ -176,10 +180,9 @@ function SortableColumnItem({ id, label, isVisible, onToggle }: SortableColumnIt
  * - 列显示/隐藏控制
  */
 
-// 预排期页面可筛选的列
+// 预排期页面可筛选的列（序号和标题固定显示，不在列表中）
 const SCHEDULED_FILTERABLE_COLUMNS = [
   { value: 'id', label: 'ID' },
-  { value: 'title', label: '标题' },
   { value: 'type', label: '需求类型' },
   { value: 'priority', label: '优先级' },
   { value: 'version', label: '版本号' },
@@ -197,35 +200,37 @@ const SCHEDULED_FILTERABLE_COLUMNS = [
   { value: 'updatedAt', label: '更新时间' },
 ];
 
-// 默认显示的列
-const DEFAULT_VISIBLE_COLUMNS = ['id', 'title', 'type', 'priority', 'version', 'overallReviewStatus', 'level1Reviewer', 'level1Status', 'level1Opinion', 'level2Reviewer', 'level2Status', 'level2Opinion', 'isOperational'];
+// 默认显示的列（序号和标题始终显示，ID默认隐藏）
+const DEFAULT_VISIBLE_COLUMNS = ['index', 'title', 'type', 'priority', 'version', 'overallReviewStatus', 'level1Reviewer', 'level1Status', 'level1Opinion', 'level2Reviewer', 'level2Status', 'level2Opinion', 'isOperational'];
 
-// 默认列顺序
-const DEFAULT_COLUMN_ORDER = ['id', 'title', 'type', 'platforms', 'priority', 'version', 'overallReviewStatus', 'level1Reviewer', 'level1Status', 'level1Opinion', 'level2Reviewer', 'level2Status', 'level2Opinion', 'isOperational', 'creator', 'createdAt', 'updatedAt'];
+// 默认列顺序（序号和标题固定在前，ID紧随标题）
+const DEFAULT_COLUMN_ORDER = ['index', 'title', 'id', 'type', 'platforms', 'priority', 'version', 'overallReviewStatus', 'level1Reviewer', 'level1Status', 'level1Opinion', 'level2Reviewer', 'level2Status', 'level2Opinion', 'isOperational', 'creator', 'createdAt', 'updatedAt'];
 
-// 列固定宽度配置（用于固定表头布局）
-const COLUMN_WIDTHS: Record<string, string> = {
-  id: 'w-24',
-  title: 'w-64',
-  type: 'w-28',
-  platforms: 'w-36',
-  priority: 'w-24',
-  version: 'w-32',
-  overallReviewStatus: 'w-36',
-  level1Reviewer: 'w-32',
-  level1Status: 'w-28',
-  level1Opinion: 'w-32',
-  level2Reviewer: 'w-32',
-  level2Status: 'w-28',
-  level2Opinion: 'w-32',
-  isOperational: 'w-24',
-  creator: 'w-32',
-  createdAt: 'w-36',
-  updatedAt: 'w-36',
+// 列固定宽度配置（使用精确像素值，确保表头和内容对齐）
+const COLUMN_WIDTHS: Record<string, number> = {
+  index: 80,                 // 序号
+  id: 96,                    // ID
+  title: 256,                // 标题
+  type: 112,                 // 类型
+  platforms: 144,            // 应用端
+  priority: 96,              // 优先级
+  version: 128,              // 版本号
+  overallReviewStatus: 144,  // 总评审状态
+  level1Reviewer: 128,       // 一级评审人
+  level1Status: 112,         // 一级评审状态
+  level1Opinion: 128,        // 一级评审意见
+  level2Reviewer: 128,       // 二级评审人
+  level2Status: 112,         // 二级评审状态
+  level2Opinion: 128,        // 二级评审意见
+  isOperational: 96,         // 是否运营
+  creator: 128,              // 创建人
+  createdAt: 180,            // 创建时间（增加宽度以容纳排序按钮和内容不换行）
+  updatedAt: 180,            // 更新时间（增加宽度以容纳排序按钮和内容不换行）
 };
 
 // 列配置版本号（用于检测配置更新）
-const COLUMN_CONFIG_VERSION = '5.0';
+// v7.1: 序号字体去掉font-mono，ID列默认隐藏
+const COLUMN_CONFIG_VERSION = '7.1';
 
 /**
  * 筛选条件验证器
@@ -264,8 +269,7 @@ const OVERALL_REVIEW_STATUS_OPTIONS = [
   { value: 'approved', label: '二级评审通过', className: 'bg-green-50 text-green-700 border-green-200' },
 ];
 
-// 版本选项（从需求数据中动态获取）
-const VERSION_OPTIONS = ['暂无版本号', 'v1.0.0', 'v1.1.0', 'v1.2.0', 'v1.3.0', 'v2.0.0', 'v2.1.0'];
+// 版本选项将从 version-store 动态获取
 
 interface FilterCondition {
   id: string;
@@ -278,6 +282,15 @@ export default function ScheduledRequirementsPage() {
   const router = useRouter();
   const { updateRequirement, loading, setLoading } = useRequirementsStore();
   const allRequirements = useRequirementsStore(state => state.requirements);
+  
+  // 获取版本号选项
+  const { getVersionNumbers, initFromStorage } = useVersionStore();
+  const VERSION_OPTIONS = getVersionNumbers();
+  
+  // 初始化版本号数据
+  useEffect(() => {
+    initFromStorage();
+  }, [initFromStorage]);
 
   // 筛选状态
   const [searchTerm, setSearchTerm] = useState('');
@@ -290,7 +303,7 @@ export default function ScheduledRequirementsPage() {
 
   // P0: 高级筛选状态（从localStorage安全加载，带版本检测和数据验证）
   const [customFilters, setCustomFilters] = useState<FilterCondition[]>(() => {
-    const savedVersion = safeGetItem('scheduled-config-version', '');
+    const savedVersion = safeGetItem('scheduled-config-version', '') as string;
     if (savedVersion !== COLUMN_CONFIG_VERSION) {
       return [];
     }
@@ -303,22 +316,32 @@ export default function ScheduledRequirementsPage() {
   
   // P0: 列管理状态（从localStorage安全加载，带版本检测和数据验证）
   const [hiddenColumns, setHiddenColumns] = useState<string[]>(() => {
-    const savedVersion = safeGetItem('scheduled-config-version', '');
+    const savedVersion = safeGetItem('scheduled-config-version', '') as string;
+    const defaultHidden = DEFAULT_COLUMN_ORDER.filter(col => !DEFAULT_VISIBLE_COLUMNS.includes(col));
+    
     if (savedVersion !== COLUMN_CONFIG_VERSION) {
-      // 版本不匹配，使用默认配置并更新版本号
+      // 版本不匹配，清除旧配置，使用默认配置并更新版本号
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('scheduled-hidden-columns');
+        localStorage.removeItem('scheduled-column-order');
+        localStorage.removeItem('scheduled-custom-filters');
+      }
       safeSetItem('scheduled-config-version', COLUMN_CONFIG_VERSION);
-      return DEFAULT_COLUMN_ORDER.filter(col => !DEFAULT_VISIBLE_COLUMNS.includes(col));
+      safeSetItem('scheduled-hidden-columns', defaultHidden);
+      return defaultHidden;
     }
+    
     return safeGetItem(
       'scheduled-hidden-columns',
-      DEFAULT_COLUMN_ORDER.filter(col => !DEFAULT_VISIBLE_COLUMNS.includes(col)),
+      defaultHidden,
       arrayValidator((item): item is string => typeof item === 'string')
     );
   });
   
   const [columnOrder, setColumnOrder] = useState<string[]>(() => {
-    const savedVersion = safeGetItem('scheduled-config-version', '');
+    const savedVersion = safeGetItem('scheduled-config-version', '') as string;
     if (savedVersion !== COLUMN_CONFIG_VERSION) {
+      safeSetItem('scheduled-column-order', DEFAULT_COLUMN_ORDER);
       return DEFAULT_COLUMN_ORDER;
     }
     return safeGetItem(
@@ -332,6 +355,10 @@ export default function ScheduledRequirementsPage() {
   const [expandedVersions, setExpandedVersions] = useState<Set<string>>(new Set());
   const [selectedRequirements, setSelectedRequirements] = useState<string[]>([]);
   
+  // 序号列批量选择模式 - 按版本管理
+  const [versionBatchModes, setVersionBatchModes] = useState<Record<string, boolean>>({});  // 每个版本的批量模式
+  const [selectedIndexes, setSelectedIndexes] = useState<string[]>([]);  // 存储选中的需求ID
+  
   // 批量操作状态
   const [batchAssignVersion, setBatchAssignVersion] = useState<string>('');
   const [showBatchActions, setShowBatchActions] = useState(false);
@@ -341,6 +368,33 @@ export default function ScheduledRequirementsPage() {
   const [currentReviewRequirement, setCurrentReviewRequirement] = useState<Requirement | null>(null);
   const [reviewLevel, setReviewLevel] = useState<number>(1);
   const [reviewOpinion, setReviewOpinion] = useState('');
+
+  // 初始化配置（确保版本升级后配置正确）
+  useEffect(() => {
+    const savedVersion = safeGetItem('scheduled-config-version', '') as string;
+    const defaultHidden = DEFAULT_COLUMN_ORDER.filter(col => !DEFAULT_VISIBLE_COLUMNS.includes(col));
+    
+    if (savedVersion !== COLUMN_CONFIG_VERSION) {
+      console.log('版本升级：从', savedVersion, '到', COLUMN_CONFIG_VERSION);
+      console.log('默认隐藏列：', defaultHidden);
+      console.log('默认列顺序：', DEFAULT_COLUMN_ORDER);
+      
+      // 清除所有相关配置
+      localStorage.removeItem('scheduled-hidden-columns');
+      localStorage.removeItem('scheduled-column-order');
+      localStorage.removeItem('scheduled-custom-filters');
+      
+      // 设置新配置
+      safeSetItem('scheduled-config-version', COLUMN_CONFIG_VERSION);
+      safeSetItem('scheduled-hidden-columns', defaultHidden);
+      safeSetItem('scheduled-column-order', DEFAULT_COLUMN_ORDER);
+      
+      // 强制更新state
+      setHiddenColumns(defaultHidden);
+      setColumnOrder(DEFAULT_COLUMN_ORDER);
+      setCustomFilters([]);
+    }
+  }, []);
 
   // 加载状态
   useEffect(() => {
@@ -399,7 +453,7 @@ export default function ScheduledRequirementsPage() {
       if (!filter.column || !filter.operator) return;
       
       filtered = filtered.filter(req => {
-        const value = String((req as any)[filter.column] || '').toLowerCase();
+        const value = String((req as Record<string, unknown>)[filter.column] || '').toLowerCase();
         const filterValue = filter.value.toLowerCase();
         
         switch (filter.operator) {
@@ -440,8 +494,8 @@ export default function ScheduledRequirementsPage() {
     Object.keys(groups).forEach(version => {
       groups[version].sort((a, b) => {
         const { field, direction } = sortConfig;
-        let aValue: any = a[field as keyof Requirement];
-        let bValue: any = b[field as keyof Requirement];
+        let aValue: unknown = a[field as keyof Requirement];
+        let bValue: unknown = b[field as keyof Requirement];
 
         // 处理不同类型的字段
         if (field === 'priority') {
@@ -765,7 +819,9 @@ export default function ScheduledRequirementsPage() {
    * 批量分配版本
    */
   const handleBatchAssignVersion = useCallback(() => {
-    if (selectedRequirements.length === 0) {
+    const targetIds = selectedIndexes.length > 0 ? selectedIndexes : selectedRequirements;
+    
+    if (targetIds.length === 0) {
       toast.error('请先选择需求');
       return;
     }
@@ -774,79 +830,159 @@ export default function ScheduledRequirementsPage() {
       return;
     }
 
-    selectedRequirements.forEach(id => {
-      updateRequirement(id, { plannedVersion: batchAssignVersion });
-    });
+    executeSyncBatchOperationWithProgress(
+      targetIds,
+      (id) => {
+        updateRequirement(id, { plannedVersion: batchAssignVersion });
+      },
+      {
+        operationName: `批量分配版本到 ${batchAssignVersion}`,
+        showSuccessToast: true,
+        showErrorToast: true,
+      }
+    );
 
-    toast.success(`已将 ${selectedRequirements.length} 个需求分配到 ${batchAssignVersion}`);
-    setSelectedRequirements([]);
+    // 不清空选择状态，保持复选框勾选
     setBatchAssignVersion('');
-  }, [selectedRequirements, batchAssignVersion, updateRequirement]);
+  }, [selectedRequirements, selectedIndexes, batchAssignVersion, updateRequirement]);
 
   /**
    * 批量评审
    */
   const handleBatchReview = useCallback((level: number, status: 'approved' | 'rejected') => {
-    if (selectedRequirements.length === 0) {
+    const targetIds = selectedIndexes.length > 0 ? selectedIndexes : selectedRequirements;
+    
+    if (targetIds.length === 0) {
       toast.error('请先选择需求');
       return;
     }
 
-    selectedRequirements.forEach(id => {
-      const requirement = allRequirements.find(r => r.id === id);
-      if (!requirement || !requirement.scheduledReview) return;
+    const levelName = level === 1 ? '一' : '二';
+    const statusText = status === 'approved' ? '通过' : '不通过';
 
-      const updatedReviewLevels = requirement.scheduledReview.reviewLevels.map(l => {
-        if (l.level === level) {
-          return {
-            ...l,
-            status,
-            reviewedAt: new Date().toISOString(),
-          };
+    executeSyncBatchOperationWithProgress(
+      targetIds,
+      (id) => {
+        const requirement = allRequirements.find(r => r.id === id);
+        if (!requirement || !requirement.scheduledReview) {
+          throw new Error('需求未找到或未配置评审流程');
         }
-        return l;
-      });
 
-      // 保留 scheduledReview 的所有属性，只更新 reviewLevels
-      updateRequirement(id, {
-        scheduledReview: {
-          ...requirement.scheduledReview,
-          reviewLevels: updatedReviewLevels,
-        },
-      });
-    });
+        const updatedReviewLevels = requirement.scheduledReview.reviewLevels.map(l => {
+          if (l.level === level) {
+            return {
+              ...l,
+              status,
+              reviewedAt: new Date().toISOString(),
+            };
+          }
+          return l;
+        });
 
-    toast.success(`已${status === 'approved' ? '通过' : '不通过'} ${selectedRequirements.length} 个需求的${level === 1 ? '一' : '二'}级评审`);
-    setSelectedRequirements([]);
-  }, [selectedRequirements, allRequirements, updateRequirement]);
+        // 保留 scheduledReview 的所有属性，只更新 reviewLevels
+        updateRequirement(id, {
+          scheduledReview: {
+            ...requirement.scheduledReview,
+            reviewLevels: updatedReviewLevels,
+          },
+        });
+      },
+      {
+        operationName: `批量${levelName}级评审${statusText}`,
+        showSuccessToast: true,
+        showErrorToast: true,
+      }
+    );
+
+    // 不清空选择状态，保持复选框勾选
+  }, [selectedRequirements, selectedIndexes, allRequirements, updateRequirement]);
 
   /**
    * 批量设置是否运营
    */
   const handleBatchIsOperational = useCallback((value: 'yes' | 'no') => {
-    if (selectedRequirements.length === 0) {
+    const targetIds = selectedIndexes.length > 0 ? selectedIndexes : selectedRequirements;
+    
+    if (targetIds.length === 0) {
       toast.error('请先选择需求');
       return;
     }
-
-    selectedRequirements.forEach(id => {
-      updateRequirement(id, {
-        isOperational: value,
-      });
-    });
 
     const labelMap = {
       'yes': '是',
       'no': '否'
     };
-    toast.success(`已将 ${selectedRequirements.length} 个需求的是否运营设置为 ${labelMap[value]}`);
-    setSelectedRequirements([]);
-  }, [selectedRequirements, updateRequirement]);
+
+    executeSyncBatchOperationWithProgress(
+      targetIds,
+      (id) => {
+        updateRequirement(id, {
+          isOperational: value,
+        });
+      },
+      {
+        operationName: `批量设置是否运营为 ${labelMap[value]}`,
+        showSuccessToast: true,
+        showErrorToast: true,
+      }
+    );
+
+    // 不清空选择状态，保持复选框勾选
+  }, [selectedRequirements, selectedIndexes, updateRequirement]);
 
   // 显示批量操作面板
   useEffect(() => {
-    setShowBatchActions(selectedRequirements.length > 0);
-  }, [selectedRequirements]);
+    setShowBatchActions(selectedRequirements.length > 0 || selectedIndexes.length > 0);
+  }, [selectedRequirements, selectedIndexes]);
+
+  /**
+   * 聚焦搜索框
+   */
+  const focusSearch = useCallback(() => {
+    const searchInput = document.querySelector('input[placeholder*="搜索"]') as HTMLInputElement;
+    if (searchInput) {
+      searchInput.focus();
+      searchInput.select();
+    }
+  }, []);
+
+  /**
+   * 清空选择
+   */
+  const clearSelection = useCallback(() => {
+    setSelectedRequirements([]);
+    setSelectedIndexes([]);
+    setVersionBatchModes({});
+  }, []);
+
+  /**
+   * 配置键盘快捷键
+   */
+  useKeyboardShortcuts([
+    {
+      key: COMMON_SHORTCUTS.SEARCH,
+      description: '聚焦搜索框',
+      action: focusSearch,
+    },
+    {
+      key: COMMON_SHORTCUTS.CANCEL,
+      description: '清空选择',
+      action: clearSelection,
+      enabled: selectedRequirements.length > 0 || selectedIndexes.length > 0,
+    },
+    {
+      key: 'ctrl+1',
+      description: '批量一级评审通过',
+      action: () => handleBatchReview(1, 'approved'),
+      enabled: selectedRequirements.length > 0 || selectedIndexes.length > 0,
+    },
+    {
+      key: 'ctrl+2',
+      description: '批量二级评审通过',
+      action: () => handleBatchReview(2, 'approved'),
+      enabled: selectedRequirements.length > 0 || selectedIndexes.length > 0,
+    },
+  ]);
 
   /**
    * 高级筛选管理
@@ -899,9 +1035,13 @@ export default function ScheduledRequirementsPage() {
   }, []);
 
   /**
-   * 判断列是否可见
+   * 判断列是否可见（序号和标题始终可见）
    */
   const isColumnVisible = useCallback((column: string) => {
+    // 序号和标题始终可见
+    if (column === 'index' || column === 'title') {
+      return true;
+    }
     return !hiddenColumns.includes(column);
   }, [hiddenColumns]);
 
@@ -944,18 +1084,53 @@ export default function ScheduledRequirementsPage() {
    */
   const renderTableHeader = useCallback((columnId: string) => {
     if (!isColumnVisible(columnId)) return null;
-    const widthClass = COLUMN_WIDTHS[columnId] || 'w-32';
-    const baseClass = `${widthClass} h-10 px-2 text-left align-middle font-medium text-sm text-muted-foreground flex-shrink-0`;
+    const width = COLUMN_WIDTHS[columnId] || 128;
+    const baseStyle = { width: `${width}px`, minWidth: `${width}px`, maxWidth: `${width}px` };
+    
+    // 计算 sticky 偏移量
+    const checkboxWidth = 48;
+    const idWidth = COLUMN_WIDTHS['id'] || 96;
+    
+    let stickyClass = `h-10 px-2 text-left align-middle font-medium text-sm text-muted-foreground border-r`;
+    let stickyStyle: React.CSSProperties = baseStyle;
+    
+    // 序号列和标题列是sticky的
+    if (columnId === 'index') {
+      stickyClass += ` sticky z-50`;
+      stickyStyle = { 
+        ...baseStyle, 
+        left: '0px',
+        backgroundColor: 'hsl(var(--muted) / 0.5)',
+        boxShadow: '2px 0 4px -2px rgba(0,0,0,0.15)'
+      };
+    } else if (columnId === 'title') {
+      const indexWidth = COLUMN_WIDTHS['index'] || 80;
+      stickyClass += ` sticky z-50`;
+      stickyStyle = { 
+        ...baseStyle, 
+        left: `${indexWidth}px`,
+        backgroundColor: 'hsl(var(--muted) / 0.5)',
+        boxShadow: '2px 0 4px -2px rgba(0,0,0,0.15)'
+      };
+    }
 
     switch (columnId) {
+      case 'index':
+        // 表头留空，不显示文字
+        return (
+          <th key={columnId} className={`${stickyClass}`} style={stickyStyle}>
+            <div className="flex items-center justify-center text-center w-full">
+            </div>
+          </th>
+        );
       case 'id':
         return (
-          <th key={columnId} className={baseClass}>
+          <th key={columnId} className={`${stickyClass} whitespace-nowrap`} style={stickyStyle}>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => handleSort('id')}
-              className="hover:bg-transparent"
+              className="hover:bg-transparent whitespace-nowrap"
             >
               ID
               {renderSortIcon('id')}
@@ -964,12 +1139,12 @@ export default function ScheduledRequirementsPage() {
         );
       case 'title':
         return (
-          <th key={columnId} className={baseClass}>
+          <th key={columnId} className={stickyClass} style={stickyStyle}>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => handleSort('title')}
-              className="hover:bg-transparent"
+              className="hover:bg-transparent whitespace-nowrap"
             >
               标题
               {renderSortIcon('title')}
@@ -977,15 +1152,15 @@ export default function ScheduledRequirementsPage() {
           </th>
         );
       case 'type':
-        return <th key={columnId} className={baseClass}>类型</th>;
+        return <th key={columnId} className={`${stickyClass} whitespace-nowrap`} style={stickyStyle}>类型</th>;
       case 'priority':
         return (
-          <th key={columnId} className={baseClass}>
+          <th key={columnId} className={`${stickyClass} whitespace-nowrap`} style={stickyStyle}>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => handleSort('priority')}
-              className="hover:bg-transparent"
+              className="hover:bg-transparent whitespace-nowrap"
             >
               优先级
               {renderSortIcon('priority')}
@@ -993,12 +1168,12 @@ export default function ScheduledRequirementsPage() {
           </th>
         );
       case 'version':
-        return <th key={columnId} className={baseClass}>版本号</th>;
+        return <th key={columnId} className={`${stickyClass} whitespace-nowrap`} style={stickyStyle}>版本号</th>;
       case 'overallReviewStatus':
-        return <th key={columnId} className={baseClass}>总评审状态</th>;
+        return <th key={columnId} className={`${stickyClass} whitespace-nowrap`} style={stickyStyle}>总评审状态</th>;
       case 'level1Reviewer':
         return (
-          <th key={columnId} className={baseClass}>
+          <th key={columnId} className={`${stickyClass} whitespace-nowrap`} style={stickyStyle}>
             <Button
               variant="ghost"
               size="sm"
@@ -1012,7 +1187,7 @@ export default function ScheduledRequirementsPage() {
         );
       case 'level1Status':
         return (
-          <th key={columnId} className={baseClass}>
+          <th key={columnId} className={`${stickyClass} whitespace-nowrap`} style={stickyStyle}>
             <Button
               variant="ghost"
               size="sm"
@@ -1025,10 +1200,10 @@ export default function ScheduledRequirementsPage() {
           </th>
         );
       case 'level1Opinion':
-        return <th key={columnId} className={baseClass}>一级评审意见</th>;
+        return <th key={columnId} className={`${stickyClass} whitespace-nowrap`} style={stickyStyle}>一级评审意见</th>;
       case 'level2Reviewer':
         return (
-          <th key={columnId} className={baseClass}>
+          <th key={columnId} className={`${stickyClass} whitespace-nowrap`} style={stickyStyle}>
             <Button
               variant="ghost"
               size="sm"
@@ -1042,7 +1217,7 @@ export default function ScheduledRequirementsPage() {
         );
       case 'level2Status':
         return (
-          <th key={columnId} className={baseClass}>
+          <th key={columnId} className={`${stickyClass} whitespace-nowrap`} style={stickyStyle}>
             <Button
               variant="ghost"
               size="sm"
@@ -1055,10 +1230,10 @@ export default function ScheduledRequirementsPage() {
           </th>
         );
       case 'level2Opinion':
-        return <th key={columnId} className={baseClass}>二级评审意见</th>;
+        return <th key={columnId} className={`${stickyClass} whitespace-nowrap`} style={stickyStyle}>二级评审意见</th>;
       case 'isOperational':
         return (
-          <th key={columnId} className={baseClass}>
+          <th key={columnId} className={`${stickyClass} whitespace-nowrap`} style={stickyStyle}>
             <Button
               variant="ghost"
               size="sm"
@@ -1071,10 +1246,10 @@ export default function ScheduledRequirementsPage() {
           </th>
         );
       case 'platforms':
-        return <th key={columnId} className={baseClass}>应用端</th>;
+        return <th key={columnId} className={`${stickyClass} whitespace-nowrap`} style={stickyStyle}>应用端</th>;
       case 'creator':
         return (
-          <th key={columnId} className={baseClass}>
+          <th key={columnId} className={`${stickyClass} whitespace-nowrap`} style={stickyStyle}>
             <Button
               variant="ghost"
               size="sm"
@@ -1088,30 +1263,30 @@ export default function ScheduledRequirementsPage() {
         );
       case 'createdAt':
         return (
-          <th key={columnId} className={baseClass}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleSort('createdAt')}
-              className="hover:bg-transparent"
-            >
-              创建时间
-              {renderSortIcon('createdAt')}
-            </Button>
+          <th key={columnId} className={`${stickyClass} whitespace-nowrap`} style={stickyStyle}>
+            <div className="flex items-center whitespace-nowrap px-1">
+              <button
+                onClick={() => handleSort('createdAt')}
+                className="text-sm hover:text-foreground transition-colors flex items-center gap-1"
+              >
+                创建时间
+                {renderSortIcon('createdAt')}
+              </button>
+            </div>
           </th>
         );
       case 'updatedAt':
         return (
-          <th key={columnId} className={baseClass}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleSort('updatedAt')}
-              className="hover:bg-transparent"
-            >
-              更新时间
-              {renderSortIcon('updatedAt')}
-            </Button>
+          <th key={columnId} className={`${stickyClass} whitespace-nowrap`} style={stickyStyle}>
+            <div className="flex items-center whitespace-nowrap px-1">
+              <button
+                onClick={() => handleSort('updatedAt')}
+                className="text-sm hover:text-foreground transition-colors flex items-center gap-1"
+              >
+                更新时间
+                {renderSortIcon('updatedAt')}
+              </button>
+            </div>
           </th>
         );
       default:
@@ -1124,23 +1299,53 @@ export default function ScheduledRequirementsPage() {
    */
   const renderTableCell = useCallback((columnId: string, requirement: Requirement) => {
     if (!isColumnVisible(columnId)) return null;
-    const widthClass = COLUMN_WIDTHS[columnId] || 'w-32';
-    const baseClass = `${widthClass} p-2 align-middle flex-shrink-0`;
+    const width = COLUMN_WIDTHS[columnId] || 128;
+    const baseStyle = { width: `${width}px`, minWidth: `${width}px`, maxWidth: `${width}px` };
+    
+    // 计算 sticky 偏移量
+    const checkboxWidth = 48;
+    const idWidth = COLUMN_WIDTHS['id'] || 96;
+    
+    let stickyClass = `p-2 align-middle border-r`;
+    let stickyStyle: React.CSSProperties = baseStyle;
+    
+    // 序号列和标题列是sticky的
+    if (columnId === 'index') {
+      stickyClass += ` sticky z-20`;
+      stickyStyle = { 
+        ...baseStyle, 
+        left: '0px',
+        backgroundColor: 'var(--background)',
+        boxShadow: '2px 0 4px -2px rgba(0,0,0,0.15)'
+      };
+    } else if (columnId === 'title') {
+      const indexWidth = COLUMN_WIDTHS['index'] || 80;
+      stickyClass += ` sticky z-20`;
+      stickyStyle = { 
+        ...baseStyle, 
+        left: `${indexWidth}px`,
+        backgroundColor: 'var(--background)',
+        boxShadow: '2px 0 4px -2px rgba(0,0,0,0.15)'
+      };
+    }
 
     switch (columnId) {
+      case 'index':
+        // 序号在外部直接渲染，这里不应该被调用
+        return null;
       case 'id':
         return (
-          <td key={columnId} className={`${baseClass} font-mono text-sm`}>
+          <td key={columnId} className={`${stickyClass} font-mono text-xs`} style={stickyStyle}>
             {requirement.id}
           </td>
         );
       case 'title':
         return (
-          <td key={columnId} className={baseClass}>
+          <td key={columnId} className={stickyClass} style={stickyStyle}>
             <div className="space-y-1">
               <Link
                 href={`/requirements/${encodeURIComponent(requirement.id)}?from=scheduled`}
-                className="hover:underline font-medium block truncate"
+                className="hover:underline font-normal text-xs block truncate"
                 title={requirement.title}
               >
                 {requirement.title}
@@ -1158,8 +1363,8 @@ export default function ScheduledRequirementsPage() {
         );
       case 'type':
         return (
-          <td key={columnId} className={baseClass}>
-            <span className="text-sm truncate block" title={getRequirementTypeConfig(requirement.type)?.label || requirement.type}>
+          <td key={columnId} className={stickyClass} style={stickyStyle}>
+            <span className="text-xs truncate block" title={getRequirementTypeConfig(requirement.type)?.label || requirement.type}>
               {getRequirementTypeConfig(requirement.type)?.label || requirement.type}
             </span>
           </td>
@@ -1170,7 +1375,7 @@ export default function ScheduledRequirementsPage() {
         // 按优先级从高到低排序：紧急 > 高 > 中 > 低
         const priorityOrder = ['紧急', '高', '中', '低'];
         return (
-          <td key={columnId} className={baseClass}>
+          <td key={columnId} className={stickyClass} style={stickyStyle}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -1187,13 +1392,13 @@ export default function ScheduledRequirementsPage() {
                       key={key}
                       onClick={() => {
                         // 如果点击的是当前选中项，则取消选择（设为空）
-                        if (currentPriority === key) {
-                          updateRequirement(requirement.id, { priority: undefined });
-                          toast.success('已取消优先级');
-                        } else {
-                          updateRequirement(requirement.id, { priority: key as any });
-                          toast.success('优先级已更新');
-                        }
+                      if (currentPriority === key) {
+                        updateRequirement(requirement.id, { priority: undefined });
+                        toast.success('已取消优先级');
+                      } else {
+                        updateRequirement(requirement.id, { priority: key as '低' | '中' | '高' | '紧急' });
+                        toast.success('优先级已更新');
+                      }
                       }}
                       className={`cursor-pointer ${currentPriority === key ? 'bg-accent' : ''}`}
                     >
@@ -1212,7 +1417,7 @@ export default function ScheduledRequirementsPage() {
       case 'version':
         const currentVersion = requirement.plannedVersion || '暂无版本号';
         return (
-          <td key={columnId} className={baseClass}>
+          <td key={columnId} className={stickyClass} style={stickyStyle}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -1246,7 +1451,7 @@ export default function ScheduledRequirementsPage() {
         const overallStatus = getOverallReviewStatus(requirement);
         const statusConfig = OVERALL_REVIEW_STATUS_OPTIONS.find(s => s.value === overallStatus);
         return (
-          <td key={columnId} className={baseClass}>
+          <td key={columnId} className={stickyClass} style={stickyStyle}>
             <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${statusConfig?.className || ''} truncate`} title={statusConfig?.label}>
               {statusConfig?.label || '待一级评审'}
             </span>
@@ -1257,11 +1462,11 @@ export default function ScheduledRequirementsPage() {
       case 'level1Reviewer':
         const level1Info = getReviewLevelInfo(requirement, 1);
         return (
-          <td key={columnId} className={baseClass}>
+          <td key={columnId} className={stickyClass} style={stickyStyle}>
             {level1Info?.reviewer ? (
-              <UserAvatar user={level1Info.reviewer} size="sm" showName />
+              <UserAvatar user={level1Info.reviewer} size="sm" showName={true} />
             ) : (
-              <span className="text-sm text-muted-foreground">未分配</span>
+              <span className="text-xs text-gray-400">未分配</span>
             )}
           </td>
         );
@@ -1271,7 +1476,7 @@ export default function ScheduledRequirementsPage() {
         const level1 = getReviewLevelInfo(requirement, 1);
         const level1StatusConfig = REVIEW_STATUS_OPTIONS.find(s => s.value === (level1?.status || 'pending'));
         return (
-          <td key={columnId} className={baseClass}>
+          <td key={columnId} className={stickyClass} style={stickyStyle}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -1289,7 +1494,7 @@ export default function ScheduledRequirementsPage() {
                     onClick={() => {
                       if (!requirement.scheduledReview) return;
                       const updatedLevels = requirement.scheduledReview.reviewLevels.map(l =>
-                        l.level === 1 ? { ...l, status: status.value as any, reviewedAt: new Date().toISOString() } : l
+                        l.level === 1 ? { ...l, status: status.value as 'pending' | 'approved' | 'rejected', reviewedAt: new Date().toISOString() } : l
                       );
                       updateRequirement(requirement.id, {
                         scheduledReview: { ...requirement.scheduledReview, reviewLevels: updatedLevels }
@@ -1310,20 +1515,20 @@ export default function ScheduledRequirementsPage() {
       case 'level1Opinion':
         const level1OpinionInfo = getReviewLevelInfo(requirement, 1);
         return (
-          <td key={columnId} className={baseClass}>
+          <td key={columnId} className={stickyClass} style={stickyStyle}>
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 px-2"
+              className="h-8 px-2 font-normal"
               onClick={() => handleOpenReviewDialog(requirement, 1)}
               title={level1OpinionInfo?.opinion || '点击填写一级评审意见'}
             >
               {level1OpinionInfo?.opinion ? (
-                <span className="text-sm truncate max-w-[100px]">
+                <span className="text-xs truncate max-w-[100px]">
                   {level1OpinionInfo.opinion}
                 </span>
               ) : (
-                <span className="text-sm text-muted-foreground">填写意见</span>
+                <span className="text-xs text-gray-400">填写意见</span>
               )}
             </Button>
           </td>
@@ -1333,11 +1538,11 @@ export default function ScheduledRequirementsPage() {
       case 'level2Reviewer':
         const level2Info = getReviewLevelInfo(requirement, 2);
         return (
-          <td key={columnId} className={baseClass}>
+          <td key={columnId} className={stickyClass} style={stickyStyle}>
             {level2Info?.reviewer ? (
-              <UserAvatar user={level2Info.reviewer} size="sm" showName />
+              <UserAvatar user={level2Info.reviewer} size="sm" showName={true} />
             ) : (
-              <span className="text-sm text-muted-foreground">未分配</span>
+              <span className="text-xs text-gray-400">未分配</span>
             )}
           </td>
         );
@@ -1347,7 +1552,7 @@ export default function ScheduledRequirementsPage() {
         const level2 = getReviewLevelInfo(requirement, 2);
         const level2StatusConfig = REVIEW_STATUS_OPTIONS.find(s => s.value === (level2?.status || 'pending'));
         return (
-          <td key={columnId} className={baseClass}>
+          <td key={columnId} className={stickyClass} style={stickyStyle}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -1365,7 +1570,7 @@ export default function ScheduledRequirementsPage() {
                     onClick={() => {
                       if (!requirement.scheduledReview) return;
                       const updatedLevels = requirement.scheduledReview.reviewLevels.map(l =>
-                        l.level === 2 ? { ...l, status: status.value as any, reviewedAt: new Date().toISOString() } : l
+                        l.level === 2 ? { ...l, status: status.value as 'pending' | 'approved' | 'rejected', reviewedAt: new Date().toISOString() } : l
                       );
                       updateRequirement(requirement.id, {
                         scheduledReview: { ...requirement.scheduledReview, reviewLevels: updatedLevels }
@@ -1386,20 +1591,20 @@ export default function ScheduledRequirementsPage() {
       case 'level2Opinion':
         const level2OpinionInfo = getReviewLevelInfo(requirement, 2);
         return (
-          <td key={columnId} className={baseClass}>
+          <td key={columnId} className={stickyClass} style={stickyStyle}>
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 px-2"
+              className="h-8 px-2 font-normal"
               onClick={() => handleOpenReviewDialog(requirement, 2)}
               title={level2OpinionInfo?.opinion || '点击填写二级评审意见'}
             >
               {level2OpinionInfo?.opinion ? (
-                <span className="text-sm truncate max-w-[100px]">
+                <span className="text-xs truncate max-w-[100px]">
                   {level2OpinionInfo.opinion}
                 </span>
               ) : (
-                <span className="text-sm text-muted-foreground">填写意见</span>
+                <span className="text-xs text-gray-400">填写意见</span>
               )}
             </Button>
           </td>
@@ -1408,14 +1613,14 @@ export default function ScheduledRequirementsPage() {
       // 是否运营 - 可下拉选择
       case 'isOperational':
         const operationalOptions = [
-          { value: 'unset', label: '未填写', className: 'text-muted-foreground' },
+          { value: 'unset', label: '未填写', className: 'text-gray-400' },
           { value: 'yes', label: '是', className: 'text-purple-700' },
           { value: 'no', label: '否', className: 'text-gray-700' }
         ];
         const currentOperational = requirement.isOperational || 'unset';
         const operationalConfig = operationalOptions.find(o => o.value === currentOperational);
         return (
-          <td key={columnId} className={baseClass}>
+          <td key={columnId} className={stickyClass} style={stickyStyle}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -1448,8 +1653,8 @@ export default function ScheduledRequirementsPage() {
       
       case 'platforms':
         return (
-          <td key={columnId} className={baseClass}>
-            <span className="text-sm truncate block" title={requirement.platforms.join(', ')}>
+          <td key={columnId} className={stickyClass} style={stickyStyle}>
+            <span className="text-xs truncate block" title={requirement.platforms.join(', ')}>
               {requirement.platforms.join(', ')}
             </span>
           </td>
@@ -1457,19 +1662,19 @@ export default function ScheduledRequirementsPage() {
       
       case 'creator':
         return (
-          <td key={columnId} className={baseClass}>
-            <UserAvatar user={requirement.creator} size="sm" showName />
+          <td key={columnId} className={stickyClass} style={stickyStyle}>
+            <UserAvatar user={requirement.creator} size="sm" showName={true} />
           </td>
         );
       case 'createdAt':
         return (
-          <td key={columnId} className={`${baseClass} text-sm`}>
+          <td key={columnId} className={`${stickyClass} text-xs whitespace-nowrap text-muted-foreground`} style={stickyStyle}>
             {requirement.createdAt}
           </td>
         );
       case 'updatedAt':
         return (
-          <td key={columnId} className={`${baseClass} text-sm`}>
+          <td key={columnId} className={`${stickyClass} text-xs whitespace-nowrap text-muted-foreground`} style={stickyStyle}>
             {requirement.updatedAt}
           </td>
         );
@@ -1506,8 +1711,13 @@ export default function ScheduledRequirementsPage() {
   if (loading) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center h-full">
-          <div className="text-muted-foreground">加载中...</div>
+        <div className="px-4 pt-4 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-80 bg-muted animate-pulse rounded-md"></div>
+            <div className="h-10 w-32 bg-muted animate-pulse rounded-md"></div>
+            <div className="h-10 w-32 bg-muted animate-pulse rounded-md"></div>
+          </div>
+          <ScheduledTableSkeleton />
         </div>
       </AppLayout>
     );
@@ -1516,7 +1726,7 @@ export default function ScheduledRequirementsPage() {
   return (
     <AppLayout>
       {/* 固定区域：搜索栏和批量操作 */}
-      <div className="sticky top-0 z-20 bg-background border-b shadow-sm">
+      <div className="sticky top-0 z-20 bg-background">
         <div className="px-4 pt-4 pb-3 space-y-3">
           {/* 筛选栏 */}
           <div className="flex items-center gap-3">
@@ -1681,12 +1891,16 @@ export default function ScheduledRequirementsPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <span className="text-sm font-medium">
-                    已选择 <span className="text-blue-600">{selectedRequirements.length}</span> 个需求
+                    已选择 <span className="text-blue-600">{selectedIndexes.length > 0 ? selectedIndexes.length : selectedRequirements.length}</span> 个需求
                   </span>
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => setSelectedRequirements([])}
+                    onClick={() => {
+                      setSelectedRequirements([]);
+                      setSelectedIndexes([]);
+                      setVersionBatchModes({});
+                    }}
                   >
                     <X className="h-3 w-3 mr-1" />
                     取消选择
@@ -1757,7 +1971,7 @@ export default function ScheduledRequirementsPage() {
       </div>
 
       {/* 内容区域 */}
-      <div className="px-4 pt-4">
+      <div className="px-4 pt-4 pb-4">
         {/* 需求列表 - 固定表头布局 */}
         <div className="space-y-4">
           {Object.keys(groupedRequirements).length === 0 ? (
@@ -1766,36 +1980,24 @@ export default function ScheduledRequirementsPage() {
               <p>没有找到预排期需求</p>
             </div>
           ) : (
-            <div className="border rounded-lg">
-              {/* 表格 */}
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse table-fixed">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="w-12 h-10 px-2 text-left align-middle font-medium text-sm text-muted-foreground flex-shrink-0">
-                        <Checkbox
-                          checked={
-                            filteredRequirements.length > 0 &&
-                            filteredRequirements.every(r => selectedRequirements.includes(r.id))
-                          }
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedRequirements(filteredRequirements.map(r => r.id));
-                            } else {
-                              setSelectedRequirements([]);
-                            }
-                          }}
-                        />
-                      </th>
-                      {columnOrder.map(columnId => renderTableHeader(columnId))}
-                    </tr>
-                  </thead>
-                </table>
-              </div>
-              
-              {/* 版本分组列表 */}
-              <div className="space-y-0">
-                {Object.entries(groupedRequirements).map(([version, requirements]) => {
+            <div className="border rounded-lg overflow-hidden" style={{ maxHeight: 'calc(100vh - 250px)' }}>
+              {/* 统一的横向和纵向滚动容器 */}
+              <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 250px)' }}>
+                <div style={{ minWidth: '1400px' }}>
+                  {/* 固定表头 */}
+                  <div className="sticky top-0 z-40 bg-background border-b">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-muted/50">
+                          {columnOrder.map(columnId => renderTableHeader(columnId))}
+                        </tr>
+                      </thead>
+                    </table>
+                  </div>
+                  
+                  {/* 版本分组列表 */}
+                  <div className="space-y-0">
+                    {Object.entries(groupedRequirements).map(([version, requirements]) => {
                   // 计算该版本的选择状态
                   const versionRequirementIds = requirements.map(r => r.id);
                   const selectedInVersion = versionRequirementIds.filter(id => selectedRequirements.includes(id));
@@ -1808,81 +2010,151 @@ export default function ScheduledRequirementsPage() {
                     open={expandedVersions.has(version)}
                     onOpenChange={() => toggleVersion(version)}
                   >
-                    {/* 版本号标题 */}
-                    <div className="w-full border-b-2 border-t-2 bg-muted/30">
-                      <div className="flex items-center py-2 hover:bg-accent/50 transition-colors">
-                        {/* 版本级复选框 - 与下方需求列表的复选框对齐 */}
-                        <div 
-                          className="w-12 flex items-center justify-center flex-shrink-0" 
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Checkbox
-                            checked={isAllVersionSelected}
-                            ref={(el) => {
-                              if (el) {
-                                (el as any).indeterminate = isSomeVersionSelected;
-                              }
+                    {/* 版本号和需求数据在同一个表格中 */}
+                    <table className="w-full border-collapse">
+                      <tbody>
+                        {/* 版本号标题行 */}
+                        <tr className="border-b-2 border-t-2 hover:bg-muted/50">
+                          {/* 固定区域：序号列 - 显示复选框 */}
+                          {isColumnVisible('index') && (
+                            <td 
+                              className="sticky z-30 border-r align-middle p-2"
+                              style={{ 
+                                left: '0px',
+                                width: `${COLUMN_WIDTHS['index']}px`,
+                                minWidth: `${COLUMN_WIDTHS['index']}px`,
+                                maxWidth: `${COLUMN_WIDTHS['index']}px`,
+                                backgroundColor: 'hsl(var(--muted) / 0.3)',
+                                boxShadow: '2px 0 4px -2px rgba(0,0,0,0.15)'
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className="flex items-center justify-center">
+                                <Checkbox
+                                  checked={versionBatchModes[version] || false}
+                                  onCheckedChange={(checked) => {
+                                    const newModes = { ...versionBatchModes };
+                                    if (checked) {
+                                      newModes[version] = true;
+                                      // 进入批量模式时，默认全选该版本下的所有需求
+                                      const versionRequirementIds = requirements.map(r => r.id);
+                                      setSelectedIndexes(prev => {
+                                        const newSelected = new Set([...prev, ...versionRequirementIds]);
+                                        return Array.from(newSelected);
+                                      });
+                                    } else {
+                                      newModes[version] = false;
+                                      // 退出批量模式时，取消该版本下所有需求的选择
+                                      const versionRequirementIds = requirements.map(r => r.id);
+                                      setSelectedIndexes(prev => prev.filter(id => !versionRequirementIds.includes(id)));
+                                    }
+                                    setVersionBatchModes(newModes);
+                                  }}
+                                />
+                              </div>
+                            </td>
+                          )}
+                          
+                          {/* 标题列 - 固定 */}
+                          {isColumnVisible('title') && (
+                            <td 
+                              className="sticky z-30 border-r align-middle p-2"
+                              style={{ 
+                                left: `${COLUMN_WIDTHS['index'] || 80}px`,
+                                width: `${COLUMN_WIDTHS['title'] || 256}px`,
+                                minWidth: `${COLUMN_WIDTHS['title'] || 256}px`,
+                                maxWidth: `${COLUMN_WIDTHS['title'] || 256}px`,
+                                backgroundColor: 'hsl(var(--muted) / 0.3)',
+                                boxShadow: '2px 0 4px -2px rgba(0,0,0,0.15)'
+                              }}
+                            >
+                              <CollapsibleTrigger className="flex items-center gap-2.5 w-full">
+                                {expandedVersions.has(version) ? (
+                                  <ChevronDown className="h-4 w-4 flex-shrink-0" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4 flex-shrink-0" />
+                                )}
+                                <h3 className="text-base font-bold text-slate-700 flex items-center">
+                                  {version}
+                                  <span className="mx-2 text-slate-400 font-normal">•</span>
+                                  <span className="text-sm font-normal text-slate-500">
+                                    {requirements.length}个需求
+                                  </span>
+                                </h3>
+                              </CollapsibleTrigger>
+                            </td>
+                          )}
+                          
+                          {/* 其他列占位 */}
+                          <td 
+                            className="border-r align-middle p-2"
+                            colSpan={columnOrder.filter(col => col !== 'index' && col !== 'title' && isColumnVisible(col)).length}
+                            style={{ 
+                              backgroundColor: 'hsl(var(--muted) / 0.3)'
                             }}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                // 选择该版本下的所有需求
-                                setSelectedRequirements(prev => {
-                                  const newSelected = new Set(prev);
-                                  versionRequirementIds.forEach(id => newSelected.add(id));
-                                  return Array.from(newSelected);
-                                });
-                              } else {
-                                // 取消选择该版本下的所有需求
-                                setSelectedRequirements(prev => 
-                                  prev.filter(id => !versionRequirementIds.includes(id))
+                          >
+                          </td>
+                        </tr>
+                        
+                        {/* 版本下的需求列表 */}
+                        <CollapsibleContent asChild>
+                          <>
+                            {requirements.map((requirement, index) => {
+                              // 判断当前版本是否处于批量模式
+                              const isVersionBatchMode = versionBatchModes[version] || false;
+                              
+                              return (
+                              <tr key={requirement.id} className="border-b hover:bg-muted/50 transition-colors">
+                            {columnOrder.map(columnId => {
+                              // 如果是序号列，根据该版本的批量选择模式显示序号或复选框
+                              if (columnId === 'index' && isColumnVisible(columnId)) {
+                                const width = COLUMN_WIDTHS[columnId] || 80;
+                                const isSelected = selectedIndexes.includes(requirement.id);
+                                
+                                return (
+                                  <td 
+                                    key={columnId}
+                                    className="sticky z-20 p-2 align-middle border-r text-xs text-center text-muted-foreground"
+                                    style={{ 
+                                      width: `${width}px`, 
+                                      minWidth: `${width}px`, 
+                                      maxWidth: `${width}px`,
+                                      left: '0px',
+                                      backgroundColor: 'var(--background)',
+                                      boxShadow: '2px 0 4px -2px rgba(0,0,0,0.15)'
+                                    }}
+                                  >
+                                    {isVersionBatchMode ? (
+                                      <Checkbox
+                                        checked={isSelected}
+                                        onCheckedChange={(checked) => {
+                                          if (checked) {
+                                            setSelectedIndexes(prev => [...prev, requirement.id]);
+                                          } else {
+                                            setSelectedIndexes(prev => prev.filter(id => id !== requirement.id));
+                                          }
+                                        }}
+                                      />
+                                    ) : (
+                                      index + 1
+                                    )}
+                                  </td>
                                 );
                               }
-                            }}
-                          />
-                        </div>
-                        
-                        {/* 展开/收起按钮和版本信息 */}
-                        <CollapsibleTrigger className="flex-1 flex items-center justify-between pr-4">
-                          <div className="flex items-center gap-2.5">
-                            {expandedVersions.has(version) ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                            <h3 className="text-sm font-semibold">{version}</h3>
-                            <span className="inline-flex items-center rounded bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
-                              {requirements.length} 个需求
-                            </span>
-                          </div>
-                        </CollapsibleTrigger>
-                      </div>
-                    </div>
-                  
-                  {/* 版本下的需求列表 - 不显示表头 */}
-                  <CollapsibleContent>
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse table-fixed">
-                        <tbody>
-                          {requirements.map(requirement => (
-                            <tr key={requirement.id} className="border-b hover:bg-accent/50">
-                              <td className="w-12 p-2 align-middle flex-shrink-0">
-                                <Checkbox
-                                  checked={selectedRequirements.includes(requirement.id)}
-                                  onCheckedChange={(checked) =>
-                                    handleSelectRequirement(requirement.id, !!checked)
-                                  }
-                                />
-                              </td>
-                              {columnOrder.map(columnId => renderTableCell(columnId, requirement))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-                  );
-                })}
+                              return renderTableCell(columnId, requirement);
+                            })}
+                              </tr>
+                              );
+                            })}
+                          </>
+                        </CollapsibleContent>
+                      </tbody>
+                    </table>
+                    </Collapsible>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
           )}

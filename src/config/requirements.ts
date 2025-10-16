@@ -36,7 +36,7 @@ export const UI_SIZES = {
   
   // 头像尺寸
   AVATAR: {
-    SMALL: 'h-6 w-6',    // 小头像（表格行内）
+    SMALL: 'h-5 w-5',    // 小头像（表格行内）
     MEDIUM: 'h-8 w-8',   // 中等头像（评论、详情）
     LARGE: 'h-10 w-10',  // 大头像（用户信息）
   },
@@ -230,7 +230,7 @@ export const FILTER_OPERATORS = [
   { value: 'is_not_empty', label: '不为空' }
 ] as const;
 
-// 可筛选的列定义
+// 可筛选的列定义（序号和标题是必须显示的，不在隐藏列表中）
 export const FILTERABLE_COLUMNS = [
   { value: 'id', label: 'ID' },
   { value: 'type', label: '需求类型' },

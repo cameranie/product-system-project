@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/ban-types */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * 测试工具库
  * 
@@ -46,9 +48,9 @@ export function customRender(
 ) {
   const { theme, ...renderOptions } = options;
   
-  function Wrapper({ children }: { children: React.ReactNode }) {
+  const Wrapper = ({ children }: { children: React.ReactNode }): JSX.Element => {
     return <TestProviders theme={theme}>{children}</TestProviders>;
-  }
+  };
 
   return render(ui, { wrapper: Wrapper, ...renderOptions });
 }
@@ -91,7 +93,7 @@ export const mockData = {
   /**
    * 生成API响应数据
    */
-  apiResponse: <T>(data: T, overrides: Partial<any> = {}) => ({
+  apiResponse: <T,>(data: T, overrides: Partial<Record<string, unknown>> = {}) => ({
     success: true,
     data,
     message: 'Success',
@@ -115,7 +117,7 @@ export const mockData = {
   /**
    * 生成分页数据
    */
-  paginatedData: <T>(items: T[], page: number = 1, size: number = 10) => ({
+  paginatedData: <T,>(items: T[], page: number = 1, size: number = 10) => ({
     items,
     pagination: {
       page,
@@ -135,7 +137,7 @@ export const apiMocks = {
   /**
    * 模拟成功响应
    */
-  success: <T>(data: T, delay: number = 0) => {
+  success: <T,>(data: T, delay: number = 0) => {
     return new Promise<{ data: T }>((resolve) => {
       setTimeout(() => {
         resolve({ data });
@@ -208,7 +210,7 @@ export const testAssertions = {
   /**
    * 检查异步操作
    */
-  expectAsyncToResolve: async <T>(promise: Promise<T>): Promise<T> => {
+  expectAsyncToResolve: async <T,>(promise: Promise<T>): Promise<T> => {
     return expect(promise).resolves.toBeDefined();
   },
 
@@ -534,3 +536,12 @@ export const testCleanup = {
 // 重新导出测试库
 export * from '@testing-library/react';
 export { customRender as render };
+
+
+
+
+
+
+
+
+

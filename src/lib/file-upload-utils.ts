@@ -5,24 +5,8 @@
 
 // 文件上传相关的工具函数和验证
 
-export const ALLOWED_FILE_TYPES = [
-  'image/jpeg',
-  'image/jpg', 
-  'image/png',
-  'image/gif',
-  'image/bmp',
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'text/plain',
-  'text/markdown',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/csv',
-  'application/zip',
-  'application/x-rar-compressed',
-  'application/x-7z-compressed'
-];
+// 允许所有文件类型上传
+export const ALLOWED_FILE_TYPES: string[] = [];
 
 export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 export const MAX_FILES = 10;
@@ -59,7 +43,8 @@ export function validateFiles(
   }
 
   files.forEach(file => {
-    if (!finalConfig.allowedTypes.includes(file.type)) {
+    // 如果 allowedTypes 为空数组，则允许所有类型
+    if (finalConfig.allowedTypes.length > 0 && !finalConfig.allowedTypes.includes(file.type)) {
       errors.push(`不支持的文件类型: ${file.name}`);
       return;
     }
@@ -216,68 +201,5 @@ export class FileURLManager {
   }
 }
 
-/**
- * 生成安全的唯一ID
- * 
- * 优先使用浏览器原生的 crypto.randomUUID() API，
- * 如果不可用则回退到基于时间戳和随机数的方案
- * 
- * @returns 唯一ID字符串
- * 
- * @example
- * ```typescript
- * const attachmentId = generateSecureId();
- * // 输出类似: "550e8400-e29b-41d4-a716-446655440000" 或 "l8xqz-abc123def456-xyz789ghi012"
- * ```
- */
-export function generateSecureId(): string {
-  // 使用crypto.randomUUID如果可用（现代浏览器支持）
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  
-  // 回退方案：使用更安全的随机数生成
-  // 格式: {timestamp}-{random}-{random}
-  const timestamp = Date.now().toString(36);
-  const randomPart = Math.random().toString(36).substring(2, 15);
-  const extraRandom = Math.random().toString(36).substring(2, 15);
-  return `${timestamp}-${randomPart}-${extraRandom}`;
-}
-
-/**
- * 生成需求ID
- * 
- * 生成格式为 #数字 的需求ID
- * 在实际生产环境中，应该由后端API返回
- * 
- * @returns 需求ID，格式为 #123456
- * 
- * @example
- * ```typescript
- * const requirementId = generateRequirementId();
- * // 输出类似: "#1727695234567"
- * ```
- */
-export function generateRequirementId(): string {
-  // 使用时间戳作为ID的一部分，确保唯一性
-  // 在实际项目中，这应该由后端数据库的自增ID或UUID提供
-  return `#${Date.now()}`;
-}
-
-/**
- * 时间格式化工具函数
- * 
- * 将当前时间格式化为 "YYYY-MM-DD HH:MM" 格式
- * 
- * @returns 格式化后的时间字符串
- * 
- * @example
- * ```typescript
- * const now = formatDateTime();
- * // 输出类似: "2025-09-30 12:33"
- * ```
- */
-export function formatDateTime(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-} 
+// 导出公共工具函数（从common-utils重新导出，保持向后兼容）
+export { generateSecureId, generateRequirementId, formatDateTime } from './common-utils'; 

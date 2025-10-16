@@ -20,6 +20,8 @@ import {
 import { X } from 'lucide-react';
 import { validateNeedToDo, validatePriority, validateRequirementIds } from '@/lib/input-validation';
 import { executeSyncBatchOperation } from '@/lib/batch-operations';
+import { RequirementTableSkeleton } from '@/components/ui/table-skeleton';
+import { useKeyboardShortcuts, COMMON_SHORTCUTS } from '@/hooks/useKeyboardShortcuts';
 
 /**
  * 筛选列配置类型（避免 readonly 类型冲突）
@@ -50,6 +52,9 @@ export default function RequirementsPage() {
   const router = useRouter();
   const { getRequirements, updateRequirement, loading, setLoading } = useRequirementsStore();
   const requirements = getRequirements();
+  
+  // 批量选择模式
+  const [batchMode, setBatchMode] = useState(false);
   
   // 使用自定义hook管理筛选和排序
   const {
@@ -104,9 +109,10 @@ export default function RequirementsPage() {
     try {
       // 如果验证通过的值为 undefined，说明是取消选择
       updateRequirement(requirementId, { needToDo: validationResult.value });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('更新失败:', error);
-      toast.error(error?.message || '更新失败，请重试');
+      const errorMessage = error instanceof Error ? error.message : '更新失败，请重试';
+      toast.error(errorMessage);
     }
   }, [updateRequirement]);
 
@@ -131,9 +137,10 @@ export default function RequirementsPage() {
     try {
       // 如果验证通过的值为 undefined，说明是取消选择
       updateRequirement(requirementId, { priority: validationResult.value });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('更新失败:', error);
-      toast.error(error?.message || '更新失败，请重试');
+      const errorMessage = error instanceof Error ? error.message : '更新失败，请重试';
+      toast.error(errorMessage);
     }
   }, [updateRequirement]);
 
@@ -155,7 +162,7 @@ export default function RequirementsPage() {
     }
 
     // P1: 批量操作ID验证（包括数量限制）
-    const idsValidation = validateRequirementIds(selectedRequirements, 100);
+    const idsValidation = validateRequirementIds(selectedRequirements.map(r => r.id), 100);
     if (!idsValidation.valid) {
       toast.error(idsValidation.error || '无效的需求选择');
       return;
@@ -163,7 +170,7 @@ export default function RequirementsPage() {
     
     // P1: 使用统一的批量操作工具
     executeSyncBatchOperation(
-      selectedRequirements,
+      selectedRequirements.map(r => r.id),
       (id) => {
         updateRequirement(id, { needToDo: value });
       },
@@ -196,14 +203,54 @@ export default function RequirementsPage() {
     router.push('/requirements/new');
   }, [router]);
 
+  /**
+   * 聚焦搜索框
+   */
+  const focusSearch = useCallback(() => {
+    const searchInput = document.querySelector('input[placeholder*="搜索"]') as HTMLInputElement;
+    if (searchInput) {
+      searchInput.focus();
+      searchInput.select();
+    }
+  }, []);
+
+  /**
+   * 配置键盘快捷键
+   */
+  useKeyboardShortcuts([
+    {
+      key: COMMON_SHORTCUTS.SEARCH,
+      description: '聚焦搜索框',
+      action: focusSearch,
+    },
+    {
+      key: COMMON_SHORTCUTS.NEW,
+      description: '新建需求',
+      action: handleCreateNew,
+    },
+    {
+      key: COMMON_SHORTCUTS.CANCEL,
+      description: '清空选择',
+      action: handleClearSelection,
+      enabled: selectedRequirements.length > 0,
+    },
+    {
+      key: COMMON_SHORTCUTS.SELECT_ALL,
+      description: '全选',
+      action: () => handleSelectAll(true),
+      preventDefault: true,
+    },
+  ]);
+
   if (loading) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">加载中...</p>
+        <div className="px-4 pt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="h-10 w-80 bg-muted animate-pulse rounded-md"></div>
+            <div className="h-10 w-32 bg-muted animate-pulse rounded-md"></div>
           </div>
+          <RequirementTableSkeleton />
         </div>
       </AppLayout>
     );
@@ -212,7 +259,7 @@ export default function RequirementsPage() {
   return (
     <AppLayout>
       {/* 固定区域：搜索栏和批量操作 */}
-      <div className="sticky top-0 z-20 bg-background border-b shadow-sm">
+      <div className="sticky top-0 z-20 bg-background">
         <div className="px-4 pt-4 pb-3 space-y-3">
           <FilterPanel
             searchTerm={searchTerm}
@@ -220,7 +267,11 @@ export default function RequirementsPage() {
             customFilters={customFilters}
             hiddenColumns={hiddenColumns}
             columnOrder={columnOrder}
-            stats={stats}
+            stats={{
+              total: requirements.length,
+              open: requirements.filter(r => r.status !== '已关闭').length,
+              closed: requirements.filter(r => r.status === '已关闭').length,
+            }}
             filterableColumns={FILTERABLE_COLUMNS as unknown as FilterableColumn[]}
             onSearchChange={setSearchTerm}
             onStatusFilterChange={setStatusFilter}
@@ -261,7 +312,7 @@ export default function RequirementsPage() {
                         批量是否要做
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent>
+                    <DropdownMenuContent className="z-[200]">
                       <DropdownMenuItem onClick={() => handleBatchNeedToDo('是')}>
                         设置为 是
                       </DropdownMenuItem>
@@ -278,16 +329,18 @@ export default function RequirementsPage() {
       </div>
 
       {/* 内容区域 */}
-      <div className="px-4 pt-4">
+      <div className="px-4 pt-4 pb-4">
         {/* 需求表格 - 自动切换虚拟滚动 */}
         {filteredRequirements.length > 100 ? (
           // 大数据量：使用虚拟滚动
           <VirtualizedRequirementTable
             requirements={filteredRequirements}
-            selectedRequirements={selectedRequirements}
+            selectedRequirements={selectedRequirements.map(r => r.id)}
             hiddenColumns={hiddenColumns}
             columnOrder={columnOrder}
             sortConfig={sortConfig}
+            batchMode={batchMode}
+            onBatchModeChange={setBatchMode}
             onRequirementSelect={handleRequirementSelect}
             onSelectAll={handleSelectAll}
             onNeedToDoChange={handleNeedToDoChange}
@@ -298,10 +351,12 @@ export default function RequirementsPage() {
           // 小数据量：使用普通表格
           <RequirementTable
             requirements={filteredRequirements}
-            selectedRequirements={selectedRequirements}
+            selectedRequirements={selectedRequirements.map(r => r.id)}
             hiddenColumns={hiddenColumns}
             columnOrder={columnOrder}
             sortConfig={sortConfig}
+            batchMode={batchMode}
+            onBatchModeChange={setBatchMode}
             onRequirementSelect={handleRequirementSelect}
             onSelectAll={handleSelectAll}
             onNeedToDoChange={handleNeedToDoChange}

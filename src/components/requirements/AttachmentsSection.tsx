@@ -42,8 +42,8 @@ export function AttachmentsSection({
   onUpload,
   onRemove,
   editable = true,
-  maxSize = 10, // 默认10MB
-  allowedTypes = ['image/*', 'application/pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt'],
+  maxSize = 100, // 默认100MB
+  allowedTypes = [], // 不限制文件类型
   title = '附件',
   showTitle = true
 }: AttachmentsSectionProps) {

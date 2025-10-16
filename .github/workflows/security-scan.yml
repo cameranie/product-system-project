@@ -1,0 +1,252 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # 每天凌晨2点运行安全扫描
+    - cron: '0 2 * * *'
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18, 20]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 获取完整历史记录用于安全扫描
+    
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    # 1. 依赖漏洞扫描
+    - name: Run npm audit
+      run: |
+        npm audit --audit-level=moderate --json > audit-results.json || true
+        npm audit --audit-level=moderate
+    
+    - name: Upload audit results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: audit-results-node-${{ matrix.node-version }}
+        path: audit-results.json
+    
+    # 2. 代码安全扫描
+    - name: Run ESLint security rules
+      run: |
+        npx eslint . --ext .js,.jsx,.ts,.tsx --config .eslintrc.security.js --format json --output-file eslint-security-results.json || true
+    
+    - name: Upload ESLint security results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: eslint-security-results-node-${{ matrix.node-version }}
+        path: eslint-security-results.json
+    
+    # 3. 依赖许可证检查
+    - name: Check licenses
+      run: |
+        npx license-checker --json --out licenses.json || true
+    
+    - name: Upload license results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: license-results-node-${{ matrix.node-version }}
+        path: licenses.json
+    
+    # 4. 敏感信息扫描
+    - name: Run TruffleHog (secrets scanner)
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+        extra_args: --debug --only-verified
+    
+    # 5. 容器安全扫描（如果有 Dockerfile）
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      if: hashFiles('**/Dockerfile') != ''
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always() && hashFiles('**/Dockerfile') != ''
+      with:
+        sarif_file: 'trivy-results.sarif'
+    
+    # 6. 代码质量安全检查
+    - name: Run SonarCloud Scan
+      if: github.event_name == 'pull_request'
+      uses: SonarSource/sonarcloud-github-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    
+    # 7. 安全测试报告
+    - name: Generate security report
+      if: always()
+      run: |
+        echo "# Security Scan Report" > security-report.md
+        echo "## Dependencies Audit" >> security-report.md
+        if [ -f audit-results.json ]; then
+          echo "✅ npm audit completed" >> security-report.md
+        else
+          echo "❌ npm audit failed" >> security-report.md
+        fi
+        
+        echo "## Code Security" >> security-report.md
+        if [ -f eslint-security-results.json ]; then
+          echo "✅ ESLint security scan completed" >> security-report.md
+        else
+          echo "❌ ESLint security scan failed" >> security-report.md
+        fi
+        
+        echo "## License Check" >> security-report.md
+        if [ -f licenses.json ]; then
+          echo "✅ License check completed" >> security-report.md
+        else
+          echo "❌ License check failed" >> security-report.md
+        fi
+        
+        echo "## Secrets Scan" >> security-report.md
+        echo "✅ TruffleHog secrets scan completed" >> security-report.md
+        
+        if [ -f trivy-results.sarif ]; then
+          echo "## Container Security" >> security-report.md
+          echo "✅ Trivy container scan completed" >> security-report.md
+        fi
+    
+    - name: Upload security report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-report
+        path: security-report.md
+
+  # 高级安全扫描（仅对 main 分支）
+  advanced-security:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    # 1. 代码复杂度分析
+    - name: Run complexity analysis
+      run: |
+        npx eslint . --ext .js,.jsx,.ts,.tsx --config .eslintrc.complexity.js --format json --output-file complexity-results.json || true
+    
+    # 2. 依赖关系分析
+    - name: Analyze dependencies
+      run: |
+        npx madge --circular --json src/ > circular-deps.json || true
+        npx madge --summary src/ > deps-summary.txt || true
+    
+    # 3. 安全配置检查
+    - name: Check security configurations
+      run: |
+        echo "Checking security configurations..."
+        
+        # 检查 package.json 安全配置
+        if [ -f package.json ]; then
+          echo "✅ package.json exists"
+          # 检查是否有安全相关的脚本
+          if grep -q "audit" package.json; then
+            echo "✅ npm audit script found"
+          else
+            echo "⚠️ npm audit script not found"
+          fi
+        fi
+        
+        # 检查环境变量文件
+        if [ -f .env.example ]; then
+          echo "✅ .env.example exists"
+        else
+          echo "❌ .env.example missing"
+        fi
+        
+        # 检查安全头配置
+        if [ -f next.config.ts ]; then
+          echo "✅ Next.js config exists"
+        else
+          echo "❌ Next.js config missing"
+        fi
+    
+    # 4. 上传高级扫描结果
+    - name: Upload advanced scan results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: advanced-security-results
+        path: |
+          complexity-results.json
+          circular-deps.json
+          deps-summary.txt
+
+  # 安全通知
+  security-notification:
+    runs-on: ubuntu-latest
+    needs: [security-scan]
+    if: always()
+    
+    steps:
+    - name: Download security artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: security-results
+    
+    - name: Check for critical vulnerabilities
+      run: |
+        echo "Checking for critical security issues..."
+        
+        # 检查 npm audit 结果
+        if [ -f security-results/audit-results-node-20/audit-results.json ]; then
+          CRITICAL_VULNS=$(jq '.vulnerabilities | to_entries | map(select(.value.severity == "critical")) | length' security-results/audit-results-node-20/audit-results.json || echo "0")
+          if [ "$CRITICAL_VULNS" -gt 0 ]; then
+            echo "🚨 CRITICAL: $CRITICAL_VULNS critical vulnerabilities found!"
+            exit 1
+          else
+            echo "✅ No critical vulnerabilities found"
+          fi
+        fi
+    
+    - name: Send security notification
+      if: failure()
+      run: |
+        echo "🚨 Security scan detected critical issues!"
+        echo "Please review the security scan results and address any critical vulnerabilities."
+        echo "Artifacts are available in the workflow run."
+
+

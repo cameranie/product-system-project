@@ -91,7 +91,7 @@ interface BaseCellProps {
 export const IDCell = React.memo<BaseCellProps>(({ requirement }) => {
   const widthClass = COLUMN_WIDTHS.id;
   return (
-    <td key="id" className={`${widthClass} p-2 align-middle flex-shrink-0 font-mono text-sm`}>
+    <td key="id" className={`${widthClass} p-2 align-middle flex-shrink-0 font-mono text-xs`}>
       {requirement.id}
     </td>
   );
@@ -109,7 +109,7 @@ export const TitleCell = React.memo<BaseCellProps>(({ requirement }) => {
       <div className="space-y-1">
         <Link
           href={`/requirements/${encodeURIComponent(requirement.id)}?from=scheduled`}
-          className="hover:underline font-medium block truncate"
+          className="hover:underline font-normal block truncate text-xs"
           title={requirement.title}
         >
           {requirement.title}
@@ -137,7 +137,7 @@ export const TypeCell = React.memo<BaseCellProps>(({ requirement }) => {
   const typeLabel = getRequirementTypeConfig(requirement.type)?.label || requirement.type;
   return (
     <td key="type" className={`${widthClass} p-2 align-middle flex-shrink-0`}>
-      <span className="text-sm truncate block" title={typeLabel}>
+      <span className="text-xs truncate block" title={typeLabel}>
         {typeLabel}
       </span>
     </td>
@@ -154,7 +154,7 @@ export const PlatformsCell = React.memo<BaseCellProps>(({ requirement }) => {
   const platforms = requirement.platforms || [];
   return (
     <td key="platforms" className={`${widthClass} p-2 align-middle flex-shrink-0`}>
-      <span className="text-sm truncate block" title={platforms.join(', ')}>
+      <span className="text-xs truncate block" title={platforms.join(', ')}>
         {platforms.join(', ') || '-'}
       </span>
     </td>
@@ -201,7 +201,7 @@ export const PriorityCell = React.memo<BaseCellProps>(({ requirement, onUpdate }
                 onClick={() => handlePriorityChange(key)}
                 className={`cursor-pointer ${currentPriority === key ? 'bg-accent' : ''}`}
               >
-                <span className={`px-2 py-1 rounded text-sm ${config.className} inline-block`}>
+                <span className={`px-2 py-1 rounded text-xs ${config.className} inline-block`}>
                   {config.label}
                 </span>
               </DropdownMenuItem>
@@ -308,7 +308,7 @@ export const ReviewerCell = React.memo<ReviewerCellProps>(({
       {levelInfo?.reviewer ? (
         <UserAvatar user={levelInfo.reviewer} size="sm" showName />
       ) : (
-        <span className="text-sm text-muted-foreground">未分配</span>
+        <span className="text-xs text-gray-400">未分配</span>
       )}
     </td>
   );
@@ -403,16 +403,16 @@ export const ReviewOpinionCell = React.memo<ReviewOpinionCellProps>(({
       <Button
         variant="ghost"
         size="sm"
-        className="h-8 px-2"
+        className="h-8 px-2 font-normal"
         onClick={() => onOpenReviewDialog(requirement, level)}
         title={levelInfo?.opinion || `点击填写${level === 1 ? '一' : '二'}级评审意见`}
       >
         {levelInfo?.opinion ? (
-          <span className="text-sm truncate max-w-[100px]">
+          <span className="text-xs truncate max-w-[100px]">
             {levelInfo.opinion}
           </span>
         ) : (
-          <span className="text-sm text-muted-foreground">填写意见</span>
+          <span className="text-xs text-gray-400">填写意见</span>
         )}
       </Button>
     </td>
@@ -427,7 +427,7 @@ export const ReviewOpinionCell = React.memo<ReviewOpinionCellProps>(({
 export const IsOperationalCell = React.memo<BaseCellProps>(({ requirement, onUpdate }) => {
   const widthClass = COLUMN_WIDTHS.isOperational;
   const operationalOptions = [
-    { value: 'unset', label: '未填写', className: 'text-muted-foreground' },
+    { value: 'unset', label: '未填写', className: 'text-gray-400' },
     { value: 'yes', label: '是', className: 'text-purple-700' },
     { value: 'no', label: '否', className: 'text-gray-700' }
   ];
@@ -491,7 +491,7 @@ export const CreatorCell = React.memo<BaseCellProps>(({ requirement }) => {
 export const CreatedAtCell = React.memo<BaseCellProps>(({ requirement }) => {
   const widthClass = COLUMN_WIDTHS.createdAt;
   return (
-    <td key="createdAt" className={`${widthClass} p-2 align-middle flex-shrink-0 text-sm`}>
+    <td key="createdAt" className={`${widthClass} p-2 align-middle flex-shrink-0 text-xs`}>
       {requirement.createdAt}
     </td>
   );
@@ -505,7 +505,7 @@ export const CreatedAtCell = React.memo<BaseCellProps>(({ requirement }) => {
 export const UpdatedAtCell = React.memo<BaseCellProps>(({ requirement }) => {
   const widthClass = COLUMN_WIDTHS.updatedAt;
   return (
-    <td key="updatedAt" className={`${widthClass} p-2 align-middle flex-shrink-0 text-sm`}>
+    <td key="updatedAt" className={`${widthClass} p-2 align-middle flex-shrink-0 text-xs`}>
       {requirement.updatedAt}
     </td>
   );

@@ -156,8 +156,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   private reportError(error: Error, errorInfo: ErrorInfo, errorId?: string): void {
     try {
       // 发送到错误监控服务（如 Sentry）
-      if (typeof window !== 'undefined' && (window as any).Sentry) {
-        (window as any).Sentry.captureException(error, {
+      if (typeof window !== 'undefined' && (window as Window & { Sentry?: { captureException: (error: Error, options?: unknown) => void } }).Sentry) {
+        (window as Window & { Sentry: { captureException: (error: Error, options?: unknown) => void } }).Sentry.captureException(error, {
           tags: {
             errorBoundary: true,
             errorId,

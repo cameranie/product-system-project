@@ -43,6 +43,23 @@ export interface ScheduledReviewData {
   reviewLevels: ScheduledReviewLevel[];
 }
 
+export interface Comment {
+  id: string;
+  content: string;
+  author: User;
+  createdAt: string;
+  attachments: Attachment[];
+  replies: Reply[];
+}
+
+export interface Reply {
+  id: string;
+  content: string;
+  author: User;
+  createdAt: string;
+  attachments: Attachment[];
+}
+
 export interface Requirement {
   id: string;
   title: string;
@@ -72,6 +89,7 @@ export interface Requirement {
   scheduledReview: ScheduledReviewData;
   delayTag?: string; // 延期标签，如 "PC 8.25 延版本"
   isOperational?: 'yes' | 'no'; // 是否运营性需求
+  comments?: Comment[]; // 评论列表
 }
 
 // 模拟用户数据

@@ -24,17 +24,21 @@ function generateBreadcrumbs(pathname: string, searchParams: URLSearchParams | n
   // 获取来源参数
   const fromParam = searchParams?.get('from')
 
+  // 预排期独立页面
+  if (segments[0] === 'scheduled') {
+    breadcrumbs.push({ title: "预排期" })
+  }
   // 需求相关路径特殊处理
-  if (segments[0] === 'requirements') {
-    // 预排期是独立页面，不是需求池的子级
-    if (segments[1] === 'scheduled') {
-      breadcrumbs.push({ title: "预排期" })
-    } 
-    // 需求池的其他子路径
+  else if (segments[0] === 'requirements') {
+    // 如果是需求池首页，不带href（显示为黑色）
+    if (segments.length === 1) {
+      breadcrumbs.push({ title: "需求池" })
+    }
+    // 如果有子路径
     else {
       // 如果from参数是scheduled，说明是从预排期来的
       if (fromParam === 'scheduled') {
-        breadcrumbs.push({ title: "预排期", href: "/requirements/scheduled" })
+        breadcrumbs.push({ title: "预排期", href: "/scheduled" })
       } else {
         breadcrumbs.push({ title: "需求池", href: "/requirements" })
       }
@@ -82,6 +86,11 @@ function generateBreadcrumbs(pathname: string, searchParams: URLSearchParams | n
     } else if (segments[2] === 'visibility') {
       breadcrumbs.push({ title: "可见性管理" })
     }
+  }
+  
+  // 版本号管理路径
+  else if (segments[0] === 'versions') {
+    breadcrumbs.push({ title: "版本号管理" })
   }
   
   // 其他路径的默认处理

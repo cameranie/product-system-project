@@ -1,29 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
-import type { User, Attachment } from '@/lib/requirements-store';
-
-/**
- * 评论接口
- */
-export interface Comment {
-  id: string;
-  content: string;
-  author: User;
-  createdAt: string;
-  attachments: Attachment[];
-  replies: Reply[];
-}
-
-/**
- * 回复接口
- */
-export interface Reply {
-  id: string;
-  content: string;
-  author: User;
-  createdAt: string;
-  attachments: Attachment[];
-}
+import type { User, Attachment, Comment, Reply } from '@/lib/requirements-store';
 
 /**
  * Hook 配置选项
@@ -34,6 +11,7 @@ interface UseCommentsOptions {
   initialComments?: Comment[];
   onCommentAdded?: (comment: Comment) => void;
   onReplyAdded?: (commentId: string, reply: Reply) => void;
+  onCommentsChange?: (comments: Comment[]) => void;
 }
 
 /**
@@ -57,31 +35,41 @@ export function useComments({
   currentUser,
   initialComments = [],
   onCommentAdded,
-  onReplyAdded
+  onReplyAdded,
+  onCommentsChange
 }: UseCommentsOptions) {
   // 状态管理
   const [comments, setComments] = useState<Comment[]>(initialComments);
   const [newComment, setNewComment] = useState('');
-  const [newCommentFiles, setNewCommentFiles] = useState<File[]>([]);
+  const [newCommentAttachments, setNewCommentAttachments] = useState<Attachment[]>([]);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');
-  const [replyFiles, setReplyFiles] = useState<File[]>([]);
-  
-  // Refs
-  const commentFileRef = useRef<HTMLInputElement>(null);
-  const replyFileRef = useRef<HTMLInputElement>(null);
+  const [replyAttachments, setReplyAttachments] = useState<Attachment[]>([]);
+  const [editingComment, setEditingComment] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
+  const [editingAttachments, setEditingAttachments] = useState<Attachment[]>([]);
 
   /**
    * 处理评论提交
    */
   const handleSubmitComment = useCallback(async () => {
-    if (!newComment.trim()) {
+    // 从富文本中提取纯文本内容进行验证
+    const getPlainText = (html: string): string => {
+      if (typeof window === 'undefined') return html;
+      const temp = document.createElement('div');
+      temp.innerHTML = html;
+      return temp.textContent || temp.innerText || '';
+    };
+    
+    const plainText = getPlainText(newComment).trim();
+    
+    if (!plainText) {
       toast.error('请输入评论内容');
       return;
     }
 
     try {
-      const { formatDateTime, FileURLManager, generateSecureId } = await import('@/lib/file-upload-utils');
+      const { formatDateTime } = await import('@/lib/file-upload-utils');
       const timeString = formatDateTime();
       
       const comment: Comment = {
@@ -89,39 +77,45 @@ export function useComments({
         content: newComment,
         author: currentUser,
         createdAt: timeString,
-        attachments: await Promise.all(newCommentFiles.map(async (file) => ({
-          id: generateSecureId(),
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          url: FileURLManager.createObjectURL(file)
-        }))),
+        attachments: newCommentAttachments,
         replies: []
       };
 
-      setComments(prev => [...prev, comment]);
+      const updatedComments = [...comments, comment];
+      setComments(updatedComments);
       setNewComment('');
-      setNewCommentFiles([]);
+      setNewCommentAttachments([]);
       toast.success('评论已发布');
       
       onCommentAdded?.(comment);
+      onCommentsChange?.(updatedComments);
     } catch (error) {
       console.error('评论提交失败:', error);
       toast.error('评论提交失败，请重试');
     }
-  }, [newComment, newCommentFiles, currentUser, onCommentAdded]);
+  }, [newComment, newCommentAttachments, currentUser, comments, onCommentAdded, onCommentsChange]);
 
   /**
    * 处理回复提交
    */
   const handleSubmitReply = useCallback(async (commentId: string) => {
-    if (!replyContent.trim()) {
+    // 从富文本中提取纯文本内容进行验证
+    const getPlainText = (html: string): string => {
+      if (typeof window === 'undefined') return html;
+      const temp = document.createElement('div');
+      temp.innerHTML = html;
+      return temp.textContent || temp.innerText || '';
+    };
+    
+    const plainText = getPlainText(replyContent).trim();
+    
+    if (!plainText) {
       toast.error('请输入回复内容');
       return;
     }
 
     try {
-      const { formatDateTime, FileURLManager, generateSecureId } = await import('@/lib/file-upload-utils');
+      const { formatDateTime } = await import('@/lib/file-upload-utils');
       const timeString = formatDateTime();
       
       const reply: Reply = {
@@ -129,61 +123,41 @@ export function useComments({
         content: replyContent,
         author: currentUser,
         createdAt: timeString,
-        attachments: await Promise.all(replyFiles.map(async (file) => ({
-          id: generateSecureId(),
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          url: FileURLManager.createObjectURL(file)
-        })))
+        attachments: replyAttachments
       };
 
-      setComments(prev => prev.map(comment => 
+      const updatedComments = comments.map(comment => 
         comment.id === commentId 
           ? { ...comment, replies: [...comment.replies, reply] }
           : comment
-      ));
+      );
+      setComments(updatedComments);
 
       setReplyContent('');
-      setReplyFiles([]);
+      setReplyAttachments([]);
       setReplyingTo(null);
       toast.success('回复已发布');
       
       onReplyAdded?.(commentId, reply);
+      onCommentsChange?.(updatedComments);
     } catch (error) {
       console.error('回复提交失败:', error);
       toast.error('回复提交失败，请重试');
     }
-  }, [replyContent, replyFiles, currentUser, onReplyAdded]);
+  }, [replyContent, replyAttachments, currentUser, comments, onReplyAdded, onCommentsChange]);
 
   /**
-   * 处理评论文件上传
+   * 处理评论附件变更
    */
-  const handleCommentFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setNewCommentFiles(prev => [...prev, ...files]);
+  const handleCommentAttachmentsChange = useCallback((attachments: Attachment[]) => {
+    setNewCommentAttachments(attachments);
   }, []);
 
   /**
-   * 处理回复文件上传
+   * 处理回复附件变更
    */
-  const handleReplyFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setReplyFiles(prev => [...prev, ...files]);
-  }, []);
-
-  /**
-   * 移除评论文件
-   */
-  const removeCommentFile = useCallback((index: number) => {
-    setNewCommentFiles(prev => prev.filter((_, i) => i !== index));
-  }, []);
-
-  /**
-   * 移除回复文件
-   */
-  const removeReplyFile = useCallback((index: number) => {
-    setReplyFiles(prev => prev.filter((_, i) => i !== index));
+  const handleReplyAttachmentsChange = useCallback((attachments: Attachment[]) => {
+    setReplyAttachments(attachments);
   }, []);
 
   /**
@@ -192,7 +166,7 @@ export function useComments({
   const startReply = useCallback((commentId: string) => {
     setReplyingTo(commentId);
     setReplyContent('');
-    setReplyFiles([]);
+    setReplyAttachments([]);
   }, []);
 
   /**
@@ -201,33 +175,111 @@ export function useComments({
   const cancelReply = useCallback(() => {
     setReplyingTo(null);
     setReplyContent('');
-    setReplyFiles([]);
+    setReplyAttachments([]);
+  }, []);
+
+  /**
+   * 开始编辑评论
+   */
+  const startEditComment = useCallback((commentId: string) => {
+    const comment = comments.find(c => c.id === commentId);
+    if (comment) {
+      setEditingComment(commentId);
+      setEditingContent(comment.content);
+      setEditingAttachments(comment.attachments);
+    }
+  }, [comments]);
+
+  /**
+   * 取消编辑评论
+   */
+  const cancelEditComment = useCallback(() => {
+    setEditingComment(null);
+    setEditingContent('');
+    setEditingAttachments([]);
+  }, []);
+
+  /**
+   * 保存编辑的评论
+   */
+  const handleSaveEditComment = useCallback(async () => {
+    // 从富文本中提取纯文本内容进行验证
+    const getPlainText = (html: string): string => {
+      if (typeof window === 'undefined') return html;
+      const temp = document.createElement('div');
+      temp.innerHTML = html;
+      return temp.textContent || temp.innerText || '';
+    };
+    
+    const plainText = getPlainText(editingContent).trim();
+    
+    if (!plainText) {
+      toast.error('请输入评论内容');
+      return;
+    }
+
+    try {
+      const updatedComments = comments.map(comment =>
+        comment.id === editingComment
+          ? { ...comment, content: editingContent, attachments: editingAttachments }
+          : comment
+      );
+      setComments(updatedComments);
+      setEditingComment(null);
+      setEditingContent('');
+      setEditingAttachments([]);
+      toast.success('评论已更新');
+      onCommentsChange?.(updatedComments);
+    } catch (error) {
+      console.error('评论更新失败:', error);
+      toast.error('评论更新失败，请重试');
+    }
+  }, [editingComment, editingContent, editingAttachments, comments, onCommentsChange]);
+
+  /**
+   * 删除评论
+   */
+  const handleDeleteComment = useCallback((commentId: string) => {
+    const updatedComments = comments.filter(c => c.id !== commentId);
+    setComments(updatedComments);
+    toast.success('评论已删除');
+    onCommentsChange?.(updatedComments);
+  }, [comments, onCommentsChange]);
+
+  /**
+   * 处理编辑评论的附件变更
+   */
+  const handleEditAttachmentsChange = useCallback((attachments: Attachment[]) => {
+    setEditingAttachments(attachments);
   }, []);
 
   return {
     // 状态
     comments,
     newComment,
-    newCommentFiles,
+    newCommentAttachments,
     replyingTo,
     replyContent,
-    replyFiles,
-    
-    // Refs
-    commentFileRef,
-    replyFileRef,
+    replyAttachments,
+    editingComment,
+    editingContent,
+    editingAttachments,
     
     // 评论操作
     setNewComment,
     handleSubmitComment,
-    handleCommentFileUpload,
-    removeCommentFile,
+    handleCommentAttachmentsChange,
+    startEditComment,
+    cancelEditComment,
+    setEditingContent,
+    handleSaveEditComment,
+    handleDeleteComment,
+    handleEditAttachmentsChange,
     
     // 回复操作
     setReplyContent,
     handleSubmitReply,
-    handleReplyFileUpload,
-    removeReplyFile,
+    handleReplyAttachmentsChange,
     startReply,
     cancelReply
   };

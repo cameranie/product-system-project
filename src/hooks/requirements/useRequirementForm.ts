@@ -186,19 +186,19 @@ export function useRequirementForm(options: UseRequirementFormOptions = {}) {
    */
   const handleFileUpload = useCallback(async (files: File[]) => {
     try {
-      // 使用增强验证（包含文件签名检查）
-      const { validateFilesEnhanced, FileURLManager, generateSecureId } = await import('@/lib/file-upload-utils');
-
-      // 验证文件（包含签名检查，防止MIME类型欺骗）
-      const validation = await validateFilesEnhanced(files, attachments.length);
+      const maxSize = 100 * 1024 * 1024; // 100MB
       
-      if (validation.errors.length > 0) {
-        toast.error(validation.errors[0]);
+      // 验证文件大小
+      const invalidFiles = files.filter(file => file.size > maxSize);
+      if (invalidFiles.length > 0) {
+        toast.error(`文件大小不能超过 100MB，请重新选择`);
         return;
       }
 
+      const { FileURLManager, generateSecureId } = await import('@/lib/file-upload-utils');
+
       // 创建附件对象
-      const newAttachments: Attachment[] = validation.validFiles.map(file => ({
+      const newAttachments: Attachment[] = files.map(file => ({
         id: generateSecureId(),
         name: file.name,
         size: file.size,
@@ -207,12 +207,12 @@ export function useRequirementForm(options: UseRequirementFormOptions = {}) {
       }));
 
       setAttachments(prev => [...prev, ...newAttachments]);
-      toast.success(`已添加 ${validation.validFiles.length} 个文件`);
+      toast.success(`已添加 ${files.length} 个文件`);
     } catch (error) {
       console.error('文件上传失败:', error);
       toast.error('文件上传失败，请重试');
     }
-  }, [attachments.length]);
+  }, []);
 
   /**
    * 处理附件删除
@@ -261,26 +261,37 @@ export function useRequirementForm(options: UseRequirementFormOptions = {}) {
 
     // ===== 描述验证 =====
     
-    // 1. 必填检查
-    if (!formData.description.trim()) {
+    // 提取富文本的纯文本内容进行验证
+    const getPlainText = (html: string): string => {
+      if (typeof window === 'undefined') return html;
+      const temp = document.createElement('div');
+      temp.innerHTML = html;
+      return temp.textContent || temp.innerText || '';
+    };
+    
+    const plainDescription = getPlainText(formData.description).trim();
+    
+    // 1. 必填检查（检查纯文本内容）
+    if (!plainDescription) {
       toast.error('请输入需求描述');
       return false;
     }
 
-    // 2. 长度限制（1-10000字符）
-    if (formData.description.length < 1) {
+    // 2. 长度限制（检查纯文本内容，1-5000字符）
+    if (plainDescription.length < 1) {
       toast.error('需求描述不能为空');
       return false;
     }
     
-    if (formData.description.length > 10000) {
-      toast.error('需求描述不能超过10000个字符');
+    if (plainDescription.length > 5000) {
+      toast.error('需求描述不能超过5000个字符');
       return false;
     }
 
-    // 3. 危险字符检测
-    if (dangerousCharsPattern.test(formData.description)) {
-      toast.error('描述包含不允许的字符');
+    // 3. 危险脚本检测（检查是否包含危险的脚本标签）
+    const dangerousScriptPattern = /<script[\s\S]*?>[\s\S]*?<\/script>|<iframe[\s\S]*?>|javascript:|onerror\s*=|onload\s*=/i;
+    if (dangerousScriptPattern.test(formData.description)) {
+      toast.error('描述包含不允许的脚本内容');
       return false;
     }
 

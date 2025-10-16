@@ -97,8 +97,8 @@ export class ErrorBoundary extends React.Component<
     });
 
     // 2. 发送到 Sentry（如果已集成）
-    if (typeof window !== 'undefined' && (window as any).Sentry) {
-      (window as any).Sentry.captureException(error, {
+    if (typeof window !== 'undefined' && (window as Window & { Sentry?: { captureException: (error: Error, options?: unknown) => void } }).Sentry) {
+      (window as Window & { Sentry: { captureException: (error: Error, options?: unknown) => void } }).Sentry.captureException(error, {
         contexts: {
           react: {
             componentStack: errorInfo.componentStack,
@@ -306,7 +306,7 @@ export class ErrorBoundary extends React.Component<
  * ```
  */
 export function useErrorHandler() {
-  const handleError = React.useCallback((error: Error, context?: Record<string, any>) => {
+  const handleError = React.useCallback((error: Error, context?: Record<string, unknown>) => {
     logger.error('Uncaught error in component', error, {
       ...context,
       action: 'manual-error-handling',
@@ -320,6 +320,7 @@ export function useErrorHandler() {
   }, []);
 
   const catchError = React.useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     <T extends (...args: any[]) => Promise<any>>(fn: T) => {
       return (async (...args: Parameters<T>) => {
         try {

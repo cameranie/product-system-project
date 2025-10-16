@@ -35,7 +35,7 @@ export default function FieldAdminPage() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   // 预设的“组”映射到字段key（与人员编辑页一致，可根据需要微调）
   const groupDefs: Array<{ name: string; keys: string[] }> = [

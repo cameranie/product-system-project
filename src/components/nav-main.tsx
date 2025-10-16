@@ -46,14 +46,14 @@ export function NavMain({
     }
     
     // 特殊处理：如果是从预排期来的需求详情页，激活预排期而不是需求池
-    if (fromSource === 'scheduled' && pathname.startsWith('/requirements/') && itemUrl === '/requirements/scheduled') {
+    if (fromSource === 'scheduled' && pathname.startsWith('/requirements/') && itemUrl === '/scheduled') {
       return true
     }
     if (fromSource === 'scheduled' && pathname.startsWith('/requirements/') && itemUrl === '/requirements') {
       return false
     }
     
-    // 检查是否有其他更具体的路径匹配（避免 /requirements 和 /requirements/scheduled 同时激活）
+    // 检查是否有其他更具体的路径匹配
     const moreSpecificMatch = allItems.some(item => {
       if (item.url === itemUrl) return false // 跳过自己
       return item.url.startsWith(itemUrl) && pathname.startsWith(item.url)
@@ -83,43 +83,52 @@ export function NavMain({
                 className="group/collapsible"
               >
                 <SidebarMenuItem>
-                  <CollapsibleTrigger asChild>
+                  {hasSubItems ? (
+                    <>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton 
+                          tooltip={item.title} 
+                          isActive={isActive}
+                          className="data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
+                        >
+                          {item.icon && <item.icon />}
+                          <span>{item.title}</span>
+                          <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {item.items!.map((subItem) => {
+                            const isSubActive = pathname === subItem.url || pathname.startsWith(subItem.url + '/')
+                            return (
+                              <SidebarMenuSubItem key={subItem.title}>
+                                <SidebarMenuSubButton 
+                                  asChild 
+                                  isActive={isSubActive}
+                                  className="data-[active=true]:bg-accent/80 data-[active=true]:text-accent-foreground"
+                                >
+                                  <Link href={subItem.url}>
+                                    <span>{subItem.title}</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            )
+                          })}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </>
+                  ) : (
                     <SidebarMenuButton 
                       tooltip={item.title} 
                       isActive={isActive}
                       className="data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
+                      asChild
                     >
-                      {item.icon && <item.icon />}
-                      <span>{item.title}</span>
-                      {hasSubItems && (
-                        <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                      )}
+                      <Link href={item.url}>
+                        {item.icon && <item.icon />}
+                        <span>{item.title}</span>
+                      </Link>
                     </SidebarMenuButton>
-                  </CollapsibleTrigger>
-                  {hasSubItems && (
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        {item.items!.map((subItem) => {
-                          const isSubActive = pathname === subItem.url || pathname.startsWith(subItem.url + '/')
-                          return (
-                            <SidebarMenuSubItem key={subItem.title}>
-                              <SidebarMenuSubButton 
-                                asChild 
-                                isActive={isSubActive}
-                                className="data-[active=true]:bg-accent/80 data-[active=true]:text-accent-foreground"
-                              >
-                                <Link href={subItem.url}>
-                                  <span>{subItem.title}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          )
-                        })}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  )}
-                  {!hasSubItems && (
-                    <Link href={item.url} className="absolute inset-0 z-10" />
                   )}
                 </SidebarMenuItem>
               </Collapsible>

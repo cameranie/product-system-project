@@ -5,20 +5,20 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { 
+  StickyTable, 
+  StickyTableHeader, 
+  StickyTableBody, 
+  StickyTableRow, 
+  StickyTableHead,
+  StickyTableCell 
+} from '@/components/ui/sticky-table';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableCell,
-  TableHead,
-} from '@/components/ui/table';
 import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { Requirement } from '@/lib/requirements-store';
 import { 
@@ -39,6 +39,8 @@ interface RequirementTableProps {
     field: string;
     direction: 'asc' | 'desc';
   };
+  batchMode?: boolean;
+  onBatchModeChange?: (enabled: boolean) => void;
   onRequirementSelect: (id: string, checked: boolean) => void;
   onSelectAll: (checked: boolean) => void;
   onNeedToDoChange: (id: string, value: string) => void;
@@ -52,6 +54,8 @@ export const RequirementTable = memo(function RequirementTable({
   hiddenColumns,
   columnOrder,
   sortConfig,
+  batchMode = false,
+  onBatchModeChange,
   onRequirementSelect,
   onSelectAll,
   onNeedToDoChange,
@@ -59,6 +63,17 @@ export const RequirementTable = memo(function RequirementTable({
   onColumnSort
 }: RequirementTableProps) {
   const isColumnVisible = useCallback((column: string) => !hiddenColumns.includes(column), [hiddenColumns]);
+
+  const handleSelectAll = useCallback((checked: boolean) => {
+    // 进入/退出批量模式
+    if (onBatchModeChange) {
+      onBatchModeChange(checked);
+    }
+    // 全选/取消全选
+    onSelectAll(checked);
+  }, [onSelectAll, onBatchModeChange]);
+
+  const isAllSelected = requirements.length > 0 && selectedRequirements.length === requirements.length;
 
   /**
    * 渲染排序按钮
@@ -90,91 +105,122 @@ export const RequirementTable = memo(function RequirementTable({
    * 可维护性：使用配置化的列宽，便于统一调整
    */
   const columnConfig = useMemo(() => ({
+    index: {
+      header: (props?: any) => (
+        <StickyTableHead className="w-[80px] min-w-[80px] max-w-[80px] px-2 border-r !z-50" {...props}>
+          <div className="flex items-center justify-center">
+            <Checkbox
+              checked={isAllSelected}
+              onCheckedChange={handleSelectAll}
+            />
+          </div>
+        </StickyTableHead>
+      ),
+      cell: (requirement: Requirement, index: number, props?: any) => {
+        const isSelected = selectedRequirements.includes(requirement.id);
+        return (
+          <StickyTableCell className="w-[80px] min-w-[80px] max-w-[80px] px-2 py-3 text-xs text-center text-muted-foreground border-r" {...props}>
+            {batchMode ? (
+              <Checkbox
+                checked={isSelected}
+                onCheckedChange={(checked) => onRequirementSelect(requirement.id, checked as boolean)}
+              />
+            ) : (
+              index + 1
+            )}
+          </StickyTableCell>
+        );
+      }
+    },
     id: {
-      header: () => (
-        <TableHead className={`${UI_SIZES.TABLE.COLUMN_WIDTHS.ID} px-2`}>
-          <div className="flex items-center">
+      header: (props?: any) => (
+        <StickyTableHead className="w-[96px] min-w-[96px] max-w-[96px] px-2 border-r" {...props}>
+          <div className="flex items-center whitespace-nowrap">
             ID
             {renderSortButton('id')}
           </div>
-        </TableHead>
+        </StickyTableHead>
       ),
-      cell: (requirement: Requirement) => (
-        <TableCell className="px-2 py-3 font-mono text-sm">
+      cell: (requirement: Requirement, index: number, props?: any) => (
+        <StickyTableCell className="w-[96px] min-w-[96px] max-w-[96px] px-2 py-3 font-mono text-xs border-r" {...props}>
           {requirement.id}
-        </TableCell>
+        </StickyTableCell>
       )
     },
     title: {
-      header: () => (
-        <TableHead className="px-3 w-[30%] sm:w-[35%] lg:w-[30%] xl:w-[25%]">
-          <div className="flex items-center">
+      header: (props?: any) => (
+        <StickyTableHead className="w-[300px] min-w-[300px] max-w-[300px] px-3 border-r z-40" {...props}>
+          <div className="flex items-center whitespace-nowrap">
             标题
             {renderSortButton('title')}
           </div>
-        </TableHead>
+        </StickyTableHead>
       ),
-      cell: (requirement: Requirement) => (
-        <TableCell className="px-3 py-3">
+      cell: (requirement: Requirement, index: number, props?: any) => (
+        <StickyTableCell className="w-[300px] min-w-[300px] max-w-[300px] px-3 py-3 border-r" {...props}>
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <Link
                 href={`/requirements/${encodeURIComponent(requirement.id)}`}
-                className="font-medium hover:underline line-clamp-2 min-w-0 flex-1 break-words overflow-hidden"
+                className="font-normal hover:underline line-clamp-2 min-w-0 flex-1 break-words overflow-hidden text-xs"
                 title={requirement.title}
               >
                 {requirement.title}
               </Link>
             </div>
           </div>
-        </TableCell>
+        </StickyTableCell>
       )
     },
     type: {
-      header: () => (
-        <TableHead className="px-3 w-[10%] sm:w-[12%] lg:w-[10%]">需求类型</TableHead>
+      header: (props?: any) => (
+        <StickyTableHead className="w-[120px] min-w-[120px] max-w-[120px] px-3 border-r" {...props}>
+          <div className="whitespace-nowrap">需求类型</div>
+        </StickyTableHead>
       ),
-      cell: (requirement: Requirement) => {
+      cell: (requirement: Requirement, index: number, props?: any) => {
         const typeConfig = getRequirementTypeConfig(requirement.type);
         return (
-          <TableCell className="px-3 py-3">
-            <span className="text-sm truncate block" title={typeConfig?.label || requirement.type}>
+          <StickyTableCell className="w-[120px] min-w-[120px] max-w-[120px] px-3 py-3 border-r" {...props}>
+            <span className="text-xs truncate block" title={typeConfig?.label || requirement.type}>
               {typeConfig?.label || requirement.type}
             </span>
-          </TableCell>
+          </StickyTableCell>
         );
       }
     },
     platforms: {
-      header: () => (
-        <TableHead className="px-3 w-[12%] sm:w-[14%] lg:w-[12%]">应用端</TableHead>
+      header: (props?: any) => (
+        <StickyTableHead className="w-[150px] min-w-[150px] max-w-[150px] px-3 border-r" {...props}>
+          <div className="whitespace-nowrap">应用端</div>
+        </StickyTableHead>
       ),
-      cell: (requirement: Requirement) => (
-        <TableCell className="px-3 py-3">
+      cell: (requirement: Requirement, index: number, props?: any) => (
+        <StickyTableCell className="w-[150px] min-w-[150px] max-w-[150px] px-3 py-3 border-r" {...props}>
           {requirement.platforms && requirement.platforms.length > 0 ? (
-            <span className="text-sm truncate block" title={requirement.platforms.join(', ')}>
+            <span className="text-xs truncate block" title={requirement.platforms.join(', ')}>
               {requirement.platforms.join(', ')}
             </span>
           ) : (
-            <span className="text-sm text-muted-foreground">-</span>
+            <span className="text-xs text-muted-foreground">-</span>
           )}
-        </TableCell>
+        </StickyTableCell>
       )
     },
     endOwner: {
-      header: () => (
-        <TableHead className="px-3 w-[12%] sm:w-[14%] lg:w-[12%]">
-          <div className="flex items-center">
+      header: (props?: any) => (
+        <StickyTableHead className="w-[150px] min-w-[150px] max-w-[150px] px-3 border-r" {...props}>
+          <div className="flex items-center whitespace-nowrap">
             端负责人
             {renderSortButton('endOwner')}
           </div>
-        </TableHead>
+        </StickyTableHead>
       ),
-      cell: (requirement: Requirement) => (
-        <TableCell className="px-3 py-3">
+      cell: (requirement: Requirement, index: number, props?: any) => (
+        <StickyTableCell className="w-[150px] min-w-[150px] max-w-[150px] px-3 py-3 border-r" {...props}>
           {requirement.endOwnerOpinion?.owner ? (
             <div className="flex items-center gap-2 min-w-0">
-              <Avatar className="h-6 w-6 flex-shrink-0">
+              <Avatar className="h-5 w-5 flex-shrink-0">
                 <AvatarImage 
                   src={requirement.endOwnerOpinion.owner.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${requirement.endOwnerOpinion.owner.name}`}
                 />
@@ -182,25 +228,27 @@ export const RequirementTable = memo(function RequirementTable({
                   {requirement.endOwnerOpinion.owner.name?.slice(0, 2) || 'U'}
                 </AvatarFallback>
               </Avatar>
-              <span className="text-sm truncate min-w-0" title={requirement.endOwnerOpinion.owner.name}>
+              <span className="text-xs truncate min-w-0" title={requirement.endOwnerOpinion.owner.name}>
                 {requirement.endOwnerOpinion.owner.name}
               </span>
             </div>
           ) : (
-            <span className="text-sm text-muted-foreground">-</span>
+            <span className="text-xs text-muted-foreground">-</span>
           )}
-        </TableCell>
+        </StickyTableCell>
       )
     },
     needToDo: {
-      header: () => (
-        <TableHead className="px-3 w-[10%] sm:w-[12%] lg:w-[10%]">是否要做</TableHead>
+      header: (props?: any) => (
+        <StickyTableHead className="w-[120px] min-w-[120px] max-w-[120px] px-3 border-r" {...props}>
+          <div className="whitespace-nowrap">是否要做</div>
+        </StickyTableHead>
       ),
-      cell: (requirement: Requirement) => {
+      cell: (requirement: Requirement, index: number, props?: any) => {
         const currentValue = requirement.needToDo;
         const config = currentValue ? getNeedToDoConfig(currentValue) : null;
         return (
-          <TableCell className="px-3 py-3">
+          <StickyTableCell className="w-[120px] min-w-[120px] max-w-[120px] px-3 py-3 border-r" {...props}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -223,33 +271,33 @@ export const RequirementTable = memo(function RequirementTable({
                     }}
                     className={`cursor-pointer ${currentValue === key ? 'bg-accent' : ''}`}
                   >
-                    <span className={`px-2 py-1 rounded text-sm ${config.className} inline-block`}>
+                    <span className={`px-2 py-1 rounded text-xs ${config.className} inline-block`}>
                       {config.label}
                     </span>
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-          </TableCell>
+          </StickyTableCell>
         );
       }
     },
     priority: {
-      header: () => (
-        <TableHead className="px-3 w-[8%] sm:w-[10%] lg:w-[8%]">
-          <div className="flex items-center">
+      header: (props?: any) => (
+        <StickyTableHead className="w-[110px] min-w-[110px] max-w-[110px] px-3 border-r" {...props}>
+          <div className="flex items-center whitespace-nowrap">
             优先级
             {renderSortButton('priority')}
           </div>
-        </TableHead>
+        </StickyTableHead>
       ),
-      cell: (requirement: Requirement) => {
+      cell: (requirement: Requirement, index: number, props?: any) => {
         const currentValue = requirement.priority;
         const config = currentValue ? getPriorityConfig(currentValue) : null;
         // 按优先级从高到低排序：紧急 > 高 > 中 > 低
         const priorityOrder = ['紧急', '高', '中', '低'];
         return (
-          <TableCell className="px-3 py-3">
+          <StickyTableCell className="w-[110px] min-w-[110px] max-w-[110px] px-3 py-3 border-r" {...props}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -274,7 +322,7 @@ export const RequirementTable = memo(function RequirementTable({
                       }}
                       className={`cursor-pointer ${currentValue === key ? 'bg-accent' : ''}`}
                     >
-                      <span className={`px-2 py-1 rounded text-sm ${config.className} inline-block`}>
+                      <span className={`px-2 py-1 rounded text-xs ${config.className} inline-block`}>
                         {config.label}
                       </span>
                     </DropdownMenuItem>
@@ -282,23 +330,23 @@ export const RequirementTable = memo(function RequirementTable({
                 })}
               </DropdownMenuContent>
             </DropdownMenu>
-          </TableCell>
+          </StickyTableCell>
         );
       }
     },
     creator: {
-      header: () => (
-        <TableHead className="px-3 w-[12%] sm:w-[14%] lg:w-[12%]">
-          <div className="flex items-center">
+      header: (props?: any) => (
+        <StickyTableHead className="w-[130px] min-w-[130px] max-w-[130px] px-3 border-r" {...props}>
+          <div className="flex items-center whitespace-nowrap">
             创建人
             {renderSortButton('creator')}
           </div>
-        </TableHead>
+        </StickyTableHead>
       ),
-      cell: (requirement: Requirement) => (
-        <TableCell className="px-3 py-3">
+      cell: (requirement: Requirement, index: number, props?: any) => (
+        <StickyTableCell className="w-[130px] min-w-[130px] max-w-[130px] px-3 py-3 border-r" {...props}>
           <div className="flex items-center gap-2 min-w-0">
-            <Avatar className="h-6 w-6 flex-shrink-0">
+            <Avatar className="h-5 w-5 flex-shrink-0">
               <AvatarImage 
                 src={requirement.creator?.avatar || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${requirement.creator?.name}`} 
               />
@@ -306,93 +354,117 @@ export const RequirementTable = memo(function RequirementTable({
                 {requirement.creator?.name?.slice(0, 2) || 'U'}
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm truncate min-w-0" title={requirement.creator?.name || '未知用户'}>
+            <span className="text-xs truncate min-w-0" title={requirement.creator?.name || '未知用户'}>
               {requirement.creator?.name || '未知用户'}
             </span>
           </div>
-        </TableCell>
+        </StickyTableCell>
       )
     },
     createdAt: {
-      header: () => (
-        <TableHead className="px-3 w-[12%] sm:w-[14%] lg:w-[12%]">
-          <div className="flex items-center">
+      header: (props?: any) => (
+        <StickyTableHead className="w-[160px] min-w-[160px] max-w-[160px] px-3 border-r" {...props}>
+          <div className="flex items-center whitespace-nowrap">
             创建时间
             {renderSortButton('createdAt')}
           </div>
-        </TableHead>
+        </StickyTableHead>
       ),
-      cell: (requirement: Requirement) => (
-        <TableCell className="px-3 py-3 text-sm text-muted-foreground whitespace-nowrap">
+      cell: (requirement: Requirement, index: number, props?: any) => (
+        <StickyTableCell className="w-[160px] min-w-[160px] max-w-[160px] px-3 py-3 text-xs text-muted-foreground whitespace-nowrap border-r" {...props}>
           {requirement.createdAt}
-        </TableCell>
+        </StickyTableCell>
       )
     },
     updatedAt: {
-      header: () => (
-        <TableHead className="px-3 w-[12%] sm:w-[14%] lg:w-[12%]">
-          <div className="flex items-center">
+      header: (props?: any) => (
+        <StickyTableHead className="w-[160px] min-w-[160px] max-w-[160px] px-3 border-r" {...props}>
+          <div className="flex items-center whitespace-nowrap">
             更新时间
             {renderSortButton('updatedAt')}
           </div>
-        </TableHead>
+        </StickyTableHead>
       ),
-      cell: (requirement: Requirement) => (
-        <TableCell className="px-3 py-3 text-sm text-muted-foreground whitespace-nowrap">
+      cell: (requirement: Requirement, index: number, props?: any) => (
+        <StickyTableCell className="w-[160px] min-w-[160px] max-w-[160px] px-3 py-3 text-xs text-muted-foreground whitespace-nowrap border-r" {...props}>
           {requirement.updatedAt}
-        </TableCell>
+        </StickyTableCell>
       )
     }
-  }), [renderSortButton, onNeedToDoChange, onPriorityChange]);
-
-  const handleSelectAll = useCallback((checked: boolean) => {
-    onSelectAll(checked);
-  }, [onSelectAll]);
-
-  const isAllSelected = requirements.length > 0 && selectedRequirements.length === requirements.length;
+  }), [renderSortButton, onNeedToDoChange, onPriorityChange, handleSelectAll, isAllSelected]);
 
   // 根据columnOrder和hiddenColumns获取可见的有序列
   const visibleColumns = useMemo(() => {
     return columnOrder.filter(col => isColumnVisible(col));
   }, [columnOrder, isColumnVisible]);
 
+  // 计算固定列的偏移量
+  const stickyOffsets = useMemo(() => {
+    const indexWidth = 80; // 序号列宽度
+    const titleWidth = 300; // 标题列宽度
+    
+    return {
+      index: 0,
+      title: indexWidth,
+    };
+  }, []);
+
   return (
-    <div className="rounded-md border overflow-x-auto">
-      <Table 
-        className="w-full table-fixed" 
-        style={{ minWidth: `${UI_SIZES.TABLE.MIN_WIDTH}px` }}
-      >
-        <TableHeader>
-          <TableRow>
-            <TableHead className={`${UI_SIZES.TABLE.COLUMN_WIDTHS.CHECKBOX} px-2`}>
-              <Checkbox
-                checked={isAllSelected}
-                onCheckedChange={handleSelectAll}
-              />
-            </TableHead>
-            {visibleColumns.map(columnId => {
+    <StickyTable minWidth={UI_SIZES.TABLE.MIN_WIDTH}>
+      <StickyTableHeader>
+        <StickyTableRow>
+          {visibleColumns.map((columnId) => {
+            const config = columnConfig[columnId as keyof typeof columnConfig];
+            if (!config) return null;
+            
+            // index 和 title 列固定
+            const isSticky = columnId === 'index' || columnId === 'title';
+            const stickyLeft = columnId === 'index' ? stickyOffsets.index : 
+                             columnId === 'title' ? stickyOffsets.title : 0;
+            const showShadow = columnId === 'title'; // 最后一个固定列显示阴影
+            
+            return (
+              <React.Fragment key={columnId}>
+                {React.cloneElement(config.header() as React.ReactElement, {
+                  sticky: isSticky,
+                  stickyLeft,
+                  showShadow,
+                  style: {
+                    ...(columnId === 'index' && { zIndex: 150 }),
+                    ...(columnId === 'title' && { zIndex: 140 }),
+                  }
+                })}
+              </React.Fragment>
+            );
+          })}
+        </StickyTableRow>
+      </StickyTableHeader>
+      <StickyTableBody>
+        {requirements.map((requirement, reqIndex) => (
+          <StickyTableRow key={requirement.id}>
+            {visibleColumns.map((columnId) => {
               const config = columnConfig[columnId as keyof typeof columnConfig];
-              return config ? <React.Fragment key={columnId}>{config.header()}</React.Fragment> : null;
+              if (!config) return null;
+              
+              // index 和 title 列固定
+              const isSticky = columnId === 'index' || columnId === 'title';
+              const stickyLeft = columnId === 'index' ? stickyOffsets.index : 
+                               columnId === 'title' ? stickyOffsets.title : 0;
+              const showShadow = columnId === 'title';
+              
+            return (
+              <React.Fragment key={columnId}>
+                {React.cloneElement(config.cell(requirement, reqIndex) as React.ReactElement, {
+                  sticky: isSticky,
+                  stickyLeft,
+                  showShadow,
+                })}
+              </React.Fragment>
+            );
             })}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {requirements.map((requirement) => (
-            <TableRow key={requirement.id} className="hover:bg-muted/50">
-              <TableCell className="px-2 py-3">
-                <Checkbox
-                  checked={selectedRequirements.includes(requirement.id)}
-                  onCheckedChange={(checked) => onRequirementSelect(requirement.id, checked as boolean)}
-                />
-              </TableCell>
-              {visibleColumns.map(columnId => {
-                const config = columnConfig[columnId as keyof typeof columnConfig];
-                return config ? <React.Fragment key={columnId}>{config.cell(requirement)}</React.Fragment> : null;
-              })}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+          </StickyTableRow>
+        ))}
+      </StickyTableBody>
+    </StickyTable>
   );
 }); 
