@@ -79,7 +79,7 @@ const columnValidator = (columns: string[]): boolean => {
  */
 function loadConfig() {
   try {
-    const configVersion = safeGetItem(KEYS.CONFIG_VERSION, '1.0');
+    const configVersion = safeGetItem(KEYS.CONFIG_VERSION, '1.0') as string;
     const customFilters = safeGetItem(KEYS.CUSTOM_FILTERS, [] as any[], arrayValidator());
     const hiddenColumns = safeGetItem(KEYS.HIDDEN_COLUMNS, DEFAULT_HIDDEN_COLUMNS, arrayValidator());
     const columnOrder = safeGetItem(KEYS.COLUMN_ORDER, DEFAULT_COLUMN_ORDER, arrayValidator());
