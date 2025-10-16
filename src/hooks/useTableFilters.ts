@@ -139,7 +139,7 @@ export function useTableFilters<T = any>(config: UseTableFiltersConfig<T>) {
     { key: `${storageKey}-hidden-columns`, value: hiddenColumns },
     { key: `${storageKey}-column-order`, value: columnOrder },
     { key: `${storageKey}-sort-config`, value: sortConfig },
-  ], { delay: 500 });
+  ] as Array<{ key: string; value: any }>, { delay: 500 });
 
   // ==================== 筛选逻辑 ====================
 
