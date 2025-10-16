@@ -64,14 +64,14 @@ export function ValidatedInput({
     <FormField
       label={label}
       required={required}
-      error={validation?.error}
+      error={validation?.errors?.[0]?.message}
       description={description}
       className={className}
     >
       <Input 
         {...props}
         className={cn(
-          validation?.error && 'border-red-500 focus-visible:ring-red-500',
+          validation?.errors?.length && 'border-red-500 focus-visible:ring-red-500',
           props.className
         )}
       />
@@ -99,14 +99,14 @@ export function ValidatedTextarea({
     <FormField
       label={label}
       required={required}
-      error={validation?.error}
+      error={validation?.errors?.[0]?.message}
       description={description}
       className={className}
     >
       <Textarea 
         {...props}
         className={cn(
-          validation?.error && 'border-red-500 focus-visible:ring-red-500',
+          validation?.errors?.length && 'border-red-500 focus-visible:ring-red-500',
           props.className
         )}
       />
@@ -165,7 +165,7 @@ export function TagInput({
     <FormField
       label={label}
       required={required}
-      error={validation?.error}
+      error={validation?.errors?.[0]?.message}
       description={description}
       className={className}
     >
@@ -176,7 +176,7 @@ export function TagInput({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={tags.length >= maxTags}
-          className={validation?.error ? 'border-red-500' : ''}
+          className={validation?.errors?.length ? 'border-red-500' : ''}
         />
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-2">
@@ -279,7 +279,7 @@ export function FileUpload({
     <FormField
       label={label}
       required={required}
-      error={validation?.error}
+      error={validation?.errors?.[0]?.message}
       description={description}
       className={className}
     >
@@ -376,7 +376,7 @@ export function CheckboxGroup({
     <FormField
       label={label}
       required={required}
-      error={validation?.error}
+      error={validation?.errors?.[0]?.message}
       description={description}
       className={className}
     >
