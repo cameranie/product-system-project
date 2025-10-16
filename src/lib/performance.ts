@@ -606,10 +606,11 @@ export function monitorPerformance(target: any, propertyName: string, descriptor
       const duration = performance.now() - startTime;
       const endMemory = (performance as any).memory?.usedJSHeapSize;
 
-      logger.debug(`Performance: ${target.constructor.name}.${propertyName}`, {
-        duration,
-        args: args.length,
-        memoryDelta: endMemory ? endMemory - startMemory : undefined,
+      logger.debug(`Performance: ${target.constructor.name}.${propertyName} (${duration.toFixed(2)}ms)`, {
+        data: {
+          args: args.length,
+          memoryDelta: endMemory ? endMemory - startMemory : undefined,
+        },
       });
 
       return result;
