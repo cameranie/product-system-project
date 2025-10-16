@@ -110,7 +110,7 @@ export function useOptimisticUpdate<T extends { id: string }>() {
       
       if (rollbackData) {
         // 回滚到原始数据
-        await updateFn(current.id, rollbackData as K).catch(() => {
+        await updateFn(current.id, rollbackData as unknown as K).catch(() => {
           // 回滚也失败了，记录错误但不再抛出
           console.error('Rollback failed for:', current.id);
         });
