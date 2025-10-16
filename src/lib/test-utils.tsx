@@ -188,7 +188,7 @@ export const testAssertions = {
    */
   expectToRender: (component: React.ReactElement) => {
     const { container } = render(component);
-    expect(container.firstChild).toBeInTheDocument();
+    expect(container.firstChild).toBeTruthy();
   },
 
   /**
