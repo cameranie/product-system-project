@@ -798,7 +798,7 @@ const storeConfig = (set: any, get: any) => ({
         const { formatDateTime } = await import('@/lib/file-upload-utils');
         const { AppError } = await import('@/lib/error-handler');
         
-        const existingRequirement = get().requirements.find(req => req.id === id);
+        const existingRequirement = get().requirements.find((req: Requirement) => req.id === id);
         if (!existingRequirement) {
           const error = new AppError(`需求 ${id} 不存在`, 'REQUIREMENT_NOT_FOUND', { id });
           set({ error: error.message });
