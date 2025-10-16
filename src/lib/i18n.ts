@@ -464,7 +464,7 @@ class I18nManager {
   /**
    * 格式化相对时间
    */
-  public formatRelativeTime(date: Date | string, unit: Intl.RelativeTimeFormatUnit = 'auto'): string {
+  public formatRelativeTime(date: Date | string, unit?: Intl.RelativeTimeFormatUnit | 'auto'): string {
     const locale = this.currentLocale;
     const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
 
@@ -480,7 +480,7 @@ class I18nManager {
     const months = Math.floor(days / 30);
     const years = Math.floor(days / 365);
 
-    if (unit === 'auto') {
+    if (!unit || unit === 'auto') {
       if (Math.abs(years) >= 1) return rtf.format(years, 'year');
       if (Math.abs(months) >= 1) return rtf.format(months, 'month');
       if (Math.abs(weeks) >= 1) return rtf.format(weeks, 'week');
