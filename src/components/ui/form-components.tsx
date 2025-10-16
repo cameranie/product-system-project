@@ -7,7 +7,7 @@ import { Label } from './label';
 import { Textarea } from './textarea';
 import { Badge } from './badge';
 import { X, Upload, File, Image } from 'lucide-react';
-import { FieldValidationResult } from '@/lib/validation';
+import { ValidationResult } from '@/lib/validation';
 
 // 表单字段包装器
 export interface FormFieldProps {
@@ -47,7 +47,7 @@ export function FormField({
 // 验证输入框
 export interface ValidatedInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
-  validation?: FieldValidationResult;
+  validation?: ValidationResult;
   required?: boolean;
   description?: string;
 }
@@ -64,14 +64,14 @@ export function ValidatedInput({
     <FormField
       label={label}
       required={required}
-      error={validation?.error}
+      error={validation?.errors?.[0]?.message}
       description={description}
       className={className}
     >
       <Input 
         {...props}
         className={cn(
-          validation?.error && 'border-red-500 focus-visible:ring-red-500',
+          validation?.errors?.length && 'border-red-500 focus-visible:ring-red-500',
           props.className
         )}
       />
@@ -82,7 +82,7 @@ export function ValidatedInput({
 // 验证文本域
 export interface ValidatedTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label: string;
-  validation?: FieldValidationResult;
+  validation?: ValidationResult;
   required?: boolean;
   description?: string;
 }
@@ -99,14 +99,14 @@ export function ValidatedTextarea({
     <FormField
       label={label}
       required={required}
-      error={validation?.error}
+      error={validation?.errors?.[0]?.message}
       description={description}
       className={className}
     >
       <Textarea 
         {...props}
         className={cn(
-          validation?.error && 'border-red-500 focus-visible:ring-red-500',
+          validation?.errors?.length && 'border-red-500 focus-visible:ring-red-500',
           props.className
         )}
       />
@@ -121,7 +121,7 @@ export interface TagInputProps {
   onTagsChange: (tags: string[]) => void;
   placeholder?: string;
   maxTags?: number;
-  validation?: FieldValidationResult;
+  validation?: ValidationResult;
   required?: boolean;
   description?: string;
   className?: string;
@@ -165,7 +165,7 @@ export function TagInput({
     <FormField
       label={label}
       required={required}
-      error={validation?.error}
+      error={validation?.errors?.[0]?.message}
       description={description}
       className={className}
     >
@@ -176,7 +176,7 @@ export function TagInput({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={tags.length >= maxTags}
-          className={validation?.error ? 'border-red-500' : ''}
+          className={validation?.errors?.length ? 'border-red-500' : ''}
         />
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-2">
@@ -211,7 +211,7 @@ export interface FileUploadProps {
   multiple?: boolean;
   maxFiles?: number;
   maxSize?: number; // bytes
-  validation?: FieldValidationResult;
+  validation?: ValidationResult;
   required?: boolean;
   description?: string;
   className?: string;
@@ -279,7 +279,7 @@ export function FileUpload({
     <FormField
       label={label}
       required={required}
-      error={validation?.error}
+      error={validation?.errors?.[0]?.message}
       description={description}
       className={className}
     >
@@ -343,7 +343,7 @@ export interface CheckboxGroupProps {
   selectedValues: string[];
   onSelectionChange: (values: string[]) => void;
   multiple?: boolean;
-  validation?: FieldValidationResult;
+  validation?: ValidationResult;
   required?: boolean;
   description?: string;
   className?: string;
@@ -376,7 +376,7 @@ export function CheckboxGroup({
     <FormField
       label={label}
       required={required}
-      error={validation?.error}
+      error={validation?.errors?.[0]?.message}
       description={description}
       className={className}
     >

@@ -433,7 +433,7 @@ export const RequirementTable = memo(function RequirementTable({
                     ...(columnId === 'index' && { zIndex: 150 }),
                     ...(columnId === 'title' && { zIndex: 140 }),
                   }
-                })}
+                } as any)}
               </React.Fragment>
             );
           })}
@@ -458,7 +458,7 @@ export const RequirementTable = memo(function RequirementTable({
                   sticky: isSticky,
                   stickyLeft,
                   showShadow,
-                })}
+                } as any)}
               </React.Fragment>
             );
             })}

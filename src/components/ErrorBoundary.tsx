@@ -90,15 +90,14 @@ export class ErrorBoundary extends React.Component<
    */
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     // 1. 记录到日志系统
-    logger.error('React Error Boundary caught an error', error, {
-      componentStack: errorInfo.componentStack,
-      errorId: this.state.errorId,
+    logger.error(`React Error Boundary caught an error: ${error.message} (ID: ${this.state.errorId})`, {
+      error,
       action: 'component-error',
     });
 
     // 2. 发送到 Sentry（如果已集成）
     if (typeof window !== 'undefined' && (window as Window & { Sentry?: { captureException: (error: Error, options?: unknown) => void } }).Sentry) {
-      (window as Window & { Sentry: { captureException: (error: Error, options?: unknown) => void } }).Sentry.captureException(error, {
+      (window as unknown as Window & { Sentry: { captureException: (error: Error, options?: unknown) => void } }).Sentry.captureException(error, {
         contexts: {
           react: {
             componentStack: errorInfo.componentStack,
@@ -307,7 +306,8 @@ export class ErrorBoundary extends React.Component<
  */
 export function useErrorHandler() {
   const handleError = React.useCallback((error: Error, context?: Record<string, unknown>) => {
-    logger.error('Uncaught error in component', error, {
+    logger.error(`Uncaught error in component: ${error.message}`, {
+      error,
       ...context,
       action: 'manual-error-handling',
     });

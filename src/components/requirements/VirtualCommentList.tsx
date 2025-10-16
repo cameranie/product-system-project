@@ -253,7 +253,7 @@ function CommentItem({
   onEditContentChange,
   onReplyContentChange,
 }: CommentItemProps) {
-  const isOwner = currentUserId === comment.user.id;
+  const isOwner = currentUserId === comment.author.id;
   const canEdit = !readOnly && isOwner;
 
   return (
@@ -261,26 +261,21 @@ function CommentItem({
       <div className="flex items-start gap-3">
         {/* 用户头像 */}
         <Avatar className="w-8 h-8">
-          <img src={comment.user.avatar || '/default-avatar.png'} alt={comment.user.name} />
+          <img src={comment.author.avatar || '/default-avatar.png'} alt={comment.author.name} />
         </Avatar>
 
         <div className="flex-1 min-w-0">
           {/* 用户信息和时间 */}
           <div className="flex items-center gap-2 mb-2">
-            <span className="font-medium text-sm">{comment.user.name}</span>
+            <span className="font-medium text-sm">{comment.author.name}</span>
             <span className="text-xs text-muted-foreground">{comment.createdAt}</span>
-            {comment.isEdited && (
-              <Badge variant="outline" className="text-xs">
-                已编辑
-              </Badge>
-            )}
           </div>
 
           {/* 评论内容或编辑框 */}
           {isEditing ? (
             <div className="space-y-2">
               <RichTextEditor
-                value={editingContent}
+                value={editingContent || ''}
                 onChange={onEditContentChange || (() => {})}
                 placeholder="编辑评论..."
               />
@@ -351,7 +346,7 @@ function CommentItem({
           {isReplying && (
             <div className="mt-4 space-y-2 border-l-2 border-primary pl-4">
               <RichTextEditor
-                value={replyContent}
+                value={replyContent || ''}
                 onChange={onReplyContentChange || (() => {})}
                 placeholder="输入回复..."
               />
@@ -372,11 +367,11 @@ function CommentItem({
               {comment.replies.map((reply) => (
                 <div key={reply.id} className="flex items-start gap-2">
                   <Avatar className="w-6 h-6">
-                    <img src={reply.user.avatar || '/default-avatar.png'} alt={reply.user.name} />
+                    <img src={reply.author.avatar || '/default-avatar.png'} alt={reply.author.name} />
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-xs">{reply.user.name}</span>
+                      <span className="font-medium text-xs">{reply.author.name}</span>
                       <span className="text-xs text-muted-foreground">{reply.createdAt}</span>
                     </div>
                     <div

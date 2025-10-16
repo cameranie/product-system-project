@@ -713,61 +713,63 @@ export function useTheme() {
 
 /**
  * 主题切换组件
+ * 注意：由于此文件是 .ts 扩展名，JSX 组件已被注释。如需使用，请创建单独的 .tsx 文件。
  */
-export function ThemeSwitcher() {
-  const { theme, changeTheme, getAllThemes } = useTheme();
-  const themes = getAllThemes();
-
-  return (
-    <select
-      value={theme}
-      onChange={(e) => changeTheme(e.target.value)}
-      className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-    >
-      {themes.map((t) => (
-        <option key={t.name} value={t.name}>
-          {t.name}
-        </option>
-      ))}
-    </select>
-  );
-}
+// export function ThemeSwitcher() {
+//   const { theme, changeTheme, getAllThemes } = useTheme();
+//   const themes = getAllThemes();
+//
+//   return (
+//     <select
+//       value={theme}
+//       onChange={(e) => changeTheme(e.target.value)}
+//       className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+//     >
+//       {themes.map((t) => (
+//         <option key={t.name} value={t.name}>
+//           {t.name}
+//         </option>
+//       ))}
+//     </select>
+//   );
+// }
 
 /**
  * 模式切换组件
+ * 注意：由于此文件是 .ts 扩展名，JSX 组件已被注释。如需使用，请创建单独的 .tsx 文件。
  */
-export function ModeSwitcher() {
-  const { mode, changeMode } = useTheme();
-
-  return (
-    <div className="flex items-center space-x-2">
-      <button
-        onClick={() => changeMode('light')}
-        className={`px-3 py-2 rounded-md ${
-          mode === 'light' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
-        }`}
-      >
-        浅色
-      </button>
-      <button
-        onClick={() => changeMode('dark')}
-        className={`px-3 py-2 rounded-md ${
-          mode === 'dark' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
-        }`}
-      >
-        深色
-      </button>
-      <button
-        onClick={() => changeMode('system')}
-        className={`px-3 py-2 rounded-md ${
-          mode === 'system' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
-        }`}
-      >
-        跟随系统
-      </button>
-    </div>
-  );
-}
+// export function ModeSwitcher() {
+//   const { mode, changeMode } = useTheme();
+//
+//   return (
+//     <div className="flex items-center space-x-2">
+//       <button
+//         onClick={() => changeMode('light')}
+//         className={`px-3 py-2 rounded-md ${
+//           mode === 'light' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
+//         }`}
+//       >
+//         浅色
+//       </button>
+//       <button
+//         onClick={() => changeMode('dark')}
+//         className={`px-3 py-2 rounded-md ${
+//           mode === 'dark' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
+//         }`}
+//       >
+//         深色
+//       </button>
+//       <button
+//         onClick={() => changeMode('system')}
+//         className={`px-3 py-2 rounded-md ${
+//           mode === 'system' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
+//         }`}
+//       >
+//         跟随系统
+//       </button>
+//     </div>
+//   );
+// }
 
 /**
  * 初始化主题

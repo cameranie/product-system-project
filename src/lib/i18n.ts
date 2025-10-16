@@ -576,45 +576,47 @@ export interface TransProps {
   children?: React.ReactNode;
 }
 
-export function Trans({ i18nKey, values, defaults, component: Component, children }: TransProps) {
-  const { t } = useTranslation();
-  const text = t(i18nKey, values) || defaults || i18nKey;
-
-  if (Component) {
-    return <Component>{text}</Component>;
-  }
-
-  if (children) {
-    return <>{children}</>;
-  }
-
-  return <>{text}</>;
-}
+// 注意：由于此文件是 .ts 扩展名，JSX 组件已被注释。如需使用，请创建单独的 .tsx 文件。
+// export function Trans({ i18nKey, values, defaults, component: Component, children }: TransProps) {
+//   const { t } = useTranslation();
+//   const text = t(i18nKey, values) || defaults || i18nKey;
+//
+//   if (Component) {
+//     return <Component>{text}</Component>;
+//   }
+//
+//   if (children) {
+//     return <>{children}</>;
+//   }
+//
+//   return <>{text}</>;
+// }
 
 /**
  * 语言切换组件
+ * 注意：由于此文件是 .ts 扩展名，JSX 组件已被注释。如需使用，请创建单独的 .tsx 文件。
  */
-export function LocaleSwitcher() {
-  const { locale, changeLocale } = useTranslation();
-  const supportedLocales = i18n.getSupportedLocales();
-
-  return (
-    <select
-      value={locale}
-      onChange={(e) => changeLocale(e.target.value as SupportedLocale)}
-      className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-    >
-      {supportedLocales.map((loc) => {
-        const config = i18n.getLocaleConfig(loc);
-        return (
-          <option key={loc} value={loc}>
-            {config.nativeName}
-          </option>
-        );
-      })}
-    </select>
-  );
-}
+// export function LocaleSwitcher() {
+//   const { locale, changeLocale } = useTranslation();
+//   const supportedLocales = i18n.getSupportedLocales();
+//
+//   return (
+//     <select
+//       value={locale}
+//       onChange={(e) => changeLocale(e.target.value as SupportedLocale)}
+//       className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+//     >
+//       {supportedLocales.map((loc) => {
+//         const config = i18n.getLocaleConfig(loc);
+//         return (
+//           <option key={loc} value={loc}>
+//             {config.nativeName}
+//           </option>
+//         );
+//       })}
+//     </select>
+//   );
+// }
 
 /**
  * 初始化国际化
