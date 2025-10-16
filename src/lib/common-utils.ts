@@ -186,7 +186,7 @@ export const objectUtils = {
     for (const key in source) {
       if (source.hasOwnProperty(key)) {
         if (typeof source[key] === 'object' && source[key] !== null && !Array.isArray(source[key])) {
-          result[key] = this.deepMerge(target[key] || {}, source[key] as any);
+          result[key] = this.deepMerge(target[key] || {}, source[key] as any) as any;
         } else {
           result[key] = source[key] as any;
         }
