@@ -56,12 +56,12 @@ export function ValidatedInput({
   label, 
   validation, 
   required, 
-  description, 
+  description,
   className,
-  ...props 
+  ...props
 }: ValidatedInputProps) {
   return (
-    <FormField
+    <FormField 
       label={label}
       required={required}
       error={validation?.errors?.[0]?.message}
@@ -72,7 +72,7 @@ export function ValidatedInput({
         {...props}
         className={cn(
           validation?.errors?.length && 'border-red-500 focus-visible:ring-red-500',
-          props.className
+          className
         )}
       />
     </FormField>
@@ -107,7 +107,7 @@ export function ValidatedTextarea({
         {...props}
         className={cn(
           validation?.errors?.length && 'border-red-500 focus-visible:ring-red-500',
-          props.className
+          className
         )}
       />
     </FormField>
