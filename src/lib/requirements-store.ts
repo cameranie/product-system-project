@@ -812,8 +812,8 @@ const storeConfig = (set: any, get: any) => ({
         };
 
         // 立即更新UI，无延迟
-        set(state => ({
-          requirements: state.requirements.map(req => 
+        set((state: RequirementsStore) => ({
+          requirements: state.requirements.map((req: Requirement) => 
             req.id === id ? updatedRequirement : req
           ),
           loading: false
