@@ -491,7 +491,7 @@ export const objectUtils = {
     const result = { ...target };
     Object.keys(source).forEach(key => {
       if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
-        result[key] = objectUtils.deepMerge(result[key] || {}, source[key]);
+        result[key] = objectUtils.deepMerge(result[key] || {}, source[key]) as any;
       } else {
         result[key] = source[key] as any;
       }
