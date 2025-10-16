@@ -794,7 +794,7 @@ const storeConfig = (set: any, get: any) => ({
         }
       },
 
-      updateRequirement: async (id: string, updates) => {
+      updateRequirement: async (id: string, updates: Partial<Requirement>) => {
         const { formatDateTime } = await import('@/lib/file-upload-utils');
         const { AppError } = await import('@/lib/error-handler');
         
