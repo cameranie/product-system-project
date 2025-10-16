@@ -763,7 +763,7 @@ const storeConfig = (set: any, get: any) => ({
         return get().requirements.find((req: Requirement) => req.id === id);
       },
 
-      createRequirement: async (requirementData) => {
+      createRequirement: async (requirementData: Omit<Requirement, 'id' | 'createdAt' | 'updatedAt'>) => {
         set({ loading: true, error: null });
         
         try {
