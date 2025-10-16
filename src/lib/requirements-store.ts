@@ -839,8 +839,8 @@ const storeConfig = (set: any, get: any) => ({
           const DELETE_API_DELAY_MS = 500;
           await new Promise(resolve => setTimeout(resolve, DELETE_API_DELAY_MS));
           
-          set(state => ({
-            requirements: state.requirements.filter(req => req.id !== id),
+          set((state: RequirementsStore) => ({
+            requirements: state.requirements.filter((req: Requirement) => req.id !== id),
             loading: false
           }));
         } catch (error) {
