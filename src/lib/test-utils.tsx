@@ -249,8 +249,8 @@ export const testSetup = {
     // 清理 sessionStorage
     sessionStorage.clear();
     
-    // 重置环境变量
-    delete process.env.NODE_ENV;
+    // 重置环境变量（process.env 属性是只读的，无法删除）
+    // delete process.env.NODE_ENV;
   },
 
   /**
