@@ -750,7 +750,7 @@ interface RequirementsStore {
 // 临时禁用持久化，确保数据更新
 const enablePersistence = false; // 改为 true 可重新启用持久化
 
-const storeConfig = (set: any, get: any) => ({
+const storeConfig = (set: any, get: any): RequirementsStore => ({
       requirements: initialRequirements,
       loading: false,
       error: null,
