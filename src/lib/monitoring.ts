@@ -95,15 +95,15 @@ export function initMonitoring(): void {
 
           // 集成配置
           integrations: [
-            new Sentry.BrowserTracing({
-              // 追踪页面导航
-              routingInstrumentation: Sentry.nextRouterInstrumentation,
-            }),
-            new Sentry.Replay({
-              // Session Replay（会话回放）
-              maskAllText: true, // 隐藏所有文本（保护隐私）
-              blockAllMedia: true, // 阻止所有媒体
-            }),
+            // 注意：BrowserTracing 在 Sentry v8+ 中已废弃
+            // new Sentry.BrowserTracing({
+            //   routingInstrumentation: Sentry.nextRouterInstrumentation,
+            // }),
+            // new Sentry.Replay({
+            //   // Session Replay（会话回放）
+            //   maskAllText: true, // 隐藏所有文本（保护隐私）
+            //   blockAllMedia: true, // 阻止所有媒体
+            // }),
           ],
 
           // 忽略特定错误
