@@ -196,7 +196,7 @@ export const testAssertions = {
    */
   expectToHaveText: (component: React.ReactElement, text: string) => {
     const { getByText } = render(component);
-    expect(getByText(text)).toBeInTheDocument();
+    expect(getByText(text)).toBeTruthy();
   },
 
   /**
