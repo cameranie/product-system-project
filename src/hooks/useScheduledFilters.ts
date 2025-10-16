@@ -137,7 +137,7 @@ export function useScheduledFilters({
     { key: createStorageKey('custom-filters'), value: customFilters },
     { key: createStorageKey('hidden-columns'), value: hiddenColumns },
     { key: createStorageKey('column-order'), value: columnOrder },
-  ], { delay: 500 });
+  ] as Array<{ key: string; value: any }>, { delay: 500 });
 
   // ==================== 筛选逻辑 ====================
 
