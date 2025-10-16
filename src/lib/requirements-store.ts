@@ -781,7 +781,7 @@ const storeConfig = (set: any, get: any) => ({
             updatedAt: timeString,
           };
 
-          set(state => ({
+          set((state: RequirementsStore) => ({
             requirements: [...state.requirements, newRequirement],
             loading: false
           }));
