@@ -29,6 +29,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+npminstall-debug.log*
 
 # env files (can opt-in for committing if needed)
 .env*
@@ -54,3 +55,36 @@ temp-*.js
 *temp-platform*
 *temp-batch*
 docs/code-review/
+
+# 临时开发文档（代码审查、优化报告等）
+BUG_FIX_SUMMARY.md
+COMMIT_REVIEW.md
+FINAL_COMMIT_SUMMARY.md
+FINAL_OPTIMIZATION_REPORT.md
+OPTIMIZATION_COMPLETED.md
+OPTIMIZATION_SUMMARY.md
+P0_COMMIT_SUMMARY.md
+P0_FIXES_README.md
+RICH_TEXT_EDITOR_FEATURES.md
+STICKY_COLUMNS_TEST.md
+TEST_STATUS.md
+*字体*.md
+*版本号*.md
+*需求池*.md
+*预排期*.md
+docs/CODE_OPTIMIZATION_REPORT.md
+docs/CODE_REVIEW_*.md
+docs/ENTERPRISE_CODE_REVIEW.md
+docs/OPTIMIZATION_*.md
+docs/OVERALL_IMPROVEMENTS_SUMMARY.md
+docs/P0_*.md
+docs/P1_*.md
+docs/P2_*.md
+docs/REQUIREMENTS_PAGES_*.md
+docs/TABLE_REFACTORING_SUMMARY.md
+docs/VERSION_*.md
+docs/*完成摘要.md
+
+# 个人配置文件
+*.code-workspace
+package.json.test-scripts
