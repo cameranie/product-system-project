@@ -173,6 +173,11 @@ class I18nManager {
    * 获取首选语言
    */
   private getPreferredLocale(): SupportedLocale {
+    // 只在客户端执行
+    if (typeof window === 'undefined') {
+      return 'zh-CN';
+    }
+    
     // 从本地存储获取
     const stored = localStorage.getItem('preferred_locale');
     if (stored && this.isSupportedLocale(stored)) {
@@ -252,21 +257,24 @@ class I18nManager {
       // 更新当前语言
       this.currentLocale = locale;
 
-      // 保存到本地存储
-      localStorage.setItem('preferred_locale', locale);
+      // 只在客户端执行
+      if (typeof window !== 'undefined') {
+        // 保存到本地存储
+        localStorage.setItem('preferred_locale', locale);
 
-      // 更新 HTML 属性
-      document.documentElement.lang = locale;
-      document.documentElement.dir = this.localeConfigs[locale].direction;
+        // 更新 HTML 属性
+        document.documentElement.lang = locale;
+        document.documentElement.dir = this.localeConfigs[locale].direction;
+
+        // 触发语言切换事件
+        window.dispatchEvent(new CustomEvent('localeChanged', {
+          detail: { locale },
+        }));
+      }
 
       logger.info('Locale changed', {
         data: { locale },
       });
-
-      // 触发语言切换事件
-      window.dispatchEvent(new CustomEvent('localeChanged', {
-        detail: { locale },
-      }));
     } catch (error) {
       logger.error('Failed to change locale', {
         error: error as Error,
@@ -625,6 +633,7 @@ export interface TransProps {
 export async function initializeI18n(locale?: SupportedLocale) {
   await i18n.initialize(locale);
 }
+
 
 
 

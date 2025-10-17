@@ -310,6 +310,9 @@ class ThemeManager {
    * 加载用户自定义主题
    */
   private async loadUserThemes(): Promise<void> {
+    // 只在客户端执行
+    if (typeof window === 'undefined') return;
+    
     try {
       const storedThemes = localStorage.getItem('user_themes');
       if (storedThemes) {
@@ -329,6 +332,9 @@ class ThemeManager {
    * 保存用户主题
    */
   private async saveUserThemes(): Promise<void> {
+    // 只在客户端执行
+    if (typeof window === 'undefined') return;
+    
     try {
       const userThemes: Record<string, ThemeConfig> = {};
       this.themes.forEach((config, name) => {
@@ -348,6 +354,7 @@ class ThemeManager {
    * 获取存储的主题
    */
   private getStoredTheme(): string {
+    if (typeof window === 'undefined') return 'default';
     return localStorage.getItem('current_theme') || 'default';
   }
 
@@ -355,6 +362,7 @@ class ThemeManager {
    * 获取存储的模式
    */
   private getStoredMode(): ThemeMode {
+    if (typeof window === 'undefined') return 'system';
     return (localStorage.getItem('theme_mode') as ThemeMode) || 'system';
   }
 
@@ -362,6 +370,9 @@ class ThemeManager {
    * 应用主题
    */
   private async applyTheme(themeName: string, mode: ThemeMode): Promise<void> {
+    // 只在客户端执行
+    if (typeof window === 'undefined') return;
+    
     const theme = this.themes.get(themeName);
     if (!theme) {
       logger.warn('Theme not found', { data: { themeName } });
@@ -369,10 +380,7 @@ class ThemeManager {
     }
 
     // 确定实际模式
-    let actualMode = mode;
-    if (mode === 'system') {
-      actualMode = this.getSystemTheme();
-    }
+    const actualMode: 'light' | 'dark' = mode === 'system' ? this.getSystemTheme() : mode;
 
     // 应用主题变量
     this.applyThemeVariables(theme, actualMode);
@@ -404,6 +412,9 @@ class ThemeManager {
    * 应用主题变量
    */
   private applyThemeVariables(theme: ThemeConfig, mode: 'light' | 'dark'): void {
+    // 只在客户端执行
+    if (typeof window === 'undefined') return;
+    
     const root = document.documentElement;
     
     // 应用基础变量
@@ -438,9 +449,11 @@ class ThemeManager {
     await this.applyTheme(themeName, this.currentMode);
 
     // 触发主题切换事件
-    window.dispatchEvent(new CustomEvent('themeChanged', {
-      detail: { theme: themeName, mode: this.currentMode },
-    }));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('themeChanged', {
+        detail: { theme: themeName, mode: this.currentMode },
+      }));
+    }
   }
 
   /**
@@ -451,9 +464,11 @@ class ThemeManager {
     await this.applyTheme(this.currentTheme, mode);
 
     // 触发模式切换事件
-    window.dispatchEvent(new CustomEvent('themeModeChanged', {
-      detail: { theme: this.currentTheme, mode },
-    }));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('themeModeChanged', {
+        detail: { theme: this.currentTheme, mode },
+      }));
+    }
   }
 
   /**
@@ -506,7 +521,6 @@ class ThemeManager {
       },
       metadata: {
         ...baseConfig.metadata,
-        name,
         updatedAt: new Date().toISOString(),
       },
     };
@@ -629,6 +643,7 @@ class ThemeManager {
    * 获取主题变量值
    */
   public getThemeVariable(variable: string): string | null {
+    if (typeof window === 'undefined') return null;
     const root = document.documentElement;
     return getComputedStyle(root).getPropertyValue(variable).trim();
   }
@@ -637,6 +652,7 @@ class ThemeManager {
    * 设置主题变量
    */
   public setThemeVariable(variable: string, value: string): void {
+    if (typeof window === 'undefined') return;
     const root = document.documentElement;
     root.style.setProperty(variable, value);
   }
@@ -777,6 +793,7 @@ export function useTheme() {
 export async function initializeTheme() {
   await themeManager.initialize();
 }
+
 
 
 

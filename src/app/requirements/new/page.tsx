@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, Suspense } from 'react';
 import { AppLayout } from '@/components/layout/app-layout';
 import { CollapsibleSidebar } from '@/components/layout/collapsible-sidebar';
 import { Button } from '@/components/ui/button';
@@ -28,7 +28,7 @@ import { PermissionDenied } from '@/components/PermissionDenied';
 import type { RequirementNewPageProps } from '@/types/page-props';
 
 /**
- * 新建需求页面
+ * 新建需求页面内部组件
  * 
  * 提供表单让用户创建新的需求，包括：
  * - 基本信息（标题、类型、描述、应用端）
@@ -46,7 +46,7 @@ import type { RequirementNewPageProps } from '@/types/page-props';
  * - XSS防护：自动清理危险字符
  * - URL验证：快捷操作链接需要有效URL
  */
-export default function CreateRequirementPage() {
+function CreateRequirementPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { createRequirement, loading } = useRequirementsStore();
@@ -264,5 +264,17 @@ export default function CreateRequirementPage() {
       </div>
     </AppLayout>
     </ErrorBoundary>
+  );
+}
+
+/**
+ * 新建需求页面
+ * 使用 Suspense 包裹以支持 useSearchParams()
+ */
+export default function CreateRequirementPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CreateRequirementPageContent />
+    </Suspense>
   );
 }

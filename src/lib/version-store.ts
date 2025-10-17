@@ -113,7 +113,9 @@ export const useVersionStore = create<VersionStore>((set, get) => ({
   addVersion: (version) => {
     set((state) => {
       const newVersions = [version, ...state.versions];
-      localStorage.setItem('version_management_versions', JSON.stringify(newVersions));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('version_management_versions', JSON.stringify(newVersions));
+      }
       return { versions: newVersions };
     });
   },
@@ -129,7 +131,9 @@ export const useVersionStore = create<VersionStore>((set, get) => ({
           schedule: updates.releaseDate ? calculateVersionSchedule(updates.releaseDate) : v.schedule
         } : v
       );
-      localStorage.setItem('version_management_versions', JSON.stringify(newVersions));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('version_management_versions', JSON.stringify(newVersions));
+      }
       return { versions: newVersions };
     });
   },
@@ -137,7 +141,9 @@ export const useVersionStore = create<VersionStore>((set, get) => ({
   deleteVersion: (id) => {
     set((state) => {
       const newVersions = state.versions.filter((v) => v.id !== id);
-      localStorage.setItem('version_management_versions', JSON.stringify(newVersions));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('version_management_versions', JSON.stringify(newVersions));
+      }
       return { versions: newVersions };
     });
   },
@@ -146,7 +152,9 @@ export const useVersionStore = create<VersionStore>((set, get) => ({
     set((state) => {
       if (state.customPlatforms.includes(platform)) return state;
       const newPlatforms = [...state.customPlatforms, platform];
-      localStorage.setItem('version_management_custom_platforms', JSON.stringify(newPlatforms));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('version_management_custom_platforms', JSON.stringify(newPlatforms));
+      }
       return { customPlatforms: newPlatforms };
     });
   },
@@ -154,7 +162,9 @@ export const useVersionStore = create<VersionStore>((set, get) => ({
   deleteCustomPlatform: (platform) => {
     set((state) => {
       const newPlatforms = state.customPlatforms.filter((p) => p !== platform);
-      localStorage.setItem('version_management_custom_platforms', JSON.stringify(newPlatforms));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('version_management_custom_platforms', JSON.stringify(newPlatforms));
+      }
       return { customPlatforms: newPlatforms };
     });
   },
@@ -169,6 +179,9 @@ export const useVersionStore = create<VersionStore>((set, get) => ({
   },
   
   initFromStorage: () => {
+    // 只在客户端环境执行
+    if (typeof window === 'undefined') return;
+    
     try {
       const savedVersions = localStorage.getItem('version_management_versions');
       const savedPlatforms = localStorage.getItem('version_management_custom_platforms');

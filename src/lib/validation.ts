@@ -14,6 +14,7 @@
  * @module validation
  */
 
+import React from 'react';
 import { logger } from './logger';
 
 /**
@@ -53,7 +54,7 @@ export interface ValidationRule {
   /** 验证函数 */
   validate: (value: any, context?: any) => boolean | Promise<boolean>;
   /** 错误消息 */
-  message: string;
+  message: string | ((value: any, context?: any) => string);
   /** 是否必需 */
   required?: boolean;
   /** 自定义错误代码 */
@@ -128,7 +129,7 @@ export class Validator {
           errors.push({
             field: '',
             code: rule.code || ruleName,
-            message: rule.message,
+            message: typeof rule.message === 'function' ? rule.message(value, context) : rule.message,
             value,
           });
         }

@@ -13,7 +13,15 @@
  * 在app/layout.tsx或_app.tsx中调用reportWebVitals
  */
 
-import type { Metric } from 'web-vitals';
+/**
+ * Performance Metric interface
+ */
+export interface Metric {
+  name: 'CLS' | 'FID' | 'FCP' | 'LCP' | 'TTFB' | 'INP';
+  value: number;
+  id: string;
+  navigationType?: string;
+}
 
 /**
  * 性能指标等级
@@ -256,12 +264,5 @@ export function getPageLoadMetrics() {
     navigationType: ['navigate', 'reload', 'back_forward', 'prerender'][navigation.type] || 'navigate',
   };
 }
-
-/**
- * 导出类型供外部使用
- */
-export type { Metric };
-
-
 
 

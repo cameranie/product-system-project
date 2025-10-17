@@ -152,7 +152,7 @@ export function validateFromParam(from: string | null): string | null {
     allowedValues: ['list', 'detail', 'kanban', 'scheduled'],
   });
 
-  return result.valid ? result.value : null;
+  return result.valid ? (result.value ?? null) : null;
 }
 
 

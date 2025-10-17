@@ -340,7 +340,7 @@ export const dataGenerators = {
   /**
    * 生成随机数组
    */
-  randomArray: <T>(generator: () => T, length: number = 5): T[] => {
+  randomArray: (generator: () => any, length: number = 5): any[] => {
     return Array.from({ length }, generator);
   },
 
@@ -363,10 +363,10 @@ export const testHooks = {
   /**
    * 测试异步 Hook
    */
-  testAsyncHook: async <T>(
+  testAsyncHook: async function <T>(
     hook: () => T,
     timeout: number = 5000
-  ): Promise<T> => {
+  ): Promise<T> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         reject(new Error('Hook test timeout'));
@@ -386,10 +386,10 @@ export const testHooks = {
   /**
    * 测试 Hook 状态变化
    */
-  testHookStateChange: <T>(
+  testHookStateChange: function <T>(
     hook: () => T,
     expectedStates: T[]
-  ): Promise<void> => {
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       let currentIndex = 0;
       
@@ -423,7 +423,7 @@ export const performanceTest = {
   /**
    * 测量函数执行时间
    */
-  measureTime: async <T>(fn: () => Promise<T>): Promise<{ result: T; duration: number }> => {
+  measureTime: async function <T>(fn: () => Promise<T>): Promise<{ result: T; duration: number }> {
     const start = performance.now();
     const result = await fn();
     const duration = performance.now() - start;
