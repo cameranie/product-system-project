@@ -38,7 +38,7 @@ export const BatchOperations = memo(function BatchOperations({
   }
 
   return (
-    <Card className="mb-4">
+    <Card className="mb-4 relative z-[110]">
       <CardContent className="py-3">
         <div className="flex items-center gap-4">
           <span className="text-sm text-muted-foreground">
@@ -51,7 +51,7 @@ export const BatchOperations = memo(function BatchOperations({
               <SelectTrigger className="w-28">
                 <SelectValue placeholder="选择" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[200]">
                 {Object.entries(NEED_TO_DO_CONFIG).map(([key, config]) => (
                   <SelectItem key={key} value={key}>
                     <div className={`px-2 py-1 rounded text-sm ${config.color} ${config.bgColor}`}>

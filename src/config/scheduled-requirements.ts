@@ -40,10 +40,11 @@ export const SCHEDULED_COLUMN_WIDTHS = {
 
 /**
  * 默认列顺序
+ * ID列放在标题后面
  */
 export const DEFAULT_SCHEDULED_COLUMN_ORDER = [
-  'id',
   'title',
+  'id',
   'type',
   'platforms',
   'priority',
@@ -63,11 +64,10 @@ export const DEFAULT_SCHEDULED_COLUMN_ORDER = [
 
 /**
  * 默认可见列
+ * 默认隐藏：id、type、creator、createdAt、updatedAt
  */
 export const DEFAULT_SCHEDULED_VISIBLE_COLUMNS = [
-  'id',
   'title',
-  'type',
   'priority',
   'version',
   'overallReviewStatus',
@@ -193,20 +193,36 @@ export const SCHEDULED_FILTER_OPERATORS = [
 /**
  * 可筛选列配置
  */
+/**
+ * 可在列控制面板中显示的所有列配置
+ * 注意：这个列表要包含所有可能出现在表格中的列
+ */
 export const SCHEDULED_FILTERABLE_COLUMNS = [
   { value: 'id', label: 'ID' },
   { value: 'type', label: '类型' },
+  { value: 'platforms', label: '应用端' },
   { value: 'priority', label: '优先级' },
   { value: 'version', label: '版本号' },
-  { value: 'platforms', label: '应用端' },
+  { value: 'overallReviewStatus', label: '总评审状态' },
+  { value: 'level1Reviewer', label: '一级评审人' },
+  { value: 'level1Status', label: '一级评审' },
+  { value: 'level1Opinion', label: '一级意见' },
+  { value: 'level2Reviewer', label: '二级评审人' },
+  { value: 'level2Status', label: '二级评审' },
+  { value: 'level2Opinion', label: '二级意见' },
+  { value: 'isOperational', label: '是否运营' },
+  { value: 'creator', label: '创建人' },
+  { value: 'createdAt', label: '创建时间' },
+  { value: 'updatedAt', label: '更新时间' },
 ] as const;
 
 /**
  * 列配置版本号
  * 
  * 当列配置结构发生变化时，递增此版本号以清除旧配置
+ * v6.5: 强制重置hiddenColumns - 确保6个默认隐藏列
  */
-export const SCHEDULED_CONFIG_VERSION = '5.0';
+export const SCHEDULED_CONFIG_VERSION = '6.5';
 
 /**
  * localStorage 键名常量

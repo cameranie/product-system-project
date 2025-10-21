@@ -83,7 +83,7 @@ function loadConfig() {
     const customFilters = safeGetItem(KEYS.CUSTOM_FILTERS, [] as any[], arrayValidator());
     const hiddenColumns = safeGetItem(KEYS.HIDDEN_COLUMNS, DEFAULT_HIDDEN_COLUMNS, arrayValidator());
     const columnOrder = safeGetItem(KEYS.COLUMN_ORDER, DEFAULT_COLUMN_ORDER, arrayValidator());
-    const sortConfig = safeGetItem(KEYS.SORT_CONFIG, { field: 'updatedAt', direction: 'desc' } as SortConfig, objectValidator(['field', 'direction'])) as SortConfig;
+    const sortConfig = safeGetItem(KEYS.SORT_CONFIG, { field: 'createdAt', direction: 'desc' } as SortConfig, objectValidator(['field', 'direction'])) as SortConfig;
 
     // 版本检测和数据验证
     if (configVersion !== CONFIG_VERSION) {
@@ -93,7 +93,7 @@ function loadConfig() {
         customFilters: [],
         hiddenColumns: DEFAULT_HIDDEN_COLUMNS,
         columnOrder: DEFAULT_COLUMN_ORDER,
-        sortConfig: { field: 'updatedAt', direction: 'desc' as const },
+        sortConfig: { field: 'createdAt', direction: 'desc' as const },
       };
     }
 
@@ -101,7 +101,7 @@ function loadConfig() {
     const validatedFilters = filterValidator(customFilters) ? customFilters : [];
     const validatedHiddenColumns = columnValidator(hiddenColumns) ? hiddenColumns : DEFAULT_HIDDEN_COLUMNS;
     const validatedColumnOrder = columnValidator(columnOrder) ? columnOrder : DEFAULT_COLUMN_ORDER;
-    const validatedSortConfig = sortValidator(sortConfig) ? sortConfig : { field: 'updatedAt', direction: 'desc' as const };
+    const validatedSortConfig = sortValidator(sortConfig) ? sortConfig : { field: 'createdAt', direction: 'desc' as const };
 
     return {
       searchTerm: '',
@@ -117,7 +117,7 @@ function loadConfig() {
       customFilters: [],
       hiddenColumns: DEFAULT_HIDDEN_COLUMNS,
       columnOrder: DEFAULT_COLUMN_ORDER,
-      sortConfig: { field: 'updatedAt', direction: 'desc' as const },
+      sortConfig: { field: 'createdAt', direction: 'desc' as const },
     };
   }
 }
@@ -273,7 +273,7 @@ export function useRequirementFilters({ requirements }: UseRequirementFiltersPro
   }, []);
 
   const resetSort = useCallback(() => {
-    setSortConfig({ field: 'updatedAt', direction: 'desc' });
+    setSortConfig({ field: 'createdAt', direction: 'desc' });
   }, []);
 
   // 列排序处理

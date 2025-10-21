@@ -131,12 +131,14 @@ export default function RequirementDetailPage() {
     if (!requirement) return;
     
     try {
+      // 同时更新 endOwnerOpinion 和顶层字段（确保列表和详情页同步）
       await updateRequirement(requirement.id, {
         endOwnerOpinion: opinion,
         needToDo: opinion.needToDo,
-        priority: opinion.priority
+        priority: opinion.priority  // 同步到顶层 priority
       });
       
+      console.log('✅ 优先级已同步:', opinion.priority);
       toast.success('端负责人意见已更新');
     } catch (error) {
       console.error('更新失败:', error);

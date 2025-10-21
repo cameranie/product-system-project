@@ -117,6 +117,7 @@ export const VirtualizedRequirementTable = memo(function VirtualizedRequirementT
   }, [onSelectAll]);
 
   const isAllSelected = requirements.length > 0 && selectedRequirements.length === requirements.length;
+  const isIndeterminate = selectedRequirements.length > 0 && selectedRequirements.length < requirements.length;
 
   // 根据columnOrder和hiddenColumns获取可见的有序列
   const visibleColumns = useMemo(() => {
@@ -378,7 +379,7 @@ export const VirtualizedRequirementTable = memo(function VirtualizedRequirementT
             style={{ left: `${stickyOffsets.checkbox}px` }}
           >
             <Checkbox
-              checked={isAllSelected}
+              checked={isAllSelected ? true : isIndeterminate ? 'indeterminate' : false}
               onCheckedChange={handleSelectAll}
             />
           </div>

@@ -74,6 +74,7 @@ export const RequirementTable = memo(function RequirementTable({
   }, [onSelectAll, onBatchModeChange]);
 
   const isAllSelected = requirements.length > 0 && selectedRequirements.length === requirements.length;
+  const isIndeterminate = selectedRequirements.length > 0 && selectedRequirements.length < requirements.length;
 
   /**
    * 渲染排序按钮
@@ -110,7 +111,7 @@ export const RequirementTable = memo(function RequirementTable({
         <StickyTableHead className="w-[80px] min-w-[80px] max-w-[80px] px-2 border-r !z-50" {...props}>
           <div className="flex items-center justify-center">
             <Checkbox
-              checked={isAllSelected}
+              checked={isAllSelected ? true : isIndeterminate ? 'indeterminate' : false}
               onCheckedChange={handleSelectAll}
             />
           </div>
@@ -257,7 +258,7 @@ export const RequirementTable = memo(function RequirementTable({
                   {config?.label || '-'}
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="center" className="w-20">
+              <DropdownMenuContent align="center" className="w-20 z-[150]">
                 {Object.entries(NEED_TO_DO_CONFIG).map(([key, config]) => (
                   <DropdownMenuItem
                     key={key}
@@ -306,7 +307,7 @@ export const RequirementTable = memo(function RequirementTable({
                   {config?.label || '-'}
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="center" className="w-20">
+              <DropdownMenuContent align="center" className="w-20 z-[150]">
                 {priorityOrder.map(key => {
                   const config = PRIORITY_CONFIG[key as keyof typeof PRIORITY_CONFIG];
                   return (
@@ -391,7 +392,7 @@ export const RequirementTable = memo(function RequirementTable({
         </StickyTableCell>
       )
     }
-  }), [renderSortButton, onNeedToDoChange, onPriorityChange, handleSelectAll, isAllSelected]);
+  }), [renderSortButton, onNeedToDoChange, onPriorityChange, handleSelectAll, isAllSelected, isIndeterminate]);
 
   // 根据columnOrder和hiddenColumns获取可见的有序列
   const visibleColumns = useMemo(() => {

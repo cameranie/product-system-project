@@ -73,7 +73,7 @@ export function ScheduledBatchActionsBar({
                 批量分配版本
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
+            <DropdownMenuContent className="z-[200]">
               {versions.map(version => (
                 <DropdownMenuItem
                   key={version}
@@ -92,7 +92,7 @@ export function ScheduledBatchActionsBar({
                 批量评审
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
+            <DropdownMenuContent className="z-[200]">
               <DropdownMenuItem onClick={() => onBatchReview(1, 'approved')}>
                 一级评审通过
               </DropdownMenuItem>
@@ -115,7 +115,7 @@ export function ScheduledBatchActionsBar({
                 批量是否运营
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
+            <DropdownMenuContent className="z-[200]">
               <DropdownMenuItem onClick={() => onBatchIsOperational('yes')}>
                 设置为 是
               </DropdownMenuItem>

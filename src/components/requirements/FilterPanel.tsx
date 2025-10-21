@@ -211,7 +211,7 @@ export function FilterPanel({
               {validCustomFilters.length > 0 ? `${validCustomFilters.length} 筛选设置` : '筛选设置'}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-[600px] ml-0" sideOffset={4}>
+          <DropdownMenuContent align="start" className="w-[600px] ml-0 z-[200]" sideOffset={4}>
             <DropdownMenuSeparator />
             {customFilters.map((filter) => (
               <div key={filter.id} className="p-2">
@@ -223,7 +223,7 @@ export function FilterPanel({
                     <SelectTrigger className={`${UI_SIZES.BUTTON.INPUT_HEIGHT} ${UI_SIZES.INPUT.MEDIUM}`}>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-[250]">
                       {filterableColumns.map((col) => (
                         <SelectItem key={col.value} value={col.value}>
                           {col.label}
@@ -239,7 +239,7 @@ export function FilterPanel({
                     <SelectTrigger className={`${UI_SIZES.BUTTON.INPUT_HEIGHT} ${UI_SIZES.INPUT.SMALL}`}>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-[250]">
                       {filterOperators.map((op) => (
                         <SelectItem key={op.value} value={op.value}>
                           {op.label}
@@ -298,7 +298,7 @@ export function FilterPanel({
           </DropdownMenuTrigger>
           <DropdownMenuContent 
             align="end" 
-            className="w-64"
+            className="w-64 z-[200]"
             onPointerLeave={(e) => {
               // 防止鼠标还在下拉菜单内时关闭
               const target = e.target as HTMLElement;

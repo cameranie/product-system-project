@@ -83,7 +83,7 @@ export function IdCell({ requirement }: IdCellProps) {
     width: `${width}px`,
     minWidth: `${width}px`,
     maxWidth: `${width}px`,
-    left: `${COLUMN_WIDTHS.INDEX}px`,
+    left: `${COLUMN_WIDTHS.INDEX + COLUMN_WIDTHS.TITLE}px`,
     backgroundColor: 'var(--background)',
     boxShadow: '2px 0 4px -2px rgba(0,0,0,0.15)'
   };
@@ -108,7 +108,7 @@ export function TitleCell({ requirement }: TitleCellProps) {
     width: `${width}px`,
     minWidth: `${width}px`,
     maxWidth: `${width}px`,
-    left: `${COLUMN_WIDTHS.INDEX + COLUMN_WIDTHS.ID}px`,
+    left: `${COLUMN_WIDTHS.INDEX}px`,
     backgroundColor: 'var(--background)',
     boxShadow: '2px 0 4px -2px rgba(0,0,0,0.15)'
   };
@@ -182,7 +182,7 @@ export function PriorityCell({ requirement, onUpdate }: PriorityCellProps) {
             {priorityConfig?.label || '-'}
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="center" className="w-20">
+        <DropdownMenuContent align="center" className="w-20 z-[150]">
           {priorityOrder.map(key => {
             const config = PRIORITY_CONFIG[key as keyof typeof PRIORITY_CONFIG];
             return (
@@ -236,7 +236,7 @@ export function VersionCell({ requirement, versionOptions, onUpdate }: VersionCe
             {currentVersion}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-32">
+        <DropdownMenuContent align="start" className="w-32 z-[150]">
           {versionOptions.map(version => (
             <DropdownMenuItem
               key={version}
@@ -250,6 +250,32 @@ export function VersionCell({ requirement, versionOptions, onUpdate }: VersionCe
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+    </td>
+  );
+}
+
+/**
+ * 评审人单元格组件
+ */
+interface ReviewerCellProps {
+  requirement: Requirement;
+  level: number;
+}
+
+export function ReviewerCell({ requirement, level }: ReviewerCellProps) {
+  const width = COLUMN_WIDTHS.REVIEWER;
+  const baseStyle = { width: `${width}px`, minWidth: `${width}px`, maxWidth: `${width}px` };
+  
+  const reviewLevel = requirement.scheduledReview?.reviewLevels?.find(r => r.level === level);
+  const reviewer = reviewLevel?.reviewer;
+  
+  return (
+    <td className="p-2 align-middle border-r text-center" style={baseStyle}>
+      {reviewer ? (
+        <UserAvatar user={reviewer} size="sm" showName={true} />
+      ) : (
+        <span className="text-xs text-muted-foreground">-</span>
+      )}
     </td>
   );
 }
@@ -294,7 +320,7 @@ export function ReviewStatusCell({ requirement, level, onUpdate }: ReviewStatusC
             {statusConfig?.label || '待评审'}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-28">
+        <DropdownMenuContent align="start" className="w-28 z-[150]">
           {statusOptions.map(option => (
             <DropdownMenuItem
               key={option.value}
@@ -387,7 +413,7 @@ export function IsOperationalCell({ requirement, onUpdate }: IsOperationalCellPr
             {operationalConfig?.label || '未填写'}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-24">
+        <DropdownMenuContent align="start" className="w-24 z-[150]">
           {operationalOptions.map(option => (
             <DropdownMenuItem
               key={option.value}

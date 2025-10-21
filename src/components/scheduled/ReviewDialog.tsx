@@ -6,7 +6,7 @@
  * @module ReviewDialog
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -31,8 +31,12 @@ interface ReviewDialogProps {
   requirement: Requirement | null;
   /** 评审级别 */
   level: number;
-  /** 保存评审意见 */
-  onSaveReview: (requirementId: string, level: number, opinion: string) => void;
+  /** 提交评审（包含通过/不通过状态） */
+  onSubmitReview: (status: 'approved' | 'rejected') => void;
+  /** 评审意见（受控） */
+  opinion: string;
+  /** 设置评审意见 */
+  onOpinionChange: (opinion: string) => void;
 }
 
 /**
@@ -43,22 +47,13 @@ export function ReviewDialog({
   onClose,
   requirement,
   level,
-  onSaveReview,
+  onSubmitReview,
+  opinion,
+  onOpinionChange,
 }: ReviewDialogProps) {
-  const [opinion, setOpinion] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 当对话框打开时，加载现有的评审意见
-  useEffect(() => {
-    if (open && requirement) {
-      const reviewLevel = requirement.scheduledReview?.reviewLevels?.find(r => r.level === level);
-      setOpinion(reviewLevel?.opinion || '');
-    } else {
-      setOpinion('');
-    }
-  }, [open, requirement, level]);
-
-  const handleSave = async () => {
+  const handleSubmit = async (status: 'approved' | 'rejected') => {
     if (!requirement) return;
 
     // 验证评审意见
@@ -69,10 +64,9 @@ export function ReviewDialog({
 
     setIsSubmitting(true);
     try {
-      await onSaveReview(requirement.id, level, opinion);
-      onClose();
+      await onSubmitReview(status);
     } catch (error) {
-      console.error('保存评审意见失败:', error);
+      console.error('评审提交失败:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -104,7 +98,7 @@ export function ReviewDialog({
               id="opinion"
               placeholder={`请输入${level === 1 ? '一级' : '二级'}评审意见...`}
               value={opinion}
-              onChange={(e) => setOpinion(e.target.value)}
+              onChange={(e) => onOpinionChange(e.target.value)}
               className="min-h-[120px]"
               maxLength={1000}
             />
@@ -122,10 +116,17 @@ export function ReviewDialog({
               取消
             </Button>
             <Button
-              onClick={handleSave}
+              variant="destructive"
+              onClick={() => handleSubmit('rejected')}
               disabled={isSubmitting}
             >
-              {isSubmitting ? '保存中...' : '保存'}
+              {isSubmitting ? '提交中...' : '不通过'}
+            </Button>
+            <Button
+              onClick={() => handleSubmit('approved')}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? '提交中...' : '通过'}
             </Button>
           </div>
         </div>

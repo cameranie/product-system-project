@@ -135,14 +135,28 @@ export default function RequirementsPage() {
     }
     
     try {
-      // 如果验证通过的值为 undefined，说明是取消选择
-      updateRequirement(requirementId, { priority: validationResult.value });
+      // 获取当前需求，同步更新 endOwnerOpinion.priority
+      const requirement = requirements.find(req => req.id === requirementId);
+      const updates: Partial<Requirement> = {
+        priority: validationResult.value,
+      };
+      
+      // 如果有 endOwnerOpinion，也同步更新其中的 priority
+      if (requirement?.endOwnerOpinion) {
+        updates.endOwnerOpinion = {
+          ...requirement.endOwnerOpinion,
+          priority: validationResult.value,
+        };
+      }
+      
+      updateRequirement(requirementId, updates);
+      console.log('✅ 优先级已同步（列表→详情）:', validationResult.value);
     } catch (error: unknown) {
       console.error('更新失败:', error);
       const errorMessage = error instanceof Error ? error.message : '更新失败，请重试';
       toast.error(errorMessage);
     }
-  }, [updateRequirement]);
+  }, [updateRequirement, requirements]);
 
   /**
    * 批量操作 - 批量更新"是否要做"字段

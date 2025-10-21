@@ -6,23 +6,11 @@
  * @module ScheduledVersionGroup
  */
 
-import { useState } from 'react';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Requirement } from '@/lib/requirements-store';
-import { COLUMN_WIDTHS } from '@/config/limits';
+import { cn } from '@/lib/utils';
 import {
   IndexCell,
   IdCell,
@@ -30,6 +18,7 @@ import {
   TypeCell,
   PriorityCell,
   VersionCell,
+  ReviewerCell,
   ReviewStatusCell,
   ReviewOpinionCell,
   IsOperationalCell,
@@ -59,10 +48,16 @@ interface ScheduledVersionGroupProps {
   onSelectAll: (checked: boolean) => void;
   /** 已选择的需求ID列表 */
   selectedRequirements: string[];
+  /** 隐藏的列 */
+  hiddenColumns?: string[];
+  /** 可见列数量 */
+  visibleColumnCount: number;
 }
 
 /**
  * 版本分组组件
+ * 现在只渲染版本标题行和数据行，不包含表头
+ * 支持批量选择模式（类似需求池）
  */
 export function ScheduledVersionGroup({
   version,
@@ -75,147 +70,179 @@ export function ScheduledVersionGroup({
   onSelectRequirement,
   onSelectAll,
   selectedRequirements,
+  hiddenColumns = [],
+  visibleColumnCount,
 }: ScheduledVersionGroupProps) {
-  const [isSelectAllChecked, setIsSelectAllChecked] = useState(false);
-  
   // 计算该版本下已选择的需求数量
   const selectedCount = requirements.filter(req => selectedRequirements.includes(req.id)).length;
   const isAllSelected = selectedCount === requirements.length && requirements.length > 0;
   const isIndeterminate = selectedCount > 0 && selectedCount < requirements.length;
+  
+  // 批量选择模式状态 - 基于选择状态计算，而非独立状态
+  const batchMode = selectedCount > 0;
 
-  const handleSelectAll = (checked: boolean) => {
-    setIsSelectAllChecked(checked);
+  // 检查列是否可见
+  const isColumnVisible = (columnId: string) => !hiddenColumns.includes(columnId);
+
+  // 处理版本级别的全选复选框
+  const handleVersionCheckbox = (checked: boolean) => {
     onSelectAll(checked);
   };
 
   return (
-    <Collapsible open={isExpanded} onOpenChange={onToggleExpanded}>
-      <CollapsibleTrigger asChild>
-        <div className="flex items-center justify-between p-3 bg-muted/50 hover:bg-muted/70 cursor-pointer border-b">
-          <div className="flex items-center gap-3">
+    <>
+      {/* 版本标题行 */}
+      <tr className="bg-muted/50 hover:bg-muted/70 border-t-2 border-b">
+        {/* 第一列：复选框 - 横向固定在左侧 */}
+        <td 
+          className="px-2 py-3 border-r sticky z-20 bg-muted/50"
+          style={{
+            width: '80px',
+            minWidth: '80px',
+            maxWidth: '80px',
+            left: '0px',
+            boxShadow: '2px 0 4px -2px rgba(0,0,0,0.15)'
+          }}
+        >
+          <div 
+            className="flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Checkbox
+              checked={isAllSelected ? true : isIndeterminate ? 'indeterminate' : false}
+              onCheckedChange={handleVersionCheckbox}
+              title={isAllSelected ? '取消选择该版本' : '选择该版本所有需求'}
+            />
+          </div>
+        </td>
+        
+        {/* 第二列：版本信息 - 横向固定 */}
+        <td 
+          className="p-0 border-r sticky z-20 bg-muted/50 cursor-pointer"
+          style={{
+            width: '256px',
+            minWidth: '256px',
+            maxWidth: '256px',
+            left: '80px',
+            boxShadow: '2px 0 4px -2px rgba(0,0,0,0.15)'
+          }}
+          onClick={onToggleExpanded}
+        >
+          <div className="flex items-center gap-3 p-3">
             {isExpanded ? (
-              <ChevronDown className="h-4 w-4" />
+              <ChevronDown className="h-4 w-4 flex-shrink-0" />
             ) : (
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-4 w-4 flex-shrink-0" />
             )}
-            <h3 className="text-base font-bold text-slate-700 flex items-center">
-              {version}
-              <span className="mx-2 text-slate-400 font-normal">•</span>
-              <span className="text-sm font-normal text-slate-500">
-                {requirements.length}个需求
+            <div className="flex-1 min-w-0 flex items-center gap-2">
+              <h3 className="text-base font-bold text-slate-700 truncate">
+                {version}
+              </h3>
+              <span className="text-sm text-slate-500 flex-shrink-0">
+                ({requirements.length}个需求)
               </span>
-            </h3>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {selectedCount > 0 && (
-              <Badge variant="outline" className="text-xs">
-                已选择 {selectedCount}
-              </Badge>
-            )}
-          </div>
-        </div>
-      </CollapsibleTrigger>
-      
-      <CollapsibleContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="sticky z-30 top-0 bg-background border-r p-2 text-center">
-                  <input
-                    type="checkbox"
-                    checked={isAllSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = isIndeterminate;
-                    }}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                    className="rounded"
-                  />
-                </TableHead>
-                <TableHead className="sticky z-30 top-0 bg-background border-r p-2 text-center font-mono text-sm">
-                  ID
-                </TableHead>
-                <TableHead className="sticky z-30 top-0 bg-background border-r p-2 text-center">
-                  标题
-                </TableHead>
-                <TableHead className="sticky z-30 top-0 bg-background border-r p-2 text-center">
-                  类型
-                </TableHead>
-                <TableHead className="sticky z-30 top-0 bg-background border-r p-2 text-center">
-                  优先级
-                </TableHead>
-                <TableHead className="sticky z-30 top-0 bg-background border-r p-2 text-center">
-                  版本号
-                </TableHead>
-                <TableHead className="sticky z-30 top-0 bg-background border-r p-2 text-center">
-                  一级评审
-                </TableHead>
-                <TableHead className="sticky z-30 top-0 bg-background border-r p-2 text-center">
-                  一级意见
-                </TableHead>
-                <TableHead className="sticky z-30 top-0 bg-background border-r p-2 text-center">
-                  二级评审
-                </TableHead>
-                <TableHead className="sticky z-30 top-0 bg-background border-r p-2 text-center">
-                  二级意见
-                </TableHead>
-                <TableHead className="sticky z-30 top-0 bg-background border-r p-2 text-center">
-                  是否运营
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {requirements.map((requirement, index) => (
-                <TableRow key={requirement.id} className="hover:bg-muted/50">
-                  <IndexCell
-                    index={index}
-                    isSelectable={true}
-                    isSelected={selectedRequirements.includes(requirement.id)}
-                    onSelect={(checked) => onSelectRequirement(requirement.id, checked)}
-                  />
-                  <IdCell requirement={requirement} />
-                  <TitleCell requirement={requirement} />
-                  <TypeCell requirement={requirement} />
-                  <PriorityCell
-                    requirement={requirement}
-                    onUpdate={onUpdateRequirement}
-                  />
-                  <VersionCell
-                    requirement={requirement}
-                    versionOptions={versionOptions}
-                    onUpdate={onUpdateRequirement}
-                  />
-                  <ReviewStatusCell
-                    requirement={requirement}
-                    level={1}
-                    onUpdate={onUpdateRequirement}
-                  />
-                  <ReviewOpinionCell
-                    requirement={requirement}
-                    level={1}
-                    onOpenReviewDialog={onOpenReviewDialog}
-                  />
-                  <ReviewStatusCell
-                    requirement={requirement}
-                    level={2}
-                    onUpdate={onUpdateRequirement}
-                  />
-                  <ReviewOpinionCell
-                    requirement={requirement}
-                    level={2}
-                    onOpenReviewDialog={onOpenReviewDialog}
-                  />
-                  <IsOperationalCell
-                    requirement={requirement}
-                    onUpdate={onUpdateRequirement}
-                  />
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+        </td>
+        
+        {/* 剩余列：占位 */}
+        <td 
+          colSpan={visibleColumnCount} 
+          className="p-0 bg-muted/50"
+        >
+          {/* 占位空间 */}
+        </td>
+      </tr>
+
+      {/* 数据行 - 只在展开时显示 */}
+      {isExpanded && requirements.map((requirement, index) => (
+        <tr key={requirement.id} className="hover:bg-muted/50 border-b transition-colors">
+          <IndexCell
+            index={index}
+            isSelectable={batchMode}
+            isSelected={selectedRequirements.includes(requirement.id)}
+            onSelect={(checked) => onSelectRequirement(requirement.id, checked)}
+          />
+          <TitleCell requirement={requirement} />
+          {isColumnVisible('id') && <IdCell requirement={requirement} />}
+          {isColumnVisible('type') && <TypeCell requirement={requirement} />}
+          {isColumnVisible('priority') && (
+            <PriorityCell
+              requirement={requirement}
+              onUpdate={onUpdateRequirement}
+            />
+          )}
+          {isColumnVisible('version') && (
+            <VersionCell
+              requirement={requirement}
+              versionOptions={versionOptions}
+              onUpdate={onUpdateRequirement}
+            />
+          )}
+          {isColumnVisible('level1Reviewer') && (
+            <ReviewerCell
+              requirement={requirement}
+              level={1}
+            />
+          )}
+          {isColumnVisible('level1Status') && (
+            <ReviewStatusCell
+              requirement={requirement}
+              level={1}
+              onUpdate={onUpdateRequirement}
+            />
+          )}
+          {isColumnVisible('level1Opinion') && (
+            <ReviewOpinionCell
+              requirement={requirement}
+              level={1}
+              onOpenReviewDialog={onOpenReviewDialog}
+            />
+          )}
+          {isColumnVisible('level2Reviewer') && (
+            <ReviewerCell
+              requirement={requirement}
+              level={2}
+            />
+          )}
+          {isColumnVisible('level2Status') && (
+            <ReviewStatusCell
+              requirement={requirement}
+              level={2}
+              onUpdate={onUpdateRequirement}
+            />
+          )}
+          {isColumnVisible('level2Opinion') && (
+            <ReviewOpinionCell
+              requirement={requirement}
+              level={2}
+              onOpenReviewDialog={onOpenReviewDialog}
+            />
+          )}
+          {isColumnVisible('isOperational') && (
+            <IsOperationalCell
+              requirement={requirement}
+              onUpdate={onUpdateRequirement}
+            />
+          )}
+          {isColumnVisible('creator') && (
+            <td className="p-2 text-sm text-center border-r">
+              {requirement.creator?.name || '-'}
+            </td>
+          )}
+          {isColumnVisible('createdAt') && (
+            <td className="p-2 text-sm text-center border-r">
+              {requirement.createdAt ? new Date(requirement.createdAt).toLocaleDateString('zh-CN') : '-'}
+            </td>
+          )}
+          {isColumnVisible('updatedAt') && (
+            <td className="p-2 text-sm text-center border-r">
+              {requirement.updatedAt ? new Date(requirement.updatedAt).toLocaleDateString('zh-CN') : '-'}
+            </td>
+          )}
+        </tr>
+      ))}
+    </>
   );
 }
 

@@ -103,9 +103,9 @@ export function useScheduledFilters({
     loadConfig('custom-filters', [], arrayValidator(filterValidator.validate))
   );
 
-  // 排序状态
+  // 排序状态（默认按创建时间降序）
   const [sortConfig, setSortConfig] = useState<SortConfig>({
-    field: 'updatedAt',
+    field: 'createdAt',
     direction: 'desc',
   });
 
